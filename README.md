@@ -89,6 +89,7 @@ INFOdns/
 │       ├── serialNumber.ts     ← YYYYMMDDnn serial inside a DB transaction
 │       ├── bulkExecutor.ts     ← processes approved bulk jobs in batches
 │       ├── broadcast.ts        ← fire-and-forget POST to /internal/broadcast
+│       ├── mailer.ts           ← nodemailer SMTP client, job success/failure emails
 │       └── db.ts               ← mysql2 pool helpers
 ├── web/                        ← React + Vite SPA
 │   ├── nginx.conf              ← SPA fallback + /api/ proxy + WS upgrade
@@ -104,7 +105,7 @@ INFOdns/
 │           ├── LoginPage.tsx
 │           ├── DomainsPage.tsx
 │           ├── DomainDetailPage.tsx  ← inline record editing, apply via bulk job
-│           ├── BulkJobsPage.tsx
+│           ├── JobsPage.tsx          ← bulk job list + new bulk job wizard
 │           ├── CustomersPage.tsx
 │           ├── UsersPage.tsx
 │           └── AuditLogPage.tsx
@@ -379,3 +380,9 @@ docker compose logs -f worker
 | `PUBLIC_API_URL` | web | Full URL the browser uses to reach the API |
 | `API_INTERNAL_URL` | worker | Internal Docker URL for the API (`http://api:3000`) |
 | `NAMED_CHECKZONE_BIN` | worker | Override path to `named-checkzone` binary |
+| `SMTP_HOST` | worker | SMTP server hostname for job notifications |
+| `SMTP_PORT` | worker | SMTP port (587 for STARTTLS, 465 for SSL) |
+| `SMTP_USER` | worker | SMTP username |
+| `SMTP_PASS` | worker | SMTP password |
+| `SMTP_FROM` | worker | From address for outgoing emails |
+| `MAIL_ADMIN_TO` | worker | Recipient for job success/failure notifications |
