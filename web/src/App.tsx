@@ -6,7 +6,6 @@ import Layout from './components/Layout'
 import LoginPage from './pages/LoginPage'
 import DomainsPage from './pages/DomainsPage'
 import DomainDetailPage from './pages/DomainDetailPage'
-import BulkJobsPage from './pages/BulkJobsPage'
 import JobsPage from './pages/JobsPage'
 import CustomersPage from './pages/CustomersPage'
 import UsersPage from './pages/UsersPage'
@@ -44,7 +43,6 @@ export default function App() {
               <Route index element={<Navigate to="/domains" replace />} />
               <Route path="domains" element={<DomainsPage />} />
               <Route path="domains/:id" element={<DomainDetailPage />} />
-              <Route path="bulk-jobs" element={<BulkJobsPage />} />
               <Route path="jobs" element={<JobsPage />} />
               <Route path="customers" element={<CustomersPage />} />
               <Route path="users" element={<UsersPage />} />

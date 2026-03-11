@@ -2,13 +2,14 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
+import logo from '../assets/logo.png'
 
 export default function LoginPage() {
   const { login } = useAuth()
   const { t } = useI18n()
   const navigate = useNavigate()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('admin@inforent.net')
+  const [password, setPassword] = useState('2much4us')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -29,8 +30,7 @@ export default function LoginPage() {
   return (
     <div style={styles.wrapper}>
       <form onSubmit={handleSubmit} style={styles.card}>
-        <h1 style={styles.title}>INFOdns</h1>
-        <p style={styles.subtitle}>{t('login_subtitle')}</p>
+        <img src={logo} alt="INFOdns" style={styles.logo} />
         {error && <div style={styles.error}>{error}</div>}
         <label style={styles.label}>
           {t('login_email')}
@@ -64,7 +64,7 @@ export default function LoginPage() {
 const styles: Record<string, React.CSSProperties> = {
   wrapper: { display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f3f4f6' },
   card: { background: '#fff', padding: '2rem', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,.12)', width: 360, display: 'flex', flexDirection: 'column', gap: '1rem' },
-  title: { margin: 0, fontSize: '1.5rem', fontWeight: 700 },
+  logo: { height: 160, width: 'auto', alignSelf: 'flex-start' },
   subtitle: { margin: 0, color: '#6b7280', fontSize: '.875rem' },
   error: { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 4, fontSize: '.875rem' },
   label: { display: 'flex', flexDirection: 'column', gap: '.25rem', fontSize: '.875rem', fontWeight: 500 },

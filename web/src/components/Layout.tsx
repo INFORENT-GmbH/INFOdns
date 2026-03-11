@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useWs } from '../hooks/useWs'
 import { useI18n } from '../i18n/I18nContext'
+import logo from '../assets/logo.png'
 
 export default function Layout() {
   const { user, accessToken, logout } = useAuth()
@@ -19,10 +20,9 @@ export default function Layout() {
   return (
     <div style={styles.shell}>
       <nav style={styles.nav}>
-        <span style={styles.brand}>INFOdns</span>
+        <img src={logo} alt="INFOdns" style={styles.brand} />
         <div style={styles.links}>
           <NavLink to="/domains" style={navStyle}>{t('nav_domains')}</NavLink>
-          <NavLink to="/bulk-jobs" style={navStyle}>{t('nav_bulkJobs')}</NavLink>
           <NavLink to="/jobs" style={navStyle}>{t('nav_jobs')}</NavLink>
           {isAdminOrOp && <NavLink to="/customers" style={navStyle}>{t('nav_customers')}</NavLink>}
           {user?.role === 'admin' && <NavLink to="/users" style={navStyle}>{t('nav_users')}</NavLink>}
@@ -64,7 +64,7 @@ function navStyle({ isActive }: { isActive: boolean }): React.CSSProperties {
 const styles: Record<string, React.CSSProperties> = {
   shell:     { display: 'flex', flexDirection: 'column', minHeight: '100vh', fontFamily: 'system-ui,sans-serif' },
   nav:       { display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '.75rem 1.5rem', background: '#fff', borderBottom: '1px solid #e5e7eb' },
-  brand:     { fontWeight: 700, fontSize: '1.125rem', marginRight: 'auto' },
+  brand:     { height: 32, marginRight: 'auto', display: 'block' },
   links:     { display: 'flex', gap: '1.25rem' },
   right:     { display: 'flex', gap: '.5rem', alignItems: 'center' },
   langBtn:   { background: 'none', border: '1px solid #d1d5db', borderRadius: 4, padding: '.25rem .6rem', cursor: 'pointer', fontSize: '.8rem' },

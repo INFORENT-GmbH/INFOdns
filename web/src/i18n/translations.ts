@@ -76,6 +76,7 @@ export const translations = {
     domainDetail_noRecords:        'No records yet',
     domainDetail_revert:           'Revert',
     domainDetail_restore:          'Restore',
+    domainDetail_bulkEditBtn:      (n: number) => `${n} domain${n === 1 ? '' : 's'} — bulk edit`,
 
     // Bulk jobs
     bulk_title:             'Bulk Jobs',
@@ -273,6 +274,7 @@ export const translations = {
     domainDetail_noRecords:        'Noch keine Einträge',
     domainDetail_revert:           'Zurücksetzen',
     domainDetail_restore:          'Wiederherstellen',
+    domainDetail_bulkEditBtn:      (n: number) => `${n} Domain${n === 1 ? '' : 's'} — Massenbearbeitung`,
 
     // Bulk jobs
     bulk_title:             'Massenaufgaben',

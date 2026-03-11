@@ -56,3 +56,10 @@ t('confirm_delete', itemName)
 - The backend (Fastify API) is in `api/`, the zone worker is in `worker/`, and the frontend is in `web/`.
 - DNS record validation lives in `api/src/records/validators.ts` — update it when adding new record types.
 - Zone rendering logic lives in `worker/src/renderZone.ts` — it is a pure function and must stay pure.
+
+## Git commits
+
+- Whenever you make changes, run `git commit` with a clear, concise message describing the change.
+- Use conventional commit format: `type(scope): description`
+   - Examples: `feat(i18n): add German translations for bulk editor`, `fix(worker): prevent race in zone render`, `docs(readme): update API endpoints`
+- Commit early and often — don't batch unrelated changes together.

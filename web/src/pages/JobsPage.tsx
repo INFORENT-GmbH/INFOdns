@@ -1,7 +1,29 @@
-import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { getBulkJobs, getBulkJobDomains, type BulkJob, type BulkJobDomain } from '../api/client'
+import { useState, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
+import {
+  getBulkJobs, createBulkJob, previewBulkJob, approveBulkJob,
+  getBulkJob, getBulkJobDomains, searchByRecord, type BulkJob, type BulkJobDomain,
+} from '../api/client'
 import { useI18n } from '../i18n/I18nContext'
+
+// ── Types ─────────────────────────────────────────────────────
+
+interface SearchResult {
+  id: number
+  fqdn: string
+  customer_id: number
+  customer_name: string
+  record_id: number
+  record_name: string
+  record_type: string
+  ttl: number
+  priority: number | null
+  value: string
+}
+
+type Operation = 'add' | 'replace' | 'delete' | 'change_ttl'
+type Step = 'search' | 'preview' | 'done'
 
 // ── Status badge ──────────────────────────────────────────────
 
@@ -24,6 +46,129 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
+// ── Payload form per operation ────────────────────────────────
+
+interface PayloadFormProps {
+  operation: Operation
+  matchType: string
+  matchName: string
+  matchValue: string
+  onChange: (payload: Record<string, unknown>) => void
+}
+
+function PayloadForm({ operation, matchType, matchName, matchValue, onChange }: PayloadFormProps) {
+  const { t } = useI18n()
+  const [newName, setNewName]         = useState(matchName)
+  const [newType, setNewType]         = useState(matchType)
+  const [newValue, setNewValue]       = useState('')
+  const [newTtl, setNewTtl]           = useState('3600')
+  const [newPriority, setNewPriority] = useState('')
+  const [filterName, setFilterName]   = useState(matchName)
+
+  const RECORD_TYPES = ['A','AAAA','CNAME','MX','NS','TXT','SRV','CAA','PTR','NAPTR','TLSA','SSHFP','DS']
+
+  useEffect(() => { emit() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function emit(overrides: Record<string, unknown> = {}) {
+    const effectiveFilterName = (overrides._filterName as string | undefined) ?? filterName
+    const match = {
+      ...(effectiveFilterName ? { name: effectiveFilterName } : {}),
+      ...(matchType  ? { type: matchType }  : {}),
+      ...(matchValue ? { value: matchValue } : {}),
+    }
+
+    if (operation === 'delete') {
+      onChange({ ...overrides, match })
+      return
+    }
+    if (operation === 'change_ttl') {
+      onChange({ ...overrides, match, new_ttl: Number(overrides.new_ttl ?? newTtl) })
+      return
+    }
+    const rec: Record<string, unknown> = {
+      name: overrides.name ?? newName,
+      type: overrides.type ?? newType,
+      value: overrides.value ?? newValue,
+      ttl: Number(overrides.ttl ?? newTtl) || null,
+      priority: (overrides.priority !== undefined ? overrides.priority : newPriority)
+        ? Number(overrides.priority ?? newPriority) : null,
+    }
+    if (operation === 'add')     onChange({ records: [rec] })
+    if (operation === 'replace') onChange({ match, replace_with: rec })
+  }
+
+  const showMatchFilter = operation === 'replace' || operation === 'delete' || operation === 'change_ttl'
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+      {showMatchFilter && (
+        <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 4, padding: '.5rem .75rem', fontSize: '.8125rem' }}>
+          <strong>{t('bulk_matching')}</strong> {matchType} {t('bulk_records')}
+          {matchValue && <> {t('bulk_withValueContaining')} <code style={{ background: '#e5e7eb', padding: '1px 4px', borderRadius: 2 }}>{matchValue}</code></>}
+          {' '}{t('bulk_whereName')}
+          <input
+            value={filterName}
+            onChange={e => { setFilterName(e.target.value); emit({ _filterName: e.target.value }) }}
+            style={{ marginLeft: '.4rem', padding: '1px 6px', border: '1px solid #d1d5db', borderRadius: 3, fontSize: '.8125rem', width: 80 }}
+            placeholder={t('bulk_anyName')}
+          />
+          <span style={{ color: '#9ca3af', marginLeft: '.4rem' }}>{t('bulk_leaveBlank')}</span>
+        </div>
+      )}
+
+      {operation === 'change_ttl' && (
+        <label style={styles.label}>
+          {t('bulk_newTtlSeconds')}
+          <input
+            type="number" value={newTtl}
+            onChange={e => { setNewTtl(e.target.value); emit({ new_ttl: Number(e.target.value) }) }}
+            style={styles.input}
+          />
+        </label>
+      )}
+
+      {(operation === 'add' || operation === 'replace') && (
+        <>
+          <label style={styles.label}>
+            {t('name')}
+            <input value={newName}
+              onChange={e => { setNewName(e.target.value); emit({ name: e.target.value }) }}
+              style={styles.input} placeholder={t('bulk_namePh')} />
+          </label>
+          <label style={styles.label}>
+            {t('type')}
+            <select value={newType}
+              onChange={e => { setNewType(e.target.value); emit({ type: e.target.value }) }}
+              style={styles.input}>
+              {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
+            </select>
+          </label>
+          <label style={styles.label}>
+            {t('value')}
+            <input value={newValue}
+              onChange={e => { setNewValue(e.target.value); emit({ value: e.target.value }) }}
+              style={styles.input} placeholder={t('bulk_valuePh')} />
+          </label>
+          <label style={styles.label}>
+            {t('bulk_ttlSeconds')}
+            <input type="number" value={newTtl}
+              onChange={e => { setNewTtl(e.target.value); emit({ ttl: Number(e.target.value) }) }}
+              style={styles.input} />
+          </label>
+          {(newType === 'MX' || newType === 'SRV') && (
+            <label style={styles.label}>
+              {t('priority')}
+              <input type="number" value={newPriority}
+                onChange={e => { setNewPriority(e.target.value); emit({ priority: Number(e.target.value) }) }}
+                style={styles.input} placeholder="10" />
+            </label>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── Job detail panel ──────────────────────────────────────────
 
 function JobDetail({ job }: { job: BulkJob }) {
@@ -41,42 +186,40 @@ function JobDetail({ job }: { job: BulkJob }) {
 
   return (
     <div style={styles.detailPanel}>
-      {/* Preview summary boxes */}
       {preview?.summary && (
         <div style={{ marginBottom: '1rem' }}>
-          <div style={styles.sectionLabel}>{t('jobs_previewSummary')}</div>
-          <div style={styles.summaryRow}>
-            <div style={styles.summaryBox}>
-              <div style={styles.summaryNum}>{preview.summary.domains_affected ?? 0}</div>
-              <div style={styles.summaryLbl}>{t('jobs_domains')}</div>
+          <div style={styles.detailLabel}>{t('jobs_previewSummary')}</div>
+          <div style={styles.detailSummaryRow}>
+            <div style={styles.detailSummaryBox}>
+              <div style={styles.detailSummaryNum}>{preview.summary.domains_affected ?? 0}</div>
+              <div style={styles.detailSummaryLbl}>{t('bulk_domainsLabel')}</div>
             </div>
-            <div style={styles.summaryBox}>
-              <div style={styles.summaryNum}>{preview.summary.records_added ?? 0}</div>
-              <div style={styles.summaryLbl}>{t('jobs_recordsAdded')}</div>
+            <div style={styles.detailSummaryBox}>
+              <div style={styles.detailSummaryNum}>{preview.summary.records_added ?? 0}</div>
+              <div style={styles.detailSummaryLbl}>{t('jobs_recordsAdded')}</div>
             </div>
-            <div style={styles.summaryBox}>
-              <div style={{ ...styles.summaryNum, color: (preview.summary.records_deleted ?? 0) > 0 ? '#dc2626' : '#111' }}>
+            <div style={styles.detailSummaryBox}>
+              <div style={{ ...styles.detailSummaryNum, color: (preview.summary.records_deleted ?? 0) > 0 ? '#dc2626' : '#111' }}>
                 {preview.summary.records_deleted ?? 0}
               </div>
-              <div style={styles.summaryLbl}>{t('jobs_recordsDeleted')}</div>
+              <div style={styles.detailSummaryLbl}>{t('jobs_recordsDeleted')}</div>
             </div>
-            <div style={styles.summaryBox}>
-              <div style={styles.summaryNum}>{preview.summary.records_updated ?? 0}</div>
-              <div style={styles.summaryLbl}>{t('jobs_ttlChanges')}</div>
+            <div style={styles.detailSummaryBox}>
+              <div style={styles.detailSummaryNum}>{preview.summary.records_updated ?? 0}</div>
+              <div style={styles.detailSummaryLbl}>{t('jobs_ttlChanges')}</div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Per-domain status */}
-      {domains.length > 0 && (
+      {(domains as BulkJobDomain[]).length > 0 && (
         <div>
-          <div style={styles.sectionLabel}>{t('jobs_perDomainStatus')}</div>
+          <div style={styles.detailLabel}>{t('jobs_perDomainStatus')}</div>
           <div style={{ border: '1px solid #e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.8125rem' }}>
               <thead>
                 <tr style={{ background: '#f9fafb' }}>
-                  <th style={styles.th}>Domain</th>
+                  <th style={styles.th}>{t('domain')}</th>
                   <th style={styles.th}>{t('jobs_status')}</th>
                   <th style={styles.th}>{t('jobs_changes')}</th>
                   <th style={styles.th}>{t('jobs_error')}</th>
@@ -84,18 +227,13 @@ function JobDetail({ job }: { job: BulkJob }) {
               </thead>
               <tbody>
                 {(domains as BulkJobDomain[]).map(d => {
-                  // find per-domain preview changes
                   const pd = preview?.per_domain?.find((p: any) => p.domain_id === d.domain_id)
                   return (
                     <tr key={d.id} style={styles.tr}>
                       <td style={styles.td}>{d.fqdn}</td>
                       <td style={styles.td}><StatusBadge status={d.status} /></td>
                       <td style={styles.td}>
-                        {pd ? (
-                          <span style={{ color: '#6b7280' }}>
-                            {pd.changes.length} change{pd.changes.length !== 1 ? 's' : ''}
-                          </span>
-                        ) : '—'}
+                        {pd ? <span style={{ color: '#6b7280' }}>{pd.changes.length}</span> : '—'}
                       </td>
                       <td style={styles.td}>
                         {d.error
@@ -111,7 +249,6 @@ function JobDetail({ job }: { job: BulkJob }) {
         </div>
       )}
 
-      {/* Job-level error */}
       {job.error && (
         <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 4, fontSize: '.8125rem', fontFamily: 'monospace', marginTop: '.5rem' }}>
           {job.error}
@@ -125,8 +262,40 @@ function JobDetail({ job }: { job: BulkJob }) {
 
 export default function JobsPage() {
   const { t } = useI18n()
-  const [expanded, setExpanded] = useState<number | null>(null)
+  const qc = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [expanded, setExpanded]     = useState<number | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [showWizard, setShowWizard] = useState(false)
+  const [step, setStep]             = useState<Step>('search')
+
+  // Search state — seed from URL params when navigated from DomainDetailPage
+  const [searchType, setSearchType]   = useState(searchParams.get('type') || 'A')
+  const [searchName, setSearchName]   = useState(searchParams.get('name') || '')
+  const [searchValue, setSearchValue] = useState(searchParams.get('value') || '')
+  const [searchDomain, setSearchDomain] = useState('')
+
+  // Auto-open wizard if URL params were provided
+  useEffect(() => {
+    if (searchParams.get('type')) {
+      setShowWizard(true)
+      setSearchParams({}, { replace: true })  // clean URL without triggering re-render loop
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Selection + operation state
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [operation, setOperation]     = useState<Operation>('add')
+  const [payload, setPayload]         = useState<Record<string, unknown>>({})
+
+  // Job wizard state
+  const [currentJobId, setCurrentJobId] = useState<number | null>(null)
+  const [busy, setBusy]                 = useState(false)
+  const [wizardError, setWizardError]   = useState<string | null>(null)
+
+  const RECORD_TYPES = ['A','AAAA','CNAME','MX','NS','TXT','SRV','CAA','PTR','NAPTR','TLSA','SSHFP','DS']
+
+  // ── Queries ──────────────────────────────────────────────────
 
   const { data: jobs = [], isLoading } = useQuery<BulkJob[]>({
     queryKey: ['bulk-jobs'],
@@ -134,7 +303,109 @@ export default function JobsPage() {
     refetchInterval: autoRefresh ? 5000 : false,
   })
 
+  const { data: searchResults = [], isFetching: searching } = useQuery<SearchResult[]>({
+    queryKey: ['record-search', searchType, searchName, searchValue],
+    queryFn: () => searchByRecord({
+      type: searchType,
+      ...(searchName  ? { name: searchName }  : {}),
+      ...(searchValue ? { value: searchValue } : {}),
+    }).then(r => r.data),
+    enabled: showWizard,
+  })
+
+  const { data: currentJob } = useQuery({
+    queryKey: ['bulk-job', currentJobId],
+    queryFn: () => getBulkJob(currentJobId!).then(r => r.data),
+    enabled: currentJobId !== null && step === 'preview',
+    refetchInterval: currentJobId !== null && step === 'preview' ? 2000 : false,
+  })
+
+  const { data: jobDomains = [] } = useQuery({
+    queryKey: ['bulk-job-domains', currentJobId],
+    queryFn: () => getBulkJobDomains(currentJobId!).then(r => r.data),
+    enabled: currentJobId !== null && step === 'preview',
+  })
+
+  // ── Derived state ────────────────────────────────────────────
+
+  const domainMap = new Map<number, SearchResult>()
+  for (const r of searchResults) {
+    if (!domainMap.has(r.id)) domainMap.set(r.id, r)
+  }
+  const domains = Array.from(domainMap.values()).filter(d =>
+    !searchDomain || d.fqdn.includes(searchDomain.toLowerCase())
+  )
+
   const activeJobs = (jobs as BulkJob[]).filter(j => j.status === 'running' || j.status === 'previewing')
+
+  // ── Handlers ─────────────────────────────────────────────────
+
+  function toggleDomain(id: number) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function handlePreview() {
+    if (selectedIds.size === 0) { setWizardError(t('bulk_selectOneDomain')); return }
+    setBusy(true)
+    setWizardError(null)
+    try {
+      const res = await createBulkJob({
+        operation,
+        filter_json: { mode: 'explicit' as const, domain_ids: Array.from(selectedIds) },
+        payload_json: payload,
+      })
+      const jobId = res.data.id
+      setCurrentJobId(jobId)
+      await previewBulkJob(jobId)
+      qc.invalidateQueries({ queryKey: ['bulk-job', jobId] })
+      qc.invalidateQueries({ queryKey: ['bulk-job-domains', jobId] })
+      setStep('preview')
+    } catch (err: any) {
+      setWizardError(err.response?.data?.message ?? err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleApprove() {
+    if (!currentJobId) return
+    setBusy(true)
+    setWizardError(null)
+    try {
+      await approveBulkJob(currentJobId)
+      qc.invalidateQueries({ queryKey: ['bulk-jobs'] })
+      setStep('done')
+    } catch (err: any) {
+      setWizardError(err.response?.data?.message ?? err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function resetWizard() {
+    setShowWizard(false)
+    setStep('search')
+    setSearchType('A')
+    setSearchName('')
+    setSearchValue('')
+    setSearchDomain('')
+    setSelectedIds(new Set())
+    setOperation('add')
+    setPayload({})
+    setCurrentJobId(null)
+    setWizardError(null)
+  }
+
+  // ── Render ────────────────────────────────────────────────────
+
+  const previewData = currentJob?.preview_json
+    ? (typeof currentJob.preview_json === 'string' ? JSON.parse(currentJob.preview_json) : currentJob.preview_json)
+    : null
 
   return (
     <div>
@@ -142,9 +413,7 @@ export default function JobsPage() {
         <h2 style={styles.h2}>{t('jobs_title')}</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem' }}>
           {activeJobs.length > 0 && (
-            <span style={styles.activeBadge}>
-              {activeJobs.length} active
-            </span>
+            <span style={styles.activeBadge}>{activeJobs.length} active</span>
           )}
           <label style={styles.toggleLabel}>
             <input
@@ -155,9 +424,227 @@ export default function JobsPage() {
             />
             {t('jobs_autoRefresh')}
           </label>
+          <button onClick={() => setShowWizard(true)} style={styles.btnPrimary}>{t('bulk_newJob')}</button>
         </div>
       </div>
 
+      {/* ── Wizard ── */}
+      {showWizard && (
+        <div style={styles.wizardCard}>
+          <div style={styles.wizardTitle}>
+            <span style={{ fontWeight: 700 }}>
+              {step === 'search'  && t('bulk_findDomains')}
+              {step === 'preview' && t('bulk_previewChanges')}
+              {step === 'done'    && t('bulk_done')}
+            </span>
+            <button onClick={resetWizard} style={styles.closeBtn}>✕</button>
+          </div>
+
+          {wizardError && <div style={styles.errorBox}>{wizardError}</div>}
+
+          {/* Step 1: Search + select + configure */}
+          {step === 'search' && (
+            <>
+              <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                <label style={styles.label}>
+                  {t('type')}
+                  <select value={searchType} onChange={e => { setSearchType(e.target.value); setSelectedIds(new Set()) }} style={{ ...styles.input, width: 100 }}>
+                    {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
+                  </select>
+                </label>
+                <label style={styles.label}>
+                  {t('bulk_recordName')}
+                  <input value={searchName} onChange={e => setSearchName(e.target.value)}
+                    style={{ ...styles.input, width: 120 }} placeholder={t('bulk_recordNamePh')} />
+                </label>
+                <label style={styles.label}>
+                  {t('bulk_recordValueContains')}
+                  <input value={searchValue} onChange={e => setSearchValue(e.target.value)}
+                    style={{ ...styles.input, width: 160 }} placeholder="1.2.3.4" />
+                </label>
+                <label style={styles.label}>
+                  {t('bulk_domainContains')}
+                  <input value={searchDomain} onChange={e => setSearchDomain(e.target.value)}
+                    style={{ ...styles.input, width: 150 }} placeholder={t('bulk_domainContainsPh')} />
+                </label>
+              </div>
+
+              {searching && <p style={styles.muted}>{t('bulk_searching')}</p>}
+
+              {domains.length > 0 && (
+                <>
+                  <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+                    <span style={{ fontSize: '.875rem', color: '#6b7280' }}>
+                      {domains.length} {t('bulk_domainsFound')}
+                    </span>
+                    <button onClick={() => setSelectedIds(new Set(domains.map(d => d.id)))} style={styles.btnMini}>{t('bulk_selectAll')}</button>
+                    <button onClick={() => setSelectedIds(new Set())} style={styles.btnMini}>{t('bulk_selectNone')}</button>
+                    <span style={{ marginLeft: 'auto', fontSize: '.875rem', fontWeight: 600 }}>
+                      {selectedIds.size} {t('bulk_selected')}
+                    </span>
+                  </div>
+                  <div style={styles.domainList}>
+                    {domains.map(d => (
+                      <label key={d.id} style={styles.domainRow}>
+                        <input type="checkbox" checked={selectedIds.has(d.id)} onChange={() => toggleDomain(d.id)} />
+                        <span style={{ fontWeight: 500 }}>{d.fqdn}</span>
+                        <span style={{ color: '#6b7280', fontSize: '.8125rem' }}>{d.customer_name}</span>
+                        <span style={styles.recordPill}>
+                          {d.record_type} {d.record_name} {d.value}
+                          {d.priority != null ? ` (${d.priority})` : ''}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {searchResults.length === 0 && !searching && (
+                <p style={styles.muted}>{t('bulk_noMatchingRecords')}</p>
+              )}
+
+              {domains.length > 0 && (
+                <>
+                  <label style={styles.label}>
+                    {t('bulk_operation')}
+                    <select value={operation} onChange={e => setOperation(e.target.value as Operation)} style={styles.input}>
+                      <option value="add">{t('bulk_opAdd')}</option>
+                      <option value="replace">{t('bulk_opReplace')}</option>
+                      <option value="delete">{t('bulk_opDelete')}</option>
+                      <option value="change_ttl">{t('bulk_opChangeTtl')}</option>
+                    </select>
+                  </label>
+
+                  <PayloadForm
+                    operation={operation}
+                    matchType={searchType}
+                    matchName={searchName}
+                    matchValue={searchValue}
+                    onChange={setPayload}
+                  />
+                </>
+              )}
+
+              <div style={styles.actions}>
+                <button onClick={resetWizard} style={styles.btnSecondary}>{t('cancel')}</button>
+                <button
+                  onClick={handlePreview}
+                  disabled={busy || selectedIds.size === 0}
+                  style={styles.btnPrimary}
+                >
+                  {busy ? t('bulk_computingPreview') : `${t('bulk_previewBtn')} (${selectedIds.size} ${t('bulk_domainsFound')})`}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* Step 2: Preview + approve */}
+          {step === 'preview' && (
+            <>
+              {currentJob ? (
+                <>
+                  <div style={styles.summaryRow}>
+                    <div style={styles.summaryBox}>
+                      <div style={styles.summaryNum}>{previewData?.summary?.domains_affected ?? 0}</div>
+                      <div style={styles.summaryLbl}>{t('bulk_domainsLabel')}</div>
+                    </div>
+                    <div style={styles.summaryBox}>
+                      <div style={styles.summaryNum}>{previewData?.summary?.records_added ?? 0}</div>
+                      <div style={styles.summaryLbl}>{t('bulk_recordsAdded')}</div>
+                    </div>
+                    <div style={styles.summaryBox}>
+                      <div style={{ ...styles.summaryNum, color: previewData?.summary?.records_deleted > 0 ? '#dc2626' : '#111' }}>
+                        {previewData?.summary?.records_deleted ?? 0}
+                      </div>
+                      <div style={styles.summaryLbl}>{t('bulk_recordsDeleted')}</div>
+                    </div>
+                    <div style={styles.summaryBox}>
+                      <div style={styles.summaryNum}>{previewData?.summary?.records_updated ?? 0}</div>
+                      <div style={styles.summaryLbl}>{t('bulk_ttlChanges')}</div>
+                    </div>
+                  </div>
+
+                  {previewData?.per_domain?.length > 0 && (
+                    <div style={{ maxHeight: 280, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 4 }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.8125rem' }}>
+                        <thead>
+                          <tr style={{ background: '#f9fafb' }}>
+                            <th style={styles.th}>{t('domain')}</th>
+                            <th style={styles.th}>{t('changes')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {previewData.per_domain.map((pd: any) => (
+                            <tr key={pd.domain_id} style={styles.tr}>
+                              <td style={styles.td}>{pd.fqdn}</td>
+                              <td style={styles.td}>
+                                {pd.changes.map((ch: any, i: number) => (
+                                  <span key={i} style={{
+                                    ...styles.changePill,
+                                    background: ch.op === 'add' ? '#dcfce7' : ch.op === 'delete' ? '#fee2e2' : '#dbeafe',
+                                    color: ch.op === 'add' ? '#15803d' : ch.op === 'delete' ? '#b91c1c' : '#1e40af',
+                                  }}>
+                                    {ch.op}
+                                    {ch.record?.type ? ` ${ch.record.type} ${ch.record.name ?? ''} ${ch.record.value ?? ''}` : ''}
+                                  </span>
+                                ))}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {(jobDomains as any[]).some(d => d.status !== 'pending') && (
+                    <div style={{ maxHeight: 180, overflow: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.8125rem' }}>
+                        <thead>
+                          <tr style={{ background: '#f9fafb' }}>
+                            <th style={styles.th}>{t('domain')}</th>
+                            <th style={styles.th}>{t('status')}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(jobDomains as any[]).map((d: any) => (
+                            <tr key={d.id}>
+                              <td style={styles.td}>{d.fqdn}</td>
+                              <td style={styles.td}><StatusBadge status={d.status} /></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  <div style={styles.actions}>
+                    <button onClick={resetWizard} style={styles.btnSecondary}>{t('cancel')}</button>
+                    <button
+                      onClick={handleApprove}
+                      disabled={busy || currentJob.status !== 'approved'}
+                      style={styles.btnPrimary}
+                    >
+                      {busy ? t('bulk_approving') : t('bulk_approveExecute')}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p style={styles.muted}>{t('bulk_loadingPreview')}</p>
+              )}
+            </>
+          )}
+
+          {/* Step 3: Done */}
+          {step === 'done' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-start' }}>
+              <p style={{ margin: 0, color: '#15803d', fontWeight: 600 }}>{t('bulk_jobApproved')}</p>
+              <button onClick={resetWizard} style={styles.btnPrimary}>{t('bulk_done')}</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Jobs table ── */}
       {isLoading ? (
         <p style={styles.muted}>{t('loading')}</p>
       ) : (jobs as BulkJob[]).length === 0 ? (
@@ -232,7 +719,25 @@ const styles: Record<string, React.CSSProperties> = {
   h2:           { margin: 0, fontSize: '1.25rem', fontWeight: 700 },
   activeBadge:  { background: '#ede9fe', color: '#6d28d9', padding: '2px 10px', borderRadius: 12, fontSize: '.75rem', fontWeight: 600 },
   toggleLabel:  { display: 'flex', alignItems: 'center', fontSize: '.8125rem', color: '#6b7280', cursor: 'pointer' },
-  muted:        { color: '#9ca3af' },
+  muted:        { color: '#9ca3af', margin: 0 },
+  wizardCard:   { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '1.5rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: 760 },
+  wizardTitle:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  closeBtn:     { background: 'none', border: 'none', fontSize: '1rem', cursor: 'pointer', color: '#6b7280' },
+  errorBox:     { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 4, fontSize: '.875rem' },
+  label:        { display: 'flex', flexDirection: 'column', gap: '.25rem', fontSize: '.875rem', fontWeight: 500 },
+  input:        { padding: '.375rem .75rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem' },
+  actions:      { display: 'flex', gap: '.5rem', justifyContent: 'flex-end', paddingTop: '.5rem' },
+  btnPrimary:   { padding: '.375rem .875rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
+  btnSecondary: { padding: '.375rem .875rem', background: '#fff', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem', cursor: 'pointer' },
+  btnMini:      { padding: '.2rem .5rem', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
+  domainList:   { display: 'flex', flexDirection: 'column', gap: '.25rem', maxHeight: 300, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 4, padding: '.5rem' },
+  domainRow:    { display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.375rem .5rem', borderRadius: 4, cursor: 'pointer', fontSize: '.875rem', userSelect: 'none' },
+  recordPill:   { marginLeft: 'auto', background: '#f3f4f6', borderRadius: 4, padding: '2px 6px', fontSize: '.75rem', fontFamily: 'monospace' },
+  summaryRow:   { display: 'flex', gap: '1rem' },
+  summaryBox:   { flex: 1, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '.75rem', textAlign: 'center' as const },
+  summaryNum:   { fontSize: '1.5rem', fontWeight: 700 },
+  summaryLbl:   { fontSize: '.75rem', color: '#6b7280', marginTop: '.25rem' },
+  changePill:   { display: 'inline-block', padding: '1px 6px', borderRadius: 4, fontSize: '.75rem', marginRight: '.25rem', fontFamily: 'monospace', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   table:        { width: '100%', borderCollapse: 'collapse' },
   th:           { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
   tr:           { borderBottom: '1px solid #e5e7eb' },
@@ -243,9 +748,9 @@ const styles: Record<string, React.CSSProperties> = {
   progressTrack:{ height: 6, background: '#e5e7eb', borderRadius: 3, width: 80, overflow: 'hidden' },
   progressBar:  { height: '100%', borderRadius: 3, transition: 'width .3s' },
   detailPanel:  { padding: '1rem 1.25rem', background: '#fafafa', borderTop: '1px solid #f0f0f0' },
-  sectionLabel: { fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', marginBottom: '.5rem' },
-  summaryRow:   { display: 'flex', gap: '.75rem', flexWrap: 'wrap' },
-  summaryBox:   { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: '.625rem 1rem', textAlign: 'center' as const, minWidth: 90 },
-  summaryNum:   { fontSize: '1.25rem', fontWeight: 700 },
-  summaryLbl:   { fontSize: '.7rem', color: '#6b7280', marginTop: '.2rem' },
+  detailLabel:  { fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' as const, marginBottom: '.5rem' },
+  detailSummaryRow: { display: 'flex', gap: '.75rem', flexWrap: 'wrap' as const },
+  detailSummaryBox: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: '.625rem 1rem', textAlign: 'center' as const, minWidth: 90 },
+  detailSummaryNum: { fontSize: '1.25rem', fontWeight: 700 },
+  detailSummaryLbl: { fontSize: '.7rem', color: '#6b7280', marginTop: '.2rem' },
 }

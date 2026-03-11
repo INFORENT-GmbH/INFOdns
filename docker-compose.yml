@@ -16,9 +16,10 @@ services:
       - internal
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 10s
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   # ── API ─────────────────────────────────────────────────────
   api:

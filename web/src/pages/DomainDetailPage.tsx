@@ -1,9 +1,9 @@
 import { useState, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getDomain, getRecords, createRecord, deleteRecord,
-  createBulkJob, previewBulkJob, approveBulkJob,
+  createBulkJob, previewBulkJob, approveBulkJob, searchByRecord,
   type DnsRecord,
 } from '../api/client'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
@@ -26,6 +26,37 @@ interface EditRow {
 interface NewRow extends EditRow {
   _newId: string  // client-only key
 }
+
+// ── Bulk-edit count button ────────────────────────────────────
+
+function BulkEditButton({ rec }: { rec: DnsRecord }) {
+  const { t } = useI18n()
+  const navigate = useNavigate()
+
+  const rawValue = rec.type === 'MX' ? rec.value : rec.type === 'SRV' ? rec.value : rec.value
+
+  const { data } = useQuery<{ id: number }[]>({
+    queryKey: ['record-search-count', rec.type, rec.name, rawValue],
+    queryFn: () => searchByRecord({ type: rec.type, name: rec.name, value: rawValue }).then(r => r.data),
+    staleTime: 30_000,
+  })
+
+  const count = data?.length ?? null
+
+  function handleClick() {
+    const params = new URLSearchParams({ type: rec.type, name: rec.name, value: rawValue })
+    navigate(`/jobs?${params.toString()}`)
+  }
+
+  if (count === null) return null
+  return (
+    <button onClick={handleClick} style={styles.bulkBtn} title="Bulk edit across domains">
+      {t('domainDetail_bulkEditBtn', count)}
+    </button>
+  )
+}
+
+// ── Main page ─────────────────────────────────────────────────
 
 export default function DomainDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -329,6 +360,7 @@ export default function DomainDetailPage() {
                       style={{ ...styles.inlineInput, fontFamily: 'monospace', width: '100%' }} />
                   </td>
                   <td style={{ ...styles.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    {!isDeleted && <BulkEditButton rec={rec} />}
                     {dirty && !isDeleted && (
                       <button onClick={() => setEdits(prev => { const n = { ...prev }; delete n[rec.id]; return n })}
                         style={{ ...styles.btnIcon, color: '#6b7280' }} title={t('domainDetail_revert')}>↩</button>
@@ -377,5 +409,6 @@ const styles: Record<string, React.CSSProperties> = {
   inlineSelect: { border: '1px solid transparent', borderRadius: 3, padding: '2px 4px', fontSize: '.8125rem', background: 'transparent', outline: 'none', cursor: 'pointer' },
   btnPrimary: { padding: '.375rem .875rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
   btnSecondary: { padding: '.375rem .875rem', background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem', cursor: 'pointer' },
-  btnIcon: { background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '.8125rem', padding: '2px 6px' },
+  btnIcon:  { background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '.8125rem', padding: '2px 6px' },
+  bulkBtn:  { background: '#ede9fe', color: '#6d28d9', border: 'none', borderRadius: 10, fontSize: '.7rem', fontWeight: 600, padding: '2px 8px', cursor: 'pointer', marginRight: 4, whiteSpace: 'nowrap' as const },
 }
