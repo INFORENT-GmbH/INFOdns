@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -39,6 +39,7 @@ export default function DomainDetailPage() {
   const [newRows, setNewRows] = useState<NewRow[]>([])
 
   const [applying, setApplying] = useState(false)
+  const applyingRef = useRef(false)
   const [applyError, setApplyError] = useState<string | null>(null)
 
   const { data: domain, isLoading: loadingDomain } = useQuery({
@@ -109,12 +110,15 @@ export default function DomainDetailPage() {
   const hasDirty = dirtyIds.length > 0 || pendingDeletes.size > 0 || newRows.length > 0
 
   async function handleApply() {
-    if (!hasDirty) return
+    if (!hasDirty || applyingRef.current) return
+    applyingRef.current = true
     setApplying(true)
     setApplyError(null)
+    // Snapshot the rows to submit — skip new rows with empty value
+    const rowsToCreate = newRows.filter(r => r.value.trim() !== '')
     try {
       // 1. Create new records directly (API enqueues render)
-      for (const row of newRows) {
+      for (const row of rowsToCreate) {
         const ttlNum = row.ttl === '' ? undefined : Number(row.ttl)
         let body: any = { name: row.name.trim(), type: row.type, value: row.value.trim() }
         if (ttlNum !== undefined) body.ttl = ttlNum
@@ -168,9 +172,10 @@ export default function DomainDetailPage() {
         await approveBulkJob(job.data.id)
       }
 
+      const submittedIds = new Set(rowsToCreate.map(r => r._newId))
       setEdits({})
       setPendingDeletes(new Set())
-      setNewRows([])
+      setNewRows(prev => prev.filter(r => !submittedIds.has(r._newId)))
       qc.invalidateQueries({ queryKey: ['records', domainId] })
       qc.invalidateQueries({ queryKey: ['domain', domainId] })
     } catch (e: any) {
@@ -185,6 +190,7 @@ export default function DomainDetailPage() {
       } catch { /* not JSON, use as-is */ }
       setApplyError(msg)
     } finally {
+      applyingRef.current = false
       setApplying(false)
     }
   }
