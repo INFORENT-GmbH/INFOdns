@@ -228,7 +228,7 @@ const styles: Record<string, React.CSSProperties> = {
   th:          { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
   tr:          { borderBottom: '1px solid #e5e7eb' },
   td:          { padding: '.5rem .75rem', fontSize: '.875rem', verticalAlign: 'middle' },
-  tdMono:      { padding: '.5rem .75rem', fontSize: '.8125rem', fontFamily: 'monospace', verticalAlign: 'middle', color: '#374151' },
+  tdMono:      { padding: '.5rem .75rem', fontSize: '.8125rem', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", verticalAlign: 'middle', color: '#374151' },
   code:        { background: '#f3f4f6', padding: '1px 5px', borderRadius: 3, fontSize: '.8125rem' },
   muted:       { color: '#9ca3af' },
   diffToggle:  { background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '.8125rem', padding: 0, textDecoration: 'underline' },

@@ -255,7 +255,7 @@ export default function DomainDetailPage() {
         <div style={styles.errorBanner}>
           <strong>{t('domainDetail_zoneFailed')}</strong>
           {(domain as any).zone_error && (
-            <pre style={{ margin: '.5rem 0 0', fontFamily: 'monospace', fontSize: '.8125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            <pre style={{ margin: '.5rem 0 0', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: '.8125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
               {(domain as any).zone_error}
             </pre>
           )}
@@ -302,7 +302,7 @@ export default function DomainDetailPage() {
               <tr key={row._newId} style={{ ...styles.tr, background: '#f0fdf4', outline: '1px solid #86efac' }}>
                 <td style={styles.td}>
                   <input value={row.name} onChange={e => setNewField(row._newId, 'name', e.target.value)}
-                    className="inline-field" style={{ ...styles.inlineInput, fontFamily: 'monospace' }} />
+                    className="inline-field" style={{ ...styles.inlineInput, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }} />
                 </td>
                 <td style={styles.td}>
                   <select value={row.type} onChange={e => setNewField(row._newId, 'type', e.target.value)}
@@ -316,7 +316,7 @@ export default function DomainDetailPage() {
                 </td>
                 <td style={{ ...styles.td, ...styles.valueCell }}>
                   <input value={row.value} onChange={e => setNewField(row._newId, 'value', e.target.value)}
-                    placeholder={t('domainDetail_valuePlaceholder')} className="inline-field" style={{ ...styles.inlineInput, fontFamily: 'monospace', width: '100%' }} />
+                    placeholder={t('domainDetail_valuePlaceholder')} className="inline-field" style={{ ...styles.inlineInput, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", width: '100%' }} />
                 </td>
                 <td style={{ ...styles.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                   <span style={styles.newBadge}>{t('domainDetail_newBadge')}</span>
@@ -341,7 +341,7 @@ export default function DomainDetailPage() {
                   <td style={styles.td}>
                     <input value={row.name} onChange={e => setField(rec.id, rec, 'name', e.target.value)}
                       disabled={isDeleted} className="inline-field"
-                      style={{ ...styles.inlineInput, fontFamily: 'monospace' }} />
+                      style={{ ...styles.inlineInput, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }} />
                   </td>
                   <td style={styles.td}>
                     <select value={row.type} onChange={e => setField(rec.id, rec, 'type', e.target.value)}
@@ -357,7 +357,7 @@ export default function DomainDetailPage() {
                   <td style={{ ...styles.td, ...styles.valueCell }}>
                     <input value={row.value} onChange={e => setField(rec.id, rec, 'value', e.target.value)}
                       disabled={isDeleted} className="inline-field"
-                      style={{ ...styles.inlineInput, fontFamily: 'monospace', width: '100%' }} />
+                      style={{ ...styles.inlineInput, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", width: '100%' }} />
                   </td>
                   <td style={{ ...styles.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                     {!isDeleted && <BulkEditButton rec={rec} />}

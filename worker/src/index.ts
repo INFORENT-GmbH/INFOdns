@@ -6,6 +6,7 @@ import { deployZone } from './deployZone.js'
 import { regenerateNamedConf } from './namedConf.js'
 import { pollBulkJobs } from './bulkExecutor.js'
 import { broadcastEvent } from './broadcast.js'
+import { sendJobMail } from './mailer.js'
 
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS ?? 2000)
 const BATCH_SIZE       = Number(process.env.BATCH_SIZE ?? 10)
@@ -106,6 +107,7 @@ async function processJob(job: QueueRow): Promise<void> {
 
   const rendered = await queryOne<{ last_rendered_at: string }>('SELECT last_rendered_at FROM domains WHERE id = ?', [domainId])
   broadcastEvent({ type: 'domain_status', domainId, fqdn: domain.fqdn, zone_status: 'clean', last_serial: serial, last_rendered_at: rendered?.last_rendered_at ?? null, zone_error: null })
+  sendJobMail(`[INFOdns] Zone deployed: ${domain.fqdn}`, `Job ${job.id} completed successfully.\n\nDomain: ${domain.fqdn}\nSerial: ${serial}\nRendered at: ${rendered?.last_rendered_at ?? 'unknown'}`)
 
   console.log(`[worker] Job ${job.id} done — ${domain.fqdn} serial ${serial}`)
 }
@@ -146,7 +148,10 @@ async function poll(): Promise<void> {
         )
         await execute("UPDATE domains SET zone_status = 'error' WHERE id = ?", [job.domain_id])
         const failedDomain = await queryOne<{ fqdn: string }>('SELECT fqdn FROM domains WHERE id = ?', [job.domain_id])
-        if (failedDomain) broadcastEvent({ type: 'domain_status', domainId: job.domain_id, fqdn: failedDomain.fqdn, zone_status: 'error', zone_error: err.message })
+        if (failedDomain) {
+          broadcastEvent({ type: 'domain_status', domainId: job.domain_id, fqdn: failedDomain.fqdn, zone_status: 'error', zone_error: err.message })
+          sendJobMail(`[INFOdns] Zone deploy FAILED: ${failedDomain.fqdn}`, `Job ${job.id} failed after ${newRetries} retries.\n\nDomain: ${failedDomain.fqdn}\nError: ${err.message}`)
+        }
       } else {
         // Back to pending for retry
         await execute(

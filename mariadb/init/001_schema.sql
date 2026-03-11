@@ -161,3 +161,7 @@ CREATE TABLE audit_logs (
 -- ── seed: global SOA template ────────────────────────────────
 INSERT INTO soa_templates (customer_id, mname, rname, refresh, retry, expire, minimum_ttl)
 VALUES (NULL, 'ns1.example.com.', 'hostmaster.example.com.', 3600, 900, 604800, 300);
+
+-- ── seed: default admin user ─────────────────────────────────
+INSERT INTO users (email, password_hash, role, full_name, is_active)
+VALUES ('admin@inforent.net', '$2b$12$WJ62HF0Q76PynWSQ2dAFWeugrox72KDrp1nh.FvUrFW9bk3P05YXq', 'admin', 'Admin', 1);

@@ -16,7 +16,7 @@ const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 1
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, ready } = useAuth()
   if (!ready) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontFamily: 'system-ui,sans-serif', color: '#9ca3af', fontSize: '.875rem' }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#9ca3af', fontSize: '.875rem' }}>
       INFOdns
     </div>
   )

@@ -92,7 +92,7 @@ export default function RecordModal({ record, onSave, onClose }: Props) {
             onChange={e => set('value', e.target.value)}
             required
             rows={3}
-            style={{ ...styles.input, fontFamily: 'monospace', resize: 'vertical' }}
+            style={{ ...styles.input, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", resize: 'vertical' }}
             placeholder={form.type === 'TXT' ? 'v=spf1 include:... ~all' : ''}
           />
         </label>

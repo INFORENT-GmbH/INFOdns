@@ -237,7 +237,7 @@ function JobDetail({ job }: { job: BulkJob }) {
                       </td>
                       <td style={styles.td}>
                         {d.error
-                          ? <span style={{ color: '#b91c1c', fontFamily: 'monospace', fontSize: '.75rem' }}>{d.error}</span>
+                          ? <span style={{ color: '#b91c1c', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: '.75rem' }}>{d.error}</span>
                           : <span style={{ color: '#9ca3af' }}>—</span>}
                       </td>
                     </tr>
@@ -250,7 +250,7 @@ function JobDetail({ job }: { job: BulkJob }) {
       )}
 
       {job.error && (
-        <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 4, fontSize: '.8125rem', fontFamily: 'monospace', marginTop: '.5rem' }}>
+        <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 4, fontSize: '.8125rem', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", marginTop: '.5rem' }}>
           {job.error}
         </div>
       )}
@@ -732,17 +732,17 @@ const styles: Record<string, React.CSSProperties> = {
   btnMini:      { padding: '.2rem .5rem', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
   domainList:   { display: 'flex', flexDirection: 'column', gap: '.25rem', maxHeight: 300, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 4, padding: '.5rem' },
   domainRow:    { display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.375rem .5rem', borderRadius: 4, cursor: 'pointer', fontSize: '.875rem', userSelect: 'none' },
-  recordPill:   { marginLeft: 'auto', background: '#f3f4f6', borderRadius: 4, padding: '2px 6px', fontSize: '.75rem', fontFamily: 'monospace' },
+  recordPill:   { marginLeft: 'auto', background: '#f3f4f6', borderRadius: 4, padding: '2px 6px', fontSize: '.75rem', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" },
   summaryRow:   { display: 'flex', gap: '1rem' },
   summaryBox:   { flex: 1, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '.75rem', textAlign: 'center' as const },
   summaryNum:   { fontSize: '1.5rem', fontWeight: 700 },
   summaryLbl:   { fontSize: '.75rem', color: '#6b7280', marginTop: '.25rem' },
-  changePill:   { display: 'inline-block', padding: '1px 6px', borderRadius: 4, fontSize: '.75rem', marginRight: '.25rem', fontFamily: 'monospace', maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  changePill:   { display: 'inline-block', padding: '1px 6px', borderRadius: 4, fontSize: '.75rem', marginRight: '.25rem', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   table:        { width: '100%', borderCollapse: 'collapse' },
   th:           { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
   tr:           { borderBottom: '1px solid #e5e7eb' },
   td:           { padding: '.625rem .75rem', fontSize: '.875rem', verticalAlign: 'middle' },
-  tdMono:       { padding: '.625rem .75rem', fontSize: '.8125rem', fontFamily: 'monospace', verticalAlign: 'middle' },
+  tdMono:       { padding: '.625rem .75rem', fontSize: '.8125rem', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", verticalAlign: 'middle' },
   code:         { background: '#f3f4f6', padding: '1px 5px', borderRadius: 3, fontSize: '.8125rem' },
   detailBtn:    { background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '.8125rem', padding: 0, textDecoration: 'underline' },
   progressTrack:{ height: 6, background: '#e5e7eb', borderRadius: 3, width: 80, overflow: 'hidden' },

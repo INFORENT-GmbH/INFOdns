@@ -62,7 +62,7 @@ function navStyle({ isActive }: { isActive: boolean }): React.CSSProperties {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  shell:     { display: 'flex', flexDirection: 'column', minHeight: '100vh', fontFamily: 'system-ui,sans-serif' },
+  shell:     { display: 'flex', flexDirection: 'column', minHeight: '100vh' },
   nav:       { display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '.75rem 1.5rem', background: '#fff', borderBottom: '1px solid #e5e7eb' },
   brand:     { height: 32, marginRight: 'auto', display: 'block' },
   links:     { display: 'flex', gap: '1.25rem' },
