@@ -1,0 +1,196 @@
+import axios from 'axios'
+
+// In production the web container proxies /api/v1 → api:3000/api/v1 via nginx.
+// In local dev (npm run dev) set VITE_API_URL=http://localhost:3000 in web/.env.local
+const BASE = (import.meta.env.VITE_API_URL ?? '') + '/api/v1'
+
+export const api = axios.create({
+  baseURL: BASE,
+  withCredentials: true,   // send httpOnly refresh_token cookie
+})
+
+// In-memory access token (never in localStorage)
+let accessToken: string | null = null
+
+export function setAccessToken(token: string | null) {
+  accessToken = token
+}
+
+export function getAccessToken() {
+  return accessToken
+}
+
+// Attach access token to every request
+api.interceptors.request.use((config) => {
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`
+  }
+  return config
+})
+
+// On 401, try to refresh once, then retry original request
+let refreshing: Promise<string | null> | null = null
+
+api.interceptors.response.use(
+  (res) => res,
+  async (error) => {
+    const original = error.config
+    if (error.response?.status === 401 && !original._retry) {
+      original._retry = true
+      if (!refreshing) {
+        refreshing = api
+          .post<{ accessToken: string }>('/auth/refresh')
+          .then((r) => {
+            accessToken = r.data.accessToken
+            return accessToken
+          })
+          .catch(() => {
+            accessToken = null
+            return null
+          })
+          .finally(() => { refreshing = null })
+      }
+      const newToken = await refreshing
+      if (!newToken) return Promise.reject(error)
+      original.headers.Authorization = `Bearer ${newToken}`
+      return api(original)
+    }
+    return Promise.reject(error)
+  }
+)
+
+// ── Typed API helpers ────────────────────────────────────────
+
+export interface Domain {
+  id: number
+  fqdn: string
+  status: string
+  zone_status: 'clean' | 'dirty' | 'error'
+  last_serial: number
+  last_rendered_at: string | null
+  default_ttl: number
+  customer_id: number
+  customer_name: string
+  created_at: string
+}
+
+export interface DnsRecord {
+  id: number
+  domain_id: number
+  name: string
+  type: string
+  ttl: number | null
+  priority: number | null
+  weight: number | null
+  port: number | null
+  value: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Customer {
+  id: number
+  name: string
+  slug: string
+  is_active: number
+  created_at: string
+}
+
+export interface User {
+  id: number
+  email: string
+  full_name: string
+  role: 'admin' | 'operator' | 'customer'
+  customer_id: number | null
+  is_active: number
+  created_at: string
+}
+
+export interface BulkJob {
+  id: number
+  operation: string
+  status: string
+  affected_domains: number
+  processed_domains: number
+  created_at: string
+}
+
+export interface AuditLog {
+  id: number
+  user_id: number | null
+  domain_id: number | null
+  entity_type: string
+  action: string
+  old_value: unknown
+  new_value: unknown
+  ip_address: string | null
+  created_at: string
+}
+
+// Auth
+export const login = (email: string, password: string) =>
+  api.post<{ accessToken: string }>('/auth/login', { email, password })
+
+export const logout = () => api.post('/auth/logout')
+
+// Domains
+export const getDomains = (params?: Record<string, string>) =>
+  api.get<Domain[]>('/domains', { params })
+
+export const getDomain = (id: number) =>
+  api.get<Domain>(`/domains/${id}`)
+
+export const createDomain = (data: Partial<Domain>) =>
+  api.post<Domain>('/domains', data)
+
+export const updateDomain = (id: number, data: Partial<Domain>) =>
+  api.put<Domain>(`/domains/${id}`, data)
+
+export const deleteDomain = (id: number) =>
+  api.delete(`/domains/${id}`)
+
+// Records
+export const getRecords = (domainId: number) =>
+  api.get<DnsRecord[]>(`/domains/${domainId}/records`)
+
+export const createRecord = (domainId: number, data: Partial<DnsRecord>) =>
+  api.post<DnsRecord>(`/domains/${domainId}/records`, data)
+
+export const updateRecord = (domainId: number, id: number, data: Partial<DnsRecord>) =>
+  api.put<DnsRecord>(`/domains/${domainId}/records/${id}`, data)
+
+export const deleteRecord = (domainId: number, id: number) =>
+  api.delete(`/domains/${domainId}/records/${id}`)
+
+// Customers
+export const getCustomers = () => api.get<Customer[]>('/customers')
+export const createCustomer = (data: Partial<Customer>) => api.post<Customer>('/customers', data)
+export const updateCustomer = (id: number, data: Partial<Customer>) => api.put<Customer>(`/customers/${id}`, data)
+export const deleteCustomer = (id: number) => api.delete(`/customers/${id}`)
+
+// Users
+export const getUsers = () => api.get<User[]>('/users')
+export const createUser = (data: Partial<User> & { password: string }) => api.post<User>('/users', data)
+export const updateUser = (id: number, data: Partial<User>) => api.put<User>(`/users/${id}`, data)
+
+// Bulk jobs
+export const getBulkJobs = () => api.get<BulkJob[]>('/bulk-jobs')
+export const createBulkJob = (data: object) => api.post<BulkJob>('/bulk-jobs', data)
+export const previewBulkJob = (id: number) => api.post(`/bulk-jobs/${id}/preview`)
+export const approveBulkJob = (id: number) => api.post(`/bulk-jobs/${id}/approve`)
+export const getBulkJob = (id: number) => api.get(`/bulk-jobs/${id}`)
+export const getBulkJobDomains = (id: number) => api.get(`/bulk-jobs/${id}/domains`)
+export const searchByRecord = (params: { type: string; name?: string; value?: string }) =>
+  api.get('/domains/search-by-record', { params })
+
+// Audit logs
+export interface AuditLogPage {
+  data: AuditLog[]
+  total: number
+  page: number
+  limit: number
+  pages: number
+}
+
+export const getAuditLogs = (params?: Record<string, string>) =>
+  api.get<AuditLogPage>('/audit-logs', { params })

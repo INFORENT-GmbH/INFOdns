@@ -1,0 +1,30 @@
+# Environment
+.env
+
+# Generated BIND keys — never commit
+bind/tsig.key
+bind/rndc.key
+
+# Generated zone files and named.conf.local (runtime state)
+bind/primary/zones/
+bind/primary/named.conf.local
+bind/secondary1/zones/
+bind/secondary1/named.conf.local
+bind/secondary2/zones/
+bind/secondary2/named.conf.local
+bind/secondary3/zones/
+bind/secondary3/named.conf.local
+
+# MariaDB data
+mariadb/data/
+
+# Backups
+backups/
+
+# Node
+node_modules/
+dist/
+*.js.map
+
+# OS
+.DS_Store

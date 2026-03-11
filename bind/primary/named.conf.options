@@ -1,0 +1,36 @@
+options {
+    directory "/var/lib/bind";
+
+    // Hidden primary: answer no queries from outside
+    allow-query { none; };
+
+    // Only secondaries (via TSIG) may request transfers — enforced per-zone too
+    allow-transfer { key tsig-secondary; };
+
+    // Send NOTIFY to secondaries automatically
+    notify yes;
+
+    // Do not recurse
+    recursion no;
+
+    // Listen on all interfaces inside the internal Docker network
+    listen-on    { any; };
+    listen-on-v6 { any; };
+
+    dnssec-validation no;
+};
+
+controls {
+    inet 0.0.0.0 port 953 allow { any; } keys { "rndc-key"; };
+};
+
+logging {
+    channel default_log {
+        stderr;
+        severity info;
+        print-time yes;
+        print-severity yes;
+        print-category yes;
+    };
+    category default { default_log; };
+};

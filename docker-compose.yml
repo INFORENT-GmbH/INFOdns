@@ -1,0 +1,162 @@
+services:
+
+  # ── Database ────────────────────────────────────────────────
+  db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: infodns
+      MYSQL_USER: infodns
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./mariadb/data:/var/lib/mysql
+      - ./mariadb/init:/docker-entrypoint-initdb.d
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── API ─────────────────────────────────────────────────────
+  api:
+    build: ./api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: infodns
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: infodns
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      INTERNAL_SECRET: ${INTERNAL_SECRET}
+      NODE_ENV: ${NODE_ENV:-production}
+    ports:
+      - "3000:3000"
+    networks:
+      - internal
+      - public
+
+  # ── Worker ──────────────────────────────────────────────────
+  worker:
+    build: ./worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: infodns
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: infodns
+      BIND_PRIMARY_HOST: bind-primary
+      BIND_PRIMARY_RNDC_PORT: 953
+      RNDC_KEY_FILE: /etc/rndc/rndc.key
+      SECONDARY_HOSTS: ${SECONDARY_HOSTS:-bind-secondary1,bind-secondary2,bind-secondary3}
+      NS_RECORDS: ${NS_RECORDS}          # comma-separated NS FQDNs for zone rendering
+      SOA_MNAME: ${SOA_MNAME}
+      SOA_RNAME: ${SOA_RNAME}
+      INTERNAL_SECRET: ${INTERNAL_SECRET}
+      API_INTERNAL_URL: http://api:3000
+      NODE_ENV: ${NODE_ENV:-production}
+    volumes:
+      - ./bind/primary/zones:/bind/primary/zones
+      - ./bind/primary:/bind/primary/conf
+      - ./bind/secondary1:/bind/secondary1/conf
+      - ./bind/secondary2:/bind/secondary2/conf
+      - ./bind/secondary3:/bind/secondary3/conf
+      - ./bind/rndc.key:/etc/rndc/rndc.key:ro
+    networks:
+      - internal
+
+  # ── Web UI ───────────────────────────────────────────────────
+  web:
+    build: ./web
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: ${PUBLIC_API_URL:-http://localhost:3000}
+    ports:
+      - "80:80"
+    networks:
+      - public
+
+  # ── Hidden Primary BIND ──────────────────────────────────────
+  bind-primary:
+    image: internetsystemsconsortium/bind9:9.18
+    restart: unless-stopped
+    volumes:
+      - ./bind/primary/named.conf:/etc/bind/named.conf:ro
+      - ./bind/primary/named.conf.options:/etc/bind/named.conf.options:ro
+      - ./bind/primary/named.conf.local:/etc/bind/named.conf.local:ro
+      - ./bind/tsig.key:/etc/bind/tsig.key:ro
+      - ./bind/rndc.key:/etc/bind/rndc.key:ro
+      - ./bind/primary/zones:/var/lib/bind/zones
+    networks:
+      - internal          # NOT on public network — hidden primary
+    expose:
+      - "53/tcp"
+      - "53/udp"
+      - "953/tcp"         # rndc
+
+  # ── Secondary BIND servers ───────────────────────────────────
+  bind-secondary1:
+    image: internetsystemsconsortium/bind9:9.18
+    restart: unless-stopped
+    volumes:
+      - ./bind/secondary1/named.conf:/etc/bind/named.conf:ro
+      - ./bind/secondary1/named.conf.options:/etc/bind/named.conf.options:ro
+      - ./bind/secondary1/named.conf.local:/etc/bind/named.conf.local:ro
+      - ./bind/tsig.key:/etc/bind/tsig.key:ro
+      - ./bind/secondary1/zones:/var/lib/bind/zones
+    networks:
+      - internal
+      - public
+    ports:
+      - "5301:53/udp"
+      - "5301:53/tcp"
+
+  bind-secondary2:
+    image: internetsystemsconsortium/bind9:9.18
+    restart: unless-stopped
+    volumes:
+      - ./bind/secondary2/named.conf:/etc/bind/named.conf:ro
+      - ./bind/secondary2/named.conf.options:/etc/bind/named.conf.options:ro
+      - ./bind/secondary2/named.conf.local:/etc/bind/named.conf.local:ro
+      - ./bind/tsig.key:/etc/bind/tsig.key:ro
+      - ./bind/secondary2/zones:/var/lib/bind/zones
+    networks:
+      - internal
+      - public
+    ports:
+      - "5302:53/udp"
+      - "5302:53/tcp"
+
+  bind-secondary3:
+    image: internetsystemsconsortium/bind9:9.18
+    restart: unless-stopped
+    volumes:
+      - ./bind/secondary3/named.conf:/etc/bind/named.conf:ro
+      - ./bind/secondary3/named.conf.options:/etc/bind/named.conf.options:ro
+      - ./bind/secondary3/named.conf.local:/etc/bind/named.conf.local:ro
+      - ./bind/tsig.key:/etc/bind/tsig.key:ro
+      - ./bind/secondary3/zones:/var/lib/bind/zones
+    networks:
+      - internal
+      - public
+    ports:
+      - "5303:53/udp"
+      - "5303:53/tcp"
+
+networks:
+  internal:
+    driver: bridge
+    internal: true    # no direct internet egress; primary is isolated here
+  public:
+    driver: bridge
