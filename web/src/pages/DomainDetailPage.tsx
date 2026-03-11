@@ -7,6 +7,7 @@ import {
   type DnsRecord,
 } from '../api/client'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
+import { useI18n } from '../i18n/I18nContext'
 
 const INLINE_STYLES = `
   .inline-field:hover { border-color: #d1d5db !important; background: #fff !important; }
@@ -30,6 +31,7 @@ export default function DomainDetailPage() {
   const { id } = useParams<{ id: string }>()
   const domainId = Number(id)
   const qc = useQueryClient()
+  const { t } = useI18n()
 
   // edits: changes to existing records keyed by record id
   const [edits, setEdits] = useState<Record<number, EditRow>>({})
@@ -204,7 +206,7 @@ export default function DomainDetailPage() {
 
   // ── render ───────────────────────────────────────────────────────────────
 
-  if (loadingDomain) return <p>Loading…</p>
+  if (loadingDomain) return <p>{t('loading')}</p>
   if (!domain) return <p>Domain not found</p>
 
   const changeCount = dirtyIds.length + pendingDeletes.size + newRows.length
@@ -213,14 +215,14 @@ export default function DomainDetailPage() {
     <div>
       <style>{INLINE_STYLES}</style>
       <div style={styles.header}>
-        <Link to="/domains" style={styles.back}>← Domains</Link>
+        <Link to="/domains" style={styles.back}>{t('domainDetail_backLink')}</Link>
         <h2 style={styles.h2}>{domain.fqdn}</h2>
         <ZoneStatusBadge status={domain.zone_status} />
       </div>
 
       {domain.zone_status === 'error' && (
         <div style={styles.errorBanner}>
-          <strong>Zone render failed.</strong>
+          <strong>{t('domainDetail_zoneFailed')}</strong>
           {(domain as any).zone_error && (
             <pre style={{ margin: '.5rem 0 0', fontFamily: 'monospace', fontSize: '.8125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
               {(domain as any).zone_error}
@@ -230,36 +232,36 @@ export default function DomainDetailPage() {
       )}
 
       <div style={styles.meta}>
-        <span>Customer: <strong>{(domain as any).customer_name}</strong></span>
-        <span>Default TTL: <strong>{domain.default_ttl}s</strong></span>
-        <span>Serial: <code>{domain.last_serial || '—'}</code></span>
-        <span>Last rendered: {domain.last_rendered_at ? new Date(domain.last_rendered_at).toLocaleString() : 'Never'}</span>
+        <span>{t('customer')}: <strong>{(domain as any).customer_name}</strong></span>
+        <span>{t('domainDetail_defaultTtl')} <strong>{domain.default_ttl}s</strong></span>
+        <span>{t('serial')}: <code>{domain.last_serial || '—'}</code></span>
+        <span>{t('domainDetail_lastRendered')} {domain.last_rendered_at ? new Date(domain.last_rendered_at).toLocaleString() : t('never')}</span>
       </div>
 
       <div style={styles.tableHeader}>
-        <h3 style={styles.h3}>DNS Records</h3>
+        <h3 style={styles.h3}>{t('domainDetail_dnsRecords')}</h3>
         <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
-          {hasDirty && <span style={styles.dirtyHint}>{changeCount} unsaved change{changeCount > 1 ? 's' : ''}</span>}
-          {hasDirty && <button onClick={handleDiscard} style={styles.btnSecondary} disabled={applying}>Discard</button>}
+          {hasDirty && <span style={styles.dirtyHint}>{changeCount} {changeCount > 1 ? t('domainDetail_unsavedChanges') : t('domainDetail_unsavedChange')}</span>}
+          {hasDirty && <button onClick={handleDiscard} style={styles.btnSecondary} disabled={applying}>{t('domainDetail_discard')}</button>}
           {hasDirty && (
             <button onClick={handleApply} style={styles.btnPrimary} disabled={applying}>
-              {applying ? 'Applying…' : 'Apply changes'}
+              {applying ? t('domainDetail_applying') : t('domainDetail_applyChanges')}
             </button>
           )}
-          <button onClick={addNewRow} style={hasDirty ? styles.btnSecondary : styles.btnPrimary}>+ Add Record</button>
+          <button onClick={addNewRow} style={hasDirty ? styles.btnSecondary : styles.btnPrimary}>{t('domainDetail_addRecord')}</button>
         </div>
       </div>
 
       {applyError && <div style={{ ...styles.errorBanner, marginBottom: '1rem' }}>{applyError}</div>}
 
-      {loadingRecords ? <p>Loading records…</p> : (
+      {loadingRecords ? <p>{t('domainDetail_loadingRecords')}</p> : (
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={styles.th}>Name</th>
-              <th style={styles.th}>Type</th>
-              <th style={styles.th}>TTL</th>
-              <th style={styles.th}>Value</th>
+              <th style={styles.th}>{t('name')}</th>
+              <th style={styles.th}>{t('type')}</th>
+              <th style={styles.th}>{t('ttl')}</th>
+              <th style={styles.th}>{t('value')}</th>
               <th style={styles.th}></th>
             </tr>
           </thead>
@@ -274,19 +276,19 @@ export default function DomainDetailPage() {
                 <td style={styles.td}>
                   <select value={row.type} onChange={e => setNewField(row._newId, 'type', e.target.value)}
                     className="inline-field" style={styles.inlineSelect}>
-                    {RECORD_TYPES.map(t => <option key={t}>{t}</option>)}
+                    {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
                   </select>
                 </td>
                 <td style={styles.td}>
                   <input value={row.ttl} onChange={e => setNewField(row._newId, 'ttl', e.target.value)}
-                    placeholder="default" className="inline-field" style={{ ...styles.inlineInput, width: 70 }} />
+                    placeholder={t('domainDetail_ttlPlaceholder')} className="inline-field" style={{ ...styles.inlineInput, width: 70 }} />
                 </td>
                 <td style={{ ...styles.td, ...styles.valueCell }}>
                   <input value={row.value} onChange={e => setNewField(row._newId, 'value', e.target.value)}
-                    placeholder="value…" className="inline-field" style={{ ...styles.inlineInput, fontFamily: 'monospace', width: '100%' }} />
+                    placeholder={t('domainDetail_valuePlaceholder')} className="inline-field" style={{ ...styles.inlineInput, fontFamily: 'monospace', width: '100%' }} />
                 </td>
                 <td style={{ ...styles.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <span style={styles.newBadge}>new</span>
+                  <span style={styles.newBadge}>{t('domainDetail_newBadge')}</span>
                   <button onClick={() => removeNewRow(row._newId)} style={{ ...styles.btnIcon, color: '#b91c1c' }}>✕</button>
                 </td>
               </tr>
@@ -313,12 +315,12 @@ export default function DomainDetailPage() {
                   <td style={styles.td}>
                     <select value={row.type} onChange={e => setField(rec.id, rec, 'type', e.target.value)}
                       disabled={isDeleted} className="inline-field" style={styles.inlineSelect}>
-                      {RECORD_TYPES.map(t => <option key={t}>{t}</option>)}
+                      {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
                     </select>
                   </td>
                   <td style={styles.td}>
                     <input value={row.ttl} onChange={e => setField(rec.id, rec, 'ttl', e.target.value)}
-                      disabled={isDeleted} placeholder="default" className="inline-field"
+                      disabled={isDeleted} placeholder={t('domainDetail_ttlPlaceholder')} className="inline-field"
                       style={{ ...styles.inlineInput, width: 70 }} />
                   </td>
                   <td style={{ ...styles.td, ...styles.valueCell }}>
@@ -329,11 +331,11 @@ export default function DomainDetailPage() {
                   <td style={{ ...styles.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                     {dirty && !isDeleted && (
                       <button onClick={() => setEdits(prev => { const n = { ...prev }; delete n[rec.id]; return n })}
-                        style={{ ...styles.btnIcon, color: '#6b7280' }} title="Revert">↩</button>
+                        style={{ ...styles.btnIcon, color: '#6b7280' }} title={t('domainDetail_revert')}>↩</button>
                     )}
                     {isDeleted
-                      ? <button onClick={() => unmarkDelete(rec.id)} style={{ ...styles.btnIcon, color: '#16a34a' }}>Restore</button>
-                      : <button onClick={() => markDelete(rec)} style={{ ...styles.btnIcon, color: '#b91c1c' }}>Delete</button>
+                      ? <button onClick={() => unmarkDelete(rec.id)} style={{ ...styles.btnIcon, color: '#16a34a' }}>{t('domainDetail_restore')}</button>
+                      : <button onClick={() => markDelete(rec)} style={{ ...styles.btnIcon, color: '#b91c1c' }}>{t('delete')}</button>
                     }
                   </td>
                 </tr>
@@ -341,7 +343,7 @@ export default function DomainDetailPage() {
             })}
 
             {records.length === 0 && newRows.length === 0 && (
-              <tr><td colSpan={5} style={{ ...styles.td, textAlign: 'center', color: '#9ca3af' }}>No records yet</td></tr>
+              <tr><td colSpan={5} style={{ ...styles.td, textAlign: 'center', color: '#9ca3af' }}>{t('domainDetail_noRecords')}</td></tr>
             )}
           </tbody>
         </table>

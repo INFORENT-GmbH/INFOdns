@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useI18n } from '../i18n/I18nContext'
 
 export default function LoginPage() {
   const { login } = useAuth()
+  const { t } = useI18n()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -18,7 +20,7 @@ export default function LoginPage() {
       await login(email, password)
       navigate('/domains')
     } catch {
-      setError('Invalid email or password')
+      setError(t('login_invalidCreds'))
     } finally {
       setLoading(false)
     }
@@ -28,10 +30,10 @@ export default function LoginPage() {
     <div style={styles.wrapper}>
       <form onSubmit={handleSubmit} style={styles.card}>
         <h1 style={styles.title}>INFOdns</h1>
-        <p style={styles.subtitle}>DNS Management</p>
+        <p style={styles.subtitle}>{t('login_subtitle')}</p>
         {error && <div style={styles.error}>{error}</div>}
         <label style={styles.label}>
-          Email
+          {t('login_email')}
           <input
             type="email"
             value={email}
@@ -42,7 +44,7 @@ export default function LoginPage() {
           />
         </label>
         <label style={styles.label}>
-          Password
+          {t('login_password')}
           <input
             type="password"
             value={password}
@@ -52,7 +54,7 @@ export default function LoginPage() {
           />
         </label>
         <button type="submit" disabled={loading} style={styles.btn}>
-          {loading ? 'Signing in…' : 'Sign in'}
+          {loading ? t('login_submitting') : t('login_submit')}
         </button>
       </form>
     </div>

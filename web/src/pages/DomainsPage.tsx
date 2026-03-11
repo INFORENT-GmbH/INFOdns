@@ -4,9 +4,11 @@ import { useQuery } from '@tanstack/react-query'
 import { getDomains, createDomain, type Domain } from '../api/client'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import { useAuth } from '../context/AuthContext'
+import { useI18n } from '../i18n/I18nContext'
 
 export default function DomainsPage() {
   const { user } = useAuth()
+  const { t } = useI18n()
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [newFqdn, setNewFqdn] = useState('')
@@ -39,17 +41,17 @@ export default function DomainsPage() {
   return (
     <div>
       <div style={styles.header}>
-        <h2 style={styles.h2}>Domains</h2>
+        <h2 style={styles.h2}>{t('domains_title')}</h2>
         <div style={styles.headerRight}>
           <input
-            placeholder="Search FQDN…"
+            placeholder={t('domains_searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={styles.searchInput}
           />
           {isAdminOrOp && (
             <button onClick={() => setShowCreate(v => !v)} style={styles.btnPrimary}>
-              + Add Domain
+              {t('domains_addDomain')}
             </button>
           )}
         </div>
@@ -58,14 +60,14 @@ export default function DomainsPage() {
       {showCreate && (
         <form onSubmit={handleCreate} style={styles.createForm}>
           <input
-            placeholder="FQDN (e.g. example.com)"
+            placeholder={t('domains_fqdnPlaceholder')}
             value={newFqdn}
             onChange={e => setNewFqdn(e.target.value)}
             required
             style={styles.input}
           />
           <input
-            placeholder="Customer ID"
+            placeholder={t('domains_customerIdPlaceholder')}
             type="number"
             value={newCustomerId}
             onChange={e => setNewCustomerId(e.target.value)}
@@ -73,26 +75,26 @@ export default function DomainsPage() {
             style={{ ...styles.input, width: 120 }}
           />
           <button type="submit" disabled={creating} style={styles.btnPrimary}>
-            {creating ? 'Creating…' : 'Create'}
+            {creating ? t('creating') : t('create')}
           </button>
           <button type="button" onClick={() => setShowCreate(false)} style={styles.btnSecondary}>
-            Cancel
+            {t('cancel')}
           </button>
         </form>
       )}
 
-      {isLoading && <p style={styles.muted}>Loading…</p>}
-      {error && <p style={styles.errorText}>Failed to load domains</p>}
+      {isLoading && <p style={styles.muted}>{t('loading')}</p>}
+      {error && <p style={styles.errorText}>{t('domains_loadError')}</p>}
 
       <table style={styles.table}>
         <thead>
           <tr>
             <th style={styles.th}>FQDN</th>
-            <th style={styles.th}>Customer</th>
-            <th style={styles.th}>Status</th>
-            <th style={styles.th}>Zone</th>
-            <th style={styles.th}>Serial</th>
-            <th style={styles.th}>Last Rendered</th>
+            <th style={styles.th}>{t('customer')}</th>
+            <th style={styles.th}>{t('status')}</th>
+            <th style={styles.th}>{t('domains_zone')}</th>
+            <th style={styles.th}>{t('serial')}</th>
+            <th style={styles.th}>{t('domains_lastRendered')}</th>
           </tr>
         </thead>
         <tbody>
@@ -108,12 +110,12 @@ export default function DomainsPage() {
               <td style={styles.td}>
                 {d.last_rendered_at
                   ? new Date(d.last_rendered_at).toLocaleString()
-                  : <span style={styles.muted}>Never</span>}
+                  : <span style={styles.muted}>{t('never')}</span>}
               </td>
             </tr>
           ))}
           {!isLoading && domains.length === 0 && (
-            <tr><td colSpan={6} style={{ ...styles.td, textAlign: 'center', ...styles.muted }}>No domains found</td></tr>
+            <tr><td colSpan={6} style={{ ...styles.td, textAlign: 'center', ...styles.muted }}>{t('domains_noneFound')}</td></tr>
           )}
         </tbody>
       </table>

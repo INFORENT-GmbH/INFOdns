@@ -35,6 +35,8 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config
+    // Never intercept the refresh endpoint itself — avoids infinite retry loop
+    if (original.url?.includes('/auth/refresh')) return Promise.reject(error)
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true
       if (!refreshing) {
@@ -112,7 +114,19 @@ export interface BulkJob {
   status: string
   affected_domains: number
   processed_domains: number
+  error: string | null
+  preview_json: unknown
   created_at: string
+  updated_at: string
+}
+
+export interface BulkJobDomain {
+  id: number
+  bulk_job_id: number
+  domain_id: number
+  fqdn: string
+  status: string
+  error: string | null
 }
 
 export interface AuditLog {

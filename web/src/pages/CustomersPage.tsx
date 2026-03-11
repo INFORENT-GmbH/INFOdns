@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getCustomers, createCustomer, updateCustomer, deleteCustomer, type Customer } from '../api/client'
+import { useI18n } from '../i18n/I18nContext'
 
 export default function CustomersPage() {
+  const { t } = useI18n()
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState<Customer | null>(null)
@@ -42,7 +44,7 @@ export default function CustomersPage() {
   }
 
   async function handleDelete(c: Customer) {
-    if (!confirm(`Delete customer "${c.name}"? This cannot be undone.`)) return
+    if (!confirm(t('customers_deleteConfirm', c.name))) return
     await deleteCustomer(c.id)
     qc.invalidateQueries({ queryKey: ['customers'] })
   }
@@ -50,37 +52,37 @@ export default function CustomersPage() {
   return (
     <div>
       <div style={styles.header}>
-        <h2 style={styles.h2}>Customers</h2>
-        <button onClick={openCreate} style={styles.btnPrimary}>+ Add Customer</button>
+        <h2 style={styles.h2}>{t('customers_title')}</h2>
+        <button onClick={openCreate} style={styles.btnPrimary}>{t('customers_add')}</button>
       </div>
 
       {showForm && (
         <form onSubmit={handleSubmit} style={styles.formCard}>
-          <h4 style={{ margin: 0 }}>{editTarget ? 'Edit Customer' : 'New Customer'}</h4>
+          <h4 style={{ margin: 0 }}>{editTarget ? t('customers_editTitle') : t('customers_newTitle')}</h4>
           {error && <div style={styles.error}>{error}</div>}
           <label style={styles.label}>
-            Name
+            {t('name')}
             <input value={name} onChange={e => setName(e.target.value)} required style={styles.input} />
           </label>
           <label style={styles.label}>
-            Slug
-            <input value={slug} onChange={e => setSlug(e.target.value)} required pattern="[a-z0-9-]+" style={styles.input} placeholder="acme-corp" />
+            {t('slug')}
+            <input value={slug} onChange={e => setSlug(e.target.value)} required pattern="[a-z0-9-]+" style={styles.input} placeholder={t('customers_slugPh')} />
           </label>
           <div style={styles.actions}>
-            <button type="button" onClick={() => setShowForm(false)} style={styles.btnSecondary}>Cancel</button>
-            <button type="submit" disabled={saving} style={styles.btnPrimary}>{saving ? 'Saving…' : 'Save'}</button>
+            <button type="button" onClick={() => setShowForm(false)} style={styles.btnSecondary}>{t('cancel')}</button>
+            <button type="submit" disabled={saving} style={styles.btnPrimary}>{saving ? t('saving') : t('save')}</button>
           </div>
         </form>
       )}
 
-      {isLoading ? <p>Loading…</p> : (
+      {isLoading ? <p>{t('loading')}</p> : (
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={styles.th}>Name</th>
-              <th style={styles.th}>Slug</th>
-              <th style={styles.th}>Active</th>
-              <th style={styles.th}>Created</th>
+              <th style={styles.th}>{t('name')}</th>
+              <th style={styles.th}>{t('slug')}</th>
+              <th style={styles.th}>{t('active')}</th>
+              <th style={styles.th}>{t('created')}</th>
               <th style={styles.th}></th>
             </tr>
           </thead>
@@ -92,8 +94,8 @@ export default function CustomersPage() {
                 <td style={styles.td}>{c.is_active ? '✓' : '—'}</td>
                 <td style={styles.td}>{new Date(c.created_at).toLocaleDateString()}</td>
                 <td style={{ ...styles.td, textAlign: 'right' }}>
-                  <button onClick={() => openEdit(c)} style={styles.btnIcon}>Edit</button>
-                  <button onClick={() => handleDelete(c)} style={{ ...styles.btnIcon, color: '#b91c1c' }}>Delete</button>
+                  <button onClick={() => openEdit(c)} style={styles.btnIcon}>{t('edit')}</button>
+                  <button onClick={() => handleDelete(c)} style={{ ...styles.btnIcon, color: '#b91c1c' }}>{t('delete')}</button>
                 </td>
               </tr>
             ))}

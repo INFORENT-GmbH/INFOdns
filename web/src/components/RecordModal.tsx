@@ -1,5 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { type DnsRecord } from '../api/client'
+import { useI18n } from '../i18n/I18nContext'
 
 const RECORD_TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT', 'SRV', 'CAA', 'PTR', 'TLSA', 'SSHFP', 'DS', 'NAPTR']
 
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export default function RecordModal({ record, onSave, onClose }: Props) {
+  const { t } = useI18n()
   const isEdit = Boolean(record)
   const [form, setForm] = useState<Partial<DnsRecord>>({
     name: '@', type: 'A', ttl: undefined, priority: undefined,
@@ -46,45 +48,45 @@ export default function RecordModal({ record, onSave, onClose }: Props) {
   return (
     <div style={styles.overlay} onClick={onClose}>
       <form style={styles.modal} onClick={e => e.stopPropagation()} onSubmit={handleSubmit}>
-        <h3 style={styles.title}>{isEdit ? 'Edit Record' : 'Add Record'}</h3>
+        <h3 style={styles.title}>{isEdit ? t('modal_editRecord') : t('modal_addRecord')}</h3>
 
         {error && <div style={styles.error}>{error}</div>}
 
         <div style={styles.grid}>
           <label style={styles.label}>
-            Name
-            <input value={form.name ?? ''} onChange={e => set('name', e.target.value)} required style={styles.input} placeholder="@ or subdomain" />
+            {t('name')}
+            <input value={form.name ?? ''} onChange={e => set('name', e.target.value)} required style={styles.input} placeholder={t('bulk_namePh')} />
           </label>
           <label style={styles.label}>
-            Type
+            {t('type')}
             <select value={form.type ?? 'A'} onChange={e => set('type', e.target.value)} style={styles.input}>
-              {RECORD_TYPES.map(t => <option key={t}>{t}</option>)}
+              {RECORD_TYPES.map(tp => <option key={tp}>{tp}</option>)}
             </select>
           </label>
           <label style={styles.label}>
-            TTL <span style={styles.hint}>(blank = zone default)</span>
+            {t('ttl')} <span style={styles.hint}>{t('modal_ttlHint')}</span>
             <input type="number" value={form.ttl ?? ''} onChange={e => set('ttl', e.target.value ? Number(e.target.value) : undefined)} style={styles.input} placeholder="3600" />
           </label>
           {needsPriority && (
             <label style={styles.label}>
-              Priority
+              {t('priority')}
               <input type="number" value={form.priority ?? ''} onChange={e => set('priority', Number(e.target.value))} required style={styles.input} />
             </label>
           )}
           {needsSrv && <>
             <label style={styles.label}>
-              Weight
+              {t('weight')}
               <input type="number" value={form.weight ?? ''} onChange={e => set('weight', Number(e.target.value))} required style={styles.input} />
             </label>
             <label style={styles.label}>
-              Port
+              {t('port')}
               <input type="number" value={form.port ?? ''} onChange={e => set('port', Number(e.target.value))} required style={styles.input} />
             </label>
           </>}
         </div>
 
         <label style={styles.label}>
-          Value
+          {t('value')}
           <textarea
             value={form.value ?? ''}
             onChange={e => set('value', e.target.value)}
@@ -96,9 +98,9 @@ export default function RecordModal({ record, onSave, onClose }: Props) {
         </label>
 
         <div style={styles.actions}>
-          <button type="button" onClick={onClose} style={styles.btnSecondary}>Cancel</button>
+          <button type="button" onClick={onClose} style={styles.btnSecondary}>{t('cancel')}</button>
           <button type="submit" disabled={saving} style={styles.btnPrimary}>
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? t('saving') : t('save')}
           </button>
         </div>
       </form>

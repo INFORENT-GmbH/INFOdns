@@ -47,7 +47,7 @@ export async function authRoutes(app: FastifyInstance) {
     reply
       .setCookie('refresh_token', refreshToken, {
         httpOnly: true,
-        sameSite: 'strict',
+        sameSite: 'lax',
         path: '/api/v1/auth/refresh',
         maxAge: 7 * 24 * 60 * 60,
       })
@@ -77,7 +77,7 @@ export async function authRoutes(app: FastifyInstance) {
     reply
       .setCookie('refresh_token', newRefresh, {
         httpOnly: true,
-        sameSite: 'strict',
+        sameSite: 'lax',
         path: '/api/v1/auth/refresh',
         maxAge: 7 * 24 * 60 * 60,
       })

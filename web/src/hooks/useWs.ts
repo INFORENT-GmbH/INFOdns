@@ -1,10 +1,12 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 type WsEvent =
   | { type: 'domain_status'; domainId: number; fqdn: string; zone_status: string; last_serial?: number; last_rendered_at?: string | null; zone_error?: string | null }
   | { type: 'bulk_job_progress'; jobId: number; status: string; processed_domains: number; affected_domains: number }
   | { type: 'record_changed'; domainId: number }
+
+export type WsStatus = 'connected' | 'disconnected' | 'reconnecting'
 
 const WS_BASE = (() => {
   const api = (import.meta.env.VITE_API_URL ?? '')
@@ -13,10 +15,13 @@ const WS_BASE = (() => {
   return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host
 })()
 
-export function useWs(token: string | null) {
+export function useWs(token: string | null): WsStatus {
   const qc = useQueryClient()
   const wsRef = useRef<WebSocket | null>(null)
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [status, setStatus] = useState<WsStatus>('connected')
+  // Track whether we've ever successfully connected so we know when a close is a *re*connect
+  const everConnected = useRef(false)
 
   useEffect(() => {
     if (!token) return  // not logged in; do nothing
@@ -28,6 +33,16 @@ export function useWs(token: string | null) {
       const url = `${WS_BASE}/api/v1/ws?token=${encodeURIComponent(token!)}`
       const ws = new WebSocket(url)
       wsRef.current = ws
+
+      ws.onopen = () => {
+        if (everConnected.current) {
+          // Was disconnected — reload to sync any missed events
+          window.location.reload()
+        } else {
+          everConnected.current = true
+          setStatus('connected')
+        }
+      }
 
       ws.onmessage = (e) => {
         let event: WsEvent
@@ -65,6 +80,7 @@ export function useWs(token: string | null) {
       ws.onclose = () => {
         wsRef.current = null
         if (!destroyed) {
+          if (everConnected.current) setStatus('reconnecting')
           retryRef.current = setTimeout(connect, 3000)
         }
       }
@@ -81,4 +97,6 @@ export function useWs(token: string | null) {
       wsRef.current = null
     }
   }, [token, qc])
+
+  return status
 }

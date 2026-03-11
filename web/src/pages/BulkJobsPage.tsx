@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getBulkJobs, createBulkJob, previewBulkJob, approveBulkJob,
-  getBulkJob, getBulkJobDomains, searchByRecord, type BulkJob,
+  getBulkJob, getBulkJobDomains, searchByRecord, type BulkJob, type BulkJobDomain,
 } from '../api/client'
+import { useI18n } from '../i18n/I18nContext'
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ interface PayloadFormProps {
 }
 
 function PayloadForm({ operation, matchType, matchName, matchValue, onChange }: PayloadFormProps) {
+  const { t } = useI18n()
   const [newName, setNewName]         = useState(matchName)
   const [newType, setNewType]         = useState(matchType)
   const [newValue, setNewValue]       = useState('')
@@ -104,22 +106,22 @@ function PayloadForm({ operation, matchType, matchName, matchValue, onChange }: 
       {/* Match criteria summary */}
       {showMatchFilter && (
         <div style={{ background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 4, padding: '.5rem .75rem', fontSize: '.8125rem' }}>
-          <strong>Matching:</strong> {matchType} records
-          {matchValue && <> with value containing <code style={{ background: '#e5e7eb', padding: '1px 4px', borderRadius: 2 }}>{matchValue}</code></>}
-          {' '}where name =
+          <strong>{t('bulk_matching')}</strong> {matchType} {t('bulk_records')}
+          {matchValue && <> {t('bulk_withValueContaining')} <code style={{ background: '#e5e7eb', padding: '1px 4px', borderRadius: 2 }}>{matchValue}</code></>}
+          {' '}{t('bulk_whereName')}
           <input
             value={filterName}
             onChange={e => { setFilterName(e.target.value); emit({ _filterName: e.target.value }) }}
             style={{ marginLeft: '.4rem', padding: '1px 6px', border: '1px solid #d1d5db', borderRadius: 3, fontSize: '.8125rem', width: 80 }}
-            placeholder="any"
+            placeholder={t('bulk_anyName')}
           />
-          <span style={{ color: '#9ca3af', marginLeft: '.4rem' }}>(leave blank to match all names)</span>
+          <span style={{ color: '#9ca3af', marginLeft: '.4rem' }}>{t('bulk_leaveBlank')}</span>
         </div>
       )}
 
       {operation === 'change_ttl' && (
         <label style={styles.label}>
-          New TTL (seconds)
+          {t('bulk_newTtlSeconds')}
           <input
             type="number" value={newTtl}
             onChange={e => { setNewTtl(e.target.value); emit({ new_ttl: Number(e.target.value) }) }}
@@ -131,34 +133,34 @@ function PayloadForm({ operation, matchType, matchName, matchValue, onChange }: 
       {(operation === 'add' || operation === 'replace') && (
         <>
           <label style={styles.label}>
-            Name
+            {t('name')}
             <input value={newName}
               onChange={e => { setNewName(e.target.value); emit({ name: e.target.value }) }}
-              style={styles.input} placeholder="@ or subdomain" />
+              style={styles.input} placeholder={t('bulk_namePh')} />
           </label>
           <label style={styles.label}>
-            Type
+            {t('type')}
             <select value={newType}
               onChange={e => { setNewType(e.target.value); emit({ type: e.target.value }) }}
               style={styles.input}>
-              {RECORD_TYPES.map(t => <option key={t}>{t}</option>)}
+              {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
             </select>
           </label>
           <label style={styles.label}>
-            Value
+            {t('value')}
             <input value={newValue}
               onChange={e => { setNewValue(e.target.value); emit({ value: e.target.value }) }}
-              style={styles.input} placeholder="e.g. 1.2.3.4" />
+              style={styles.input} placeholder={t('bulk_valuePh')} />
           </label>
           <label style={styles.label}>
-            TTL (seconds)
+            {t('bulk_ttlSeconds')}
             <input type="number" value={newTtl}
               onChange={e => { setNewTtl(e.target.value); emit({ ttl: Number(e.target.value) }) }}
               style={styles.input} />
           </label>
           {(newType === 'MX' || newType === 'SRV') && (
             <label style={styles.label}>
-              Priority
+              {t('priority')}
               <input type="number" value={newPriority}
                 onChange={e => { setNewPriority(e.target.value); emit({ priority: Number(e.target.value) }) }}
                 style={styles.input} placeholder="10" />
@@ -170,12 +172,102 @@ function PayloadForm({ operation, matchType, matchName, matchValue, onChange }: 
   )
 }
 
+// ── Job detail panel (expandable row) ─────────────────────────
+
+function JobDetail({ job }: { job: BulkJob }) {
+  const { t } = useI18n()
+  const { data: domains = [] } = useQuery<BulkJobDomain[]>({
+    queryKey: ['bulk-job-domains', job.id],
+    queryFn: () => getBulkJobDomains(job.id).then(r => r.data),
+    refetchInterval: ['running', 'previewing'].includes(job.status) ? 2000 : false,
+  })
+
+  const preview = job.preview_json
+    ? (typeof job.preview_json === 'string' ? JSON.parse(job.preview_json) : job.preview_json) as any
+    : null
+
+  return (
+    <div style={styles.detailPanel}>
+      {preview?.summary && (
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={styles.detailLabel}>{t('jobs_previewSummary')}</div>
+          <div style={styles.detailSummaryRow}>
+            <div style={styles.detailSummaryBox}>
+              <div style={styles.detailSummaryNum}>{preview.summary.domains_affected ?? 0}</div>
+              <div style={styles.detailSummaryLbl}>{t('bulk_domainsLabel')}</div>
+            </div>
+            <div style={styles.detailSummaryBox}>
+              <div style={styles.detailSummaryNum}>{preview.summary.records_added ?? 0}</div>
+              <div style={styles.detailSummaryLbl}>{t('jobs_recordsAdded')}</div>
+            </div>
+            <div style={styles.detailSummaryBox}>
+              <div style={{ ...styles.detailSummaryNum, color: (preview.summary.records_deleted ?? 0) > 0 ? '#dc2626' : '#111' }}>
+                {preview.summary.records_deleted ?? 0}
+              </div>
+              <div style={styles.detailSummaryLbl}>{t('jobs_recordsDeleted')}</div>
+            </div>
+            <div style={styles.detailSummaryBox}>
+              <div style={styles.detailSummaryNum}>{preview.summary.records_updated ?? 0}</div>
+              <div style={styles.detailSummaryLbl}>{t('jobs_ttlChanges')}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(domains as BulkJobDomain[]).length > 0 && (
+        <div>
+          <div style={styles.detailLabel}>{t('jobs_perDomainStatus')}</div>
+          <div style={{ border: '1px solid #e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.8125rem' }}>
+              <thead>
+                <tr style={{ background: '#f9fafb' }}>
+                  <th style={styles.th}>{t('domain')}</th>
+                  <th style={styles.th}>{t('jobs_status')}</th>
+                  <th style={styles.th}>{t('jobs_changes')}</th>
+                  <th style={styles.th}>{t('jobs_error')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(domains as BulkJobDomain[]).map(d => {
+                  const pd = preview?.per_domain?.find((p: any) => p.domain_id === d.domain_id)
+                  return (
+                    <tr key={d.id} style={styles.tr}>
+                      <td style={styles.td}>{d.fqdn}</td>
+                      <td style={styles.td}><StatusBadge status={d.status} /></td>
+                      <td style={styles.td}>
+                        {pd ? <span style={{ color: '#6b7280' }}>{pd.changes.length}</span> : '—'}
+                      </td>
+                      <td style={styles.td}>
+                        {d.error
+                          ? <span style={{ color: '#b91c1c', fontFamily: 'monospace', fontSize: '.75rem' }}>{d.error}</span>
+                          : <span style={{ color: '#9ca3af' }}>—</span>}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {job.error && (
+        <div style={{ background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 4, fontSize: '.8125rem', fontFamily: 'monospace', marginTop: '.5rem' }}>
+          {job.error}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────
 
 export default function BulkJobsPage() {
+  const { t } = useI18n()
   const qc = useQueryClient()
   const [showWizard, setShowWizard] = useState(false)
   const [step, setStep] = useState<Step>('search')
+  const [expandedJob, setExpandedJob] = useState<number | null>(null)
 
   // Search state
   const [searchType, setSearchType] = useState('A')
@@ -258,7 +350,7 @@ export default function BulkJobsPage() {
   }
 
   async function handlePreview() {
-    if (selectedIds.size === 0) { setError('Select at least one domain'); return }
+    if (selectedIds.size === 0) { setError(t('bulk_selectOneDomain')); return }
     setBusy(true)
     setError(null)
     try {
@@ -318,8 +410,8 @@ export default function BulkJobsPage() {
   return (
     <div>
       <div style={styles.header}>
-        <h2 style={styles.h2}>Bulk Jobs</h2>
-        <button onClick={() => setShowWizard(true)} style={styles.btnPrimary}>+ New Bulk Job</button>
+        <h2 style={styles.h2}>{t('bulk_title')}</h2>
+        <button onClick={() => setShowWizard(true)} style={styles.btnPrimary}>{t('bulk_newJob')}</button>
       </div>
 
       {showWizard && (
@@ -327,10 +419,10 @@ export default function BulkJobsPage() {
           {/* Header */}
           <div style={styles.wizardTitle}>
             <span style={{ fontWeight: 700 }}>
-              {step === 'search' && 'Find domains by record'}
-              {step === 'payload' && 'Configure operation'}
-              {step === 'preview' && 'Preview changes'}
-              {step === 'done' && 'Done'}
+              {step === 'search' && t('bulk_findDomains')}
+              {step === 'payload' && t('bulk_configureOp')}
+              {step === 'preview' && t('bulk_previewChanges')}
+              {step === 'done' && t('bulk_done')}
             </span>
             <button onClick={resetWizard} style={styles.closeBtn}>✕</button>
           </div>
@@ -342,32 +434,32 @@ export default function BulkJobsPage() {
             <>
               <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
                 <label style={styles.label}>
-                  Type
+                  {t('type')}
                   <select value={searchType} onChange={e => { setSearchType(e.target.value); handleSearch() }} style={{ ...styles.input, width: 100 }}>
-                    {RECORD_TYPES.map(t => <option key={t}>{t}</option>)}
+                    {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
                   </select>
                 </label>
                 <label style={styles.label}>
-                  Record name
+                  {t('bulk_recordName')}
                   <input value={searchName} onChange={e => setSearchName(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                    style={{ ...styles.input, width: 120 }} placeholder="@ or www" />
+                    style={{ ...styles.input, width: 120 }} placeholder={t('bulk_recordNamePh')} />
                 </label>
                 <label style={styles.label}>
-                  Record value contains
+                  {t('bulk_recordValueContains')}
                   <input value={searchValue} onChange={e => setSearchValue(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSearch()}
                     style={{ ...styles.input, width: 160 }} placeholder="1.2.3.4" />
                 </label>
                 <label style={styles.label}>
-                  Domain contains
+                  {t('bulk_domainContains')}
                   <input value={searchDomain} onChange={e => setSearchDomain(e.target.value)}
-                    style={{ ...styles.input, width: 150 }} placeholder="example.com" />
+                    style={{ ...styles.input, width: 150 }} placeholder={t('bulk_domainContainsPh')} />
                 </label>
                 <label style={{ ...styles.label, justifyContent: 'flex-end' }}>
                   &nbsp;
                   <button onClick={handleSearch} style={styles.btnPrimary} disabled={searching}>
-                    {searching ? 'Searching…' : 'Search'}
+                    {searching ? t('bulk_searching') : t('bulk_search')}
                   </button>
                 </label>
               </div>
@@ -376,12 +468,12 @@ export default function BulkJobsPage() {
                 <>
                   <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
                     <span style={{ fontSize: '.875rem', color: '#6b7280' }}>
-                      {domains.length} domain{domains.length !== 1 ? 's' : ''} found
+                      {domains.length} {t('bulk_domainsFound')}
                     </span>
-                    <button onClick={selectAll} style={styles.btnMini}>Select all</button>
-                    <button onClick={selectNone} style={styles.btnMini}>None</button>
+                    <button onClick={selectAll} style={styles.btnMini}>{t('bulk_selectAll')}</button>
+                    <button onClick={selectNone} style={styles.btnMini}>{t('bulk_selectNone')}</button>
                     <span style={{ marginLeft: 'auto', fontSize: '.875rem', fontWeight: 600 }}>
-                      {selectedIds.size} selected
+                      {selectedIds.size} {t('bulk_selected')}
                     </span>
                   </div>
                   <div style={styles.domainList}>
@@ -405,19 +497,19 @@ export default function BulkJobsPage() {
               )}
 
               {searchResults.length === 0 && !searching && (
-                <p style={styles.muted}>No matching records found.</p>
+                <p style={styles.muted}>{t('bulk_noMatchingRecords')}</p>
               )}
 
               {/* Operation selector */}
               {domains.length > 0 && (
                 <>
                   <label style={styles.label}>
-                    Operation
+                    {t('bulk_operation')}
                     <select value={operation} onChange={e => setOperation(e.target.value as Operation)} style={styles.input}>
-                      <option value="add">Add record</option>
-                      <option value="replace">Replace matching record</option>
-                      <option value="delete">Delete matching record</option>
-                      <option value="change_ttl">Change TTL</option>
+                      <option value="add">{t('bulk_opAdd')}</option>
+                      <option value="replace">{t('bulk_opReplace')}</option>
+                      <option value="delete">{t('bulk_opDelete')}</option>
+                      <option value="change_ttl">{t('bulk_opChangeTtl')}</option>
                     </select>
                   </label>
 
@@ -432,13 +524,13 @@ export default function BulkJobsPage() {
               )}
 
               <div style={styles.actions}>
-                <button onClick={resetWizard} style={styles.btnSecondary}>Cancel</button>
+                <button onClick={resetWizard} style={styles.btnSecondary}>{t('cancel')}</button>
                 <button
                   onClick={handlePreview}
                   disabled={busy || selectedIds.size === 0}
                   style={styles.btnPrimary}
                 >
-                  {busy ? 'Computing preview…' : `Preview (${selectedIds.size} domain${selectedIds.size !== 1 ? 's' : ''})`}
+                  {busy ? t('bulk_computingPreview') : `${t('bulk_previewBtn')} (${selectedIds.size} ${t('bulk_domainsFound')})`}
                 </button>
               </div>
             </>
@@ -452,21 +544,21 @@ export default function BulkJobsPage() {
                   <div style={styles.summaryRow}>
                     <div style={styles.summaryBox}>
                       <div style={styles.summaryNum}>{previewData?.summary?.domains_affected ?? 0}</div>
-                      <div style={styles.summaryLbl}>Domains</div>
+                      <div style={styles.summaryLbl}>{t('bulk_domainsLabel')}</div>
                     </div>
                     <div style={styles.summaryBox}>
                       <div style={styles.summaryNum}>{previewData?.summary?.records_added ?? 0}</div>
-                      <div style={styles.summaryLbl}>Records added</div>
+                      <div style={styles.summaryLbl}>{t('bulk_recordsAdded')}</div>
                     </div>
                     <div style={styles.summaryBox}>
                       <div style={{ ...styles.summaryNum, color: previewData?.summary?.records_deleted > 0 ? '#dc2626' : '#111' }}>
                         {previewData?.summary?.records_deleted ?? 0}
                       </div>
-                      <div style={styles.summaryLbl}>Records deleted</div>
+                      <div style={styles.summaryLbl}>{t('bulk_recordsDeleted')}</div>
                     </div>
                     <div style={styles.summaryBox}>
                       <div style={styles.summaryNum}>{previewData?.summary?.records_updated ?? 0}</div>
-                      <div style={styles.summaryLbl}>TTL changes</div>
+                      <div style={styles.summaryLbl}>{t('bulk_ttlChanges')}</div>
                     </div>
                   </div>
 
@@ -476,8 +568,8 @@ export default function BulkJobsPage() {
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.8125rem' }}>
                         <thead>
                           <tr style={{ background: '#f9fafb' }}>
-                            <th style={styles.th}>Domain</th>
-                            <th style={styles.th}>Changes</th>
+                            <th style={styles.th}>{t('domain')}</th>
+                            <th style={styles.th}>{t('changes')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -509,8 +601,8 @@ export default function BulkJobsPage() {
                       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.8125rem' }}>
                         <thead>
                           <tr style={{ background: '#f9fafb' }}>
-                            <th style={styles.th}>Domain</th>
-                            <th style={styles.th}>Status</th>
+                            <th style={styles.th}>{t('domain')}</th>
+                            <th style={styles.th}>{t('status')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -526,18 +618,18 @@ export default function BulkJobsPage() {
                   )}
 
                   <div style={styles.actions}>
-                    <button onClick={resetWizard} style={styles.btnSecondary}>Cancel</button>
+                    <button onClick={resetWizard} style={styles.btnSecondary}>{t('cancel')}</button>
                     <button
                       onClick={handleApprove}
                       disabled={busy || currentJob.status !== 'approved'}
                       style={styles.btnPrimary}
                     >
-                      {busy ? 'Approving…' : 'Approve & Execute'}
+                      {busy ? t('bulk_approving') : t('bulk_approveExecute')}
                     </button>
                   </div>
                 </>
               ) : (
-                <p style={styles.muted}>Loading preview…</p>
+                <p style={styles.muted}>{t('bulk_loadingPreview')}</p>
               )}
             </>
           )}
@@ -546,9 +638,9 @@ export default function BulkJobsPage() {
           {step === 'done' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'flex-start' }}>
               <p style={{ margin: 0, color: '#15803d', fontWeight: 600 }}>
-                Bulk job approved — zones will be updated shortly.
+                {t('bulk_jobApproved')}
               </p>
-              <button onClick={resetWizard} style={styles.btnPrimary}>Done</button>
+              <button onClick={resetWizard} style={styles.btnPrimary}>{t('bulk_done')}</button>
             </div>
           )}
         </div>
@@ -556,41 +648,65 @@ export default function BulkJobsPage() {
 
       {/* ── Jobs table ── */}
       {jobsLoading ? (
-        <p style={styles.muted}>Loading…</p>
+        <p style={styles.muted}>{t('loading')}</p>
+      ) : (jobs as BulkJob[]).length === 0 ? (
+        <p style={styles.muted}>{t('bulk_noJobs')}</p>
       ) : (
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={styles.th}>ID</th>
-              <th style={styles.th}>Operation</th>
-              <th style={styles.th}>Status</th>
-              <th style={styles.th}>Domains</th>
-              <th style={styles.th}>Progress</th>
-              <th style={styles.th}>Created</th>
+              <th style={styles.th}>{t('bulk_id')}</th>
+              <th style={styles.th}>{t('bulk_operation')}</th>
+              <th style={styles.th}>{t('status')}</th>
+              <th style={styles.th}>{t('bulk_domainsLabel')}</th>
+              <th style={styles.th}>{t('bulk_progress')}</th>
+              <th style={styles.th}>{t('created')}</th>
+              <th style={styles.th}></th>
             </tr>
           </thead>
           <tbody>
             {(jobs as BulkJob[]).map(j => (
-              <tr key={j.id} style={styles.tr}>
-                <td style={styles.td}>{j.id}</td>
-                <td style={styles.td}><code>{j.operation}</code></td>
-                <td style={styles.td}><StatusBadge status={j.status} /></td>
-                <td style={styles.td}>{j.affected_domains ?? '—'}</td>
-                <td style={styles.td}>
-                  {j.affected_domains
-                    ? `${j.processed_domains ?? 0} / ${j.affected_domains}`
-                    : '—'}
-                </td>
-                <td style={styles.td}>{new Date(j.created_at).toLocaleString()}</td>
-              </tr>
+              <>
+                <tr key={j.id} style={styles.tr}>
+                  <td style={styles.tdMono}>{j.id}</td>
+                  <td style={styles.td}><code style={styles.code}>{j.operation}</code></td>
+                  <td style={styles.td}><StatusBadge status={j.status} /></td>
+                  <td style={styles.td}>{j.affected_domains ?? '—'}</td>
+                  <td style={styles.td}>
+                    {j.affected_domains ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                        <div style={styles.progressTrack}>
+                          <div style={{
+                            ...styles.progressBar,
+                            width: `${Math.round(((j.processed_domains ?? 0) / j.affected_domains) * 100)}%`,
+                            background: j.status === 'failed' ? '#dc2626' : '#2563eb',
+                          }} />
+                        </div>
+                        <span style={{ fontSize: '.8125rem', color: '#6b7280', whiteSpace: 'nowrap' }}>
+                          {j.processed_domains ?? 0} / {j.affected_domains}
+                        </span>
+                      </div>
+                    ) : '—'}
+                  </td>
+                  <td style={styles.tdMono}>{new Date(j.created_at).toLocaleString()}</td>
+                  <td style={{ ...styles.td, textAlign: 'right' }}>
+                    <button
+                      onClick={() => setExpandedJob(expandedJob === j.id ? null : j.id)}
+                      style={styles.detailBtn}
+                    >
+                      {expandedJob === j.id ? t('jobs_hide') : t('jobs_detail')}
+                    </button>
+                  </td>
+                </tr>
+                {expandedJob === j.id && (
+                  <tr key={`${j.id}-detail`}>
+                    <td colSpan={7} style={{ padding: 0, borderBottom: '1px solid #e5e7eb' }}>
+                      <JobDetail job={j} />
+                    </td>
+                  </tr>
+                )}
+              </>
             ))}
-            {(jobs as BulkJob[]).length === 0 && (
-              <tr>
-                <td colSpan={6} style={{ ...styles.td, textAlign: 'center', color: '#9ca3af' }}>
-                  No bulk jobs yet
-                </td>
-              </tr>
-            )}
           </tbody>
         </table>
       )}
@@ -623,6 +739,17 @@ const styles: Record<string, React.CSSProperties> = {
   table:        { width: '100%', borderCollapse: 'collapse' },
   th:           { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
   tr:           { borderBottom: '1px solid #e5e7eb' },
-  td:           { padding: '.625rem .75rem', fontSize: '.875rem' },
+  td:           { padding: '.625rem .75rem', fontSize: '.875rem', verticalAlign: 'middle' },
+  tdMono:       { padding: '.625rem .75rem', fontSize: '.8125rem', fontFamily: 'monospace', verticalAlign: 'middle' },
+  code:         { background: '#f3f4f6', padding: '1px 5px', borderRadius: 3, fontSize: '.8125rem' },
+  detailBtn:    { background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '.8125rem', padding: 0, textDecoration: 'underline' },
+  progressTrack:{ height: 6, background: '#e5e7eb', borderRadius: 3, width: 80, overflow: 'hidden' },
+  progressBar:  { height: '100%', borderRadius: 3, transition: 'width .3s' },
+  detailPanel:  { padding: '1rem 1.25rem', background: '#fafafa', borderTop: '1px solid #f0f0f0' },
+  detailLabel:  { fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' as const, marginBottom: '.5rem' },
+  detailSummaryRow: { display: 'flex', gap: '.75rem', flexWrap: 'wrap' as const },
+  detailSummaryBox: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: '.625rem 1rem', textAlign: 'center' as const, minWidth: 90 },
+  detailSummaryNum: { fontSize: '1.25rem', fontWeight: 700 },
+  detailSummaryLbl: { fontSize: '.7rem', color: '#6b7280', marginTop: '.2rem' },
   muted:        { color: '#9ca3af', margin: 0 },
 }

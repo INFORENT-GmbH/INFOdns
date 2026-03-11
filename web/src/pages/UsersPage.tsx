@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getUsers, createUser, type User } from '../api/client'
+import { useI18n } from '../i18n/I18nContext'
 
 export default function UsersPage() {
+  const { t } = useI18n()
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ email: '', password: '', full_name: '', role: 'customer', customer_id: '' })
@@ -44,45 +46,45 @@ export default function UsersPage() {
   return (
     <div>
       <div style={styles.header}>
-        <h2 style={styles.h2}>Users</h2>
-        <button onClick={() => setShowForm(v => !v)} style={styles.btnPrimary}>+ Add User</button>
+        <h2 style={styles.h2}>{t('users_title')}</h2>
+        <button onClick={() => setShowForm(v => !v)} style={styles.btnPrimary}>{t('users_add')}</button>
       </div>
 
       {showForm && (
         <form onSubmit={handleSubmit} style={styles.formCard}>
-          <h4 style={{ margin: 0 }}>New User</h4>
+          <h4 style={{ margin: 0 }}>{t('users_newTitle')}</h4>
           {error && <div style={styles.error}>{error}</div>}
           <div style={styles.grid}>
-            <label style={styles.label}>Email <input type="email" value={form.email} onChange={e => setField('email', e.target.value)} required style={styles.input} /></label>
-            <label style={styles.label}>Password <input type="password" value={form.password} onChange={e => setField('password', e.target.value)} required minLength={8} style={styles.input} /></label>
-            <label style={styles.label}>Full name <input value={form.full_name} onChange={e => setField('full_name', e.target.value)} required style={styles.input} /></label>
+            <label style={styles.label}>{t('email')} <input type="email" value={form.email} onChange={e => setField('email', e.target.value)} required style={styles.input} /></label>
+            <label style={styles.label}>{t('login_password')} <input type="password" value={form.password} onChange={e => setField('password', e.target.value)} required minLength={8} style={styles.input} /></label>
+            <label style={styles.label}>{t('users_fullName')} <input value={form.full_name} onChange={e => setField('full_name', e.target.value)} required style={styles.input} /></label>
             <label style={styles.label}>
-              Role
+              {t('role')}
               <select value={form.role} onChange={e => setField('role', e.target.value)} style={styles.input}>
                 <option value="admin">admin</option>
                 <option value="operator">operator</option>
                 <option value="customer">customer</option>
               </select>
             </label>
-            <label style={styles.label}>Customer ID (optional) <input type="number" value={form.customer_id} onChange={e => setField('customer_id', e.target.value)} style={styles.input} /></label>
+            <label style={styles.label}>{t('users_customerIdOptional')} <input type="number" value={form.customer_id} onChange={e => setField('customer_id', e.target.value)} style={styles.input} /></label>
           </div>
           <div style={styles.actions}>
-            <button type="button" onClick={() => setShowForm(false)} style={styles.btnSecondary}>Cancel</button>
-            <button type="submit" disabled={saving} style={styles.btnPrimary}>{saving ? 'Creating…' : 'Create'}</button>
+            <button type="button" onClick={() => setShowForm(false)} style={styles.btnSecondary}>{t('cancel')}</button>
+            <button type="submit" disabled={saving} style={styles.btnPrimary}>{saving ? t('creating') : t('create')}</button>
           </div>
         </form>
       )}
 
-      {isLoading ? <p>Loading…</p> : (
+      {isLoading ? <p>{t('loading')}</p> : (
         <table style={styles.table}>
           <thead>
             <tr>
-              <th style={styles.th}>Email</th>
-              <th style={styles.th}>Name</th>
-              <th style={styles.th}>Role</th>
-              <th style={styles.th}>Customer ID</th>
-              <th style={styles.th}>Active</th>
-              <th style={styles.th}>Created</th>
+              <th style={styles.th}>{t('email')}</th>
+              <th style={styles.th}>{t('name')}</th>
+              <th style={styles.th}>{t('role')}</th>
+              <th style={styles.th}>{t('domains_customerIdPlaceholder')}</th>
+              <th style={styles.th}>{t('active')}</th>
+              <th style={styles.th}>{t('created')}</th>
             </tr>
           </thead>
           <tbody>

@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getAuditLogs, type AuditLog } from '../api/client'
+import { useI18n } from '../i18n/I18nContext'
 
 const ACTIONS = ['', 'create', 'update', 'delete', 'bulk_apply']
 const LIMIT = 50
 
 export default function AuditLogPage() {
+  const { t } = useI18n()
   const [filters, setFilters] = useState({ domain_id: '', user_id: '', action: '', from: '', to: '' })
   const [page, setPage] = useState(1)
   const [expanded, setExpanded] = useState<number | null>(null)
@@ -34,22 +36,22 @@ export default function AuditLogPage() {
   return (
     <div>
       <div style={styles.header}>
-        <h2 style={styles.h2}>Audit Log</h2>
+        <h2 style={styles.h2}>{t('audit_title')}</h2>
         {total > 0 && (
-          <span style={styles.totalBadge}>{total.toLocaleString()} entries</span>
+          <span style={styles.totalBadge}>{total.toLocaleString()} {t('audit_entries')}</span>
         )}
       </div>
 
       {/* Filters */}
       <div style={styles.filters}>
         <input
-          placeholder="Domain ID"
+          placeholder={t('audit_domainId')}
           value={filters.domain_id}
           onChange={e => setFilter('domain_id', e.target.value)}
           style={styles.filterInput}
         />
         <input
-          placeholder="User ID"
+          placeholder={t('audit_userId')}
           value={filters.user_id}
           onChange={e => setFilter('user_id', e.target.value)}
           style={styles.filterInput}
@@ -60,7 +62,7 @@ export default function AuditLogPage() {
           style={{ ...styles.filterInput, width: 160 }}
         >
           {ACTIONS.map(a => (
-            <option key={a} value={a}>{a || 'All actions'}</option>
+            <option key={a} value={a}>{a || t('audit_allActions')}</option>
           ))}
         </select>
         <input
@@ -68,37 +70,37 @@ export default function AuditLogPage() {
           value={filters.from}
           onChange={e => setFilter('from', e.target.value)}
           style={styles.filterInput}
-          title="From date"
+          title={t('audit_fromDate')}
         />
         <input
           type="date"
           value={filters.to}
           onChange={e => setFilter('to', e.target.value)}
           style={styles.filterInput}
-          title="To date"
+          title={t('audit_toDate')}
         />
         <button
           onClick={() => { setFilters({ domain_id: '', user_id: '', action: '', from: '', to: '' }); setPage(1) }}
           style={styles.btnSecondary}
         >
-          Clear
+          {t('audit_clear')}
         </button>
       </div>
 
       {isLoading ? (
-        <p style={styles.muted}>Loading…</p>
+        <p style={styles.muted}>{t('loading')}</p>
       ) : (
         <>
           <table style={{ ...styles.table, opacity: isFetching ? 0.6 : 1 }}>
             <thead>
               <tr>
-                <th style={styles.th}>Time</th>
-                <th style={styles.th}>User</th>
-                <th style={styles.th}>Action</th>
-                <th style={styles.th}>Entity</th>
-                <th style={styles.th}>Domain</th>
-                <th style={styles.th}>IP</th>
-                <th style={styles.th}>Changes</th>
+                <th style={styles.th}>{t('audit_time')}</th>
+                <th style={styles.th}>{t('audit_user')}</th>
+                <th style={styles.th}>{t('audit_action')}</th>
+                <th style={styles.th}>{t('audit_entity')}</th>
+                <th style={styles.th}>{t('domain')}</th>
+                <th style={styles.th}>{t('audit_ip')}</th>
+                <th style={styles.th}>{t('changes')}</th>
               </tr>
             </thead>
             <tbody>
@@ -117,7 +119,7 @@ export default function AuditLogPage() {
                           style={styles.diffToggle}
                           onClick={() => setExpanded(expanded === log.id ? null : log.id)}
                         >
-                          {expanded === log.id ? 'Hide' : 'View diff'}
+                          {expanded === log.id ? t('audit_hide') : t('audit_viewDiff')}
                         </button>
                       ) : <span style={styles.muted}>—</span>}
                     </td>
@@ -128,7 +130,7 @@ export default function AuditLogPage() {
                         <div style={styles.diffGrid}>
                           {log.old_value != null && (
                             <div>
-                              <div style={{ ...styles.diffLabel, color: '#b91c1c' }}>Before</div>
+                              <div style={{ ...styles.diffLabel, color: '#b91c1c' }}>{t('audit_before')}</div>
                               <pre style={{ ...styles.diffPre, borderColor: '#fecaca' }}>
                                 {JSON.stringify(log.old_value, null, 2)}
                               </pre>
@@ -136,7 +138,7 @@ export default function AuditLogPage() {
                           )}
                           {log.new_value != null && (
                             <div>
-                              <div style={{ ...styles.diffLabel, color: '#15803d' }}>After</div>
+                              <div style={{ ...styles.diffLabel, color: '#15803d' }}>{t('audit_after')}</div>
                               <pre style={{ ...styles.diffPre, borderColor: '#bbf7d0' }}>
                                 {JSON.stringify(log.new_value, null, 2)}
                               </pre>
@@ -151,7 +153,7 @@ export default function AuditLogPage() {
               {logs.length === 0 && (
                 <tr>
                   <td colSpan={7} style={{ ...styles.td, textAlign: 'center', color: '#9ca3af' }}>
-                    No log entries found
+                    {t('audit_noEntries')}
                   </td>
                 </tr>
               )}
@@ -176,7 +178,7 @@ export default function AuditLogPage() {
                 ‹
               </button>
               <span style={styles.pageInfo}>
-                Page {page} of {totalPages}
+                {t('audit_page')} {page} {t('audit_of')} {totalPages}
               </span>
               <button
                 style={styles.pageBtn}
