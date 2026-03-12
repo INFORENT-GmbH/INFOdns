@@ -24,7 +24,7 @@ jobs:
         run: |
           install -m 600 -D /dev/null ~/.ssh/id_ed25519
           printf '%s' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
-          ssh-keyscan -H hil1.dns.infrant.de >> ~/.ssh/known_hosts
+          ssh-keyscan -H hil1.dns.inforant.de >> ~/.ssh/known_hosts
 
       - name: Parse host and path from SSH_PATH_HIL1
         id: parse
