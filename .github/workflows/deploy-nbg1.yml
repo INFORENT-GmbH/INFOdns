@@ -45,6 +45,7 @@ jobs:
             --exclude='bind/secondary1/' \
             --exclude='bind/secondary2/' \
             --exclude='bind/secondary3/' \
+            --exclude='.env' \
             --exclude='mariadb/data/' \
             --exclude='web/node_modules/' \
             --exclude='api/node_modules/' \
