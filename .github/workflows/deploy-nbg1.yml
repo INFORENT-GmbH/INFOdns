@@ -28,6 +28,13 @@ jobs:
           printf '%s' "${{ secrets.SSH_KEY }}" | base64 -d > ~/.ssh/id_ed25519
           ssh-keyscan -H nbg1.dns.inforant.de >> ~/.ssh/known_hosts
 
+      - name: Parse host and path from SSH_PATH_NBG1
+        id: parse
+        run: |
+          SSH_PATH="${{ vars.SSH_PATH_NBG1 }}"
+          echo "host=${SSH_PATH%%:*}" >> $GITHUB_OUTPUT
+          echo "path=${SSH_PATH#*:}" >> $GITHUB_OUTPUT
+
       - name: Sync repository to nbg1
         run: |
           rsync -az --delete \
@@ -46,8 +53,8 @@ jobs:
 
       - name: Deploy on nbg1
         run: |
-          ssh root@nbg1.dns.inforant.de "
-            cd ${{ vars.SSH_PATH_NBG1 }} &&
+          ssh ${{ steps.parse.outputs.host }} "
+            cd ${{ steps.parse.outputs.path }} &&
             docker compose pull --quiet 2>/dev/null || true &&
             docker compose up -d --build --remove-orphans
           "
