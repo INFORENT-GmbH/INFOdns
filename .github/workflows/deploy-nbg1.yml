@@ -1,0 +1,50 @@
+name: Deploy — nbg1 (primary)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'bind/secondary-hil1/**'
+      - 'bind/secondary-hel1/**'
+      - '.github/workflows/deploy-hil1.yml'
+      - '.github/workflows/deploy-hel1.yml'
+      - 'README.md'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          install -m 600 -D /dev/null ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          ssh-keyscan -H nbg1.inforant.net >> ~/.ssh/known_hosts
+
+      - name: Sync repository to nbg1
+        run: |
+          rsync -az --delete \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='bind/secondary-hil1/' \
+            --exclude='bind/secondary-hel1/' \
+            --exclude='bind/secondary1/' \
+            --exclude='bind/secondary2/' \
+            --exclude='bind/secondary3/' \
+            --exclude='mariadb/data/' \
+            --exclude='web/node_modules/' \
+            --exclude='api/node_modules/' \
+            --exclude='worker/node_modules/' \
+            ./ ${{ vars.SSH_PATH_NBG1 }}/
+
+      - name: Deploy on nbg1
+        run: |
+          ssh root@nbg1.inforant.net "
+            cd ${{ vars.SSH_PATH_NBG1 }} &&
+            docker compose pull --quiet 2>/dev/null || true &&
+            docker compose up -d --build --remove-orphans
+          "

@@ -1,0 +1,43 @@
+name: Deploy — hil1 (secondary)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bind/secondary-hil1/**'
+      - 'bind/tsig.key'
+      - '.github/workflows/deploy-hil1.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          install -m 600 -D /dev/null ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          ssh-keyscan -H hil1.dns.infrant.de >> ~/.ssh/known_hosts
+
+      - name: Parse host and path from SSH_PATH_HIL1
+        id: parse
+        run: |
+          SSH_PATH="${{ vars.SSH_PATH_HIL1 }}"
+          echo "host=${SSH_PATH%%:*}" >> $GITHUB_OUTPUT
+          echo "path=${SSH_PATH#*:}" >> $GITHUB_OUTPUT
+
+      - name: Sync BIND config to hil1
+        run: |
+          rsync -az --delete \
+            bind/secondary-hil1/ ${{ vars.SSH_PATH_HIL1 }}/
+
+      - name: Reload BIND on hil1
+        run: |
+          ssh ${{ steps.parse.outputs.host }} "
+            named-checkconf ${{ steps.parse.outputs.path }}/named.conf &&
+            rndc reconfig
+          "

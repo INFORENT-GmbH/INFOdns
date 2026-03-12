@@ -48,9 +48,16 @@ The Worker is the **only** process that writes zone files or calls rndc.
 | `worker` | `./worker` (Node poll loop) | internal | — |
 | `web` | `./web` (React + Vite + nginx) | public | 80 |
 | `bind-primary` | `internetsystemsconsortium/bind9:9.18` | **internal only** | 53, 953 (internal) |
-| `bind-secondary1/2/3` | same image | internal + public | 5301–5303:53 |
 
 `bind-primary` is on the `internal: true` Docker network — it is **never reachable from the internet**.
+
+The two public secondaries run on real external servers deployed separately:
+
+| Server | Hostname | IP | Role |
+|---|---|---|---|
+| nbg1 | `nbg1.dns.inforant.de` | `168.119.122.226` | Hidden primary (Docker stack) |
+| hil1 | `hil1.dns.infrant.de` | `5.78.139.169` | Public secondary |
+| hel1 | `hel1.dns.inforant.de` | `89.167.67.148` | Public secondary |
 
 ---
 
@@ -110,10 +117,16 @@ INFOdns/
 │           ├── UsersPage.tsx
 │           └── AuditLogPage.tsx
 ├── bind/
-│   ├── primary/                ← named.conf, zones/ (written by worker)
-│   ├── secondary1/2/3/         ← named.conf, zones/ (written by BIND via AXFR)
-│   ├── tsig.key                ← TSIG for AXFR auth (not committed)
-│   └── rndc.key                ← rndc control key (not committed)
+│   ├── primary/                ← named.conf, zones/ (written by worker), deployed to nbg1
+│   ├── secondary-hil1/         ← named.conf.options (static), deployed to hil1 by CI
+│   ├── secondary-hel1/         ← named.conf.options (static), deployed to hel1 by CI
+│   ├── tsig.key                ← TSIG for AXFR auth (not committed, deploy manually)
+│   └── rndc.key                ← rndc control key (not committed, deploy manually)
+├── .github/
+│   └── workflows/
+│       ├── deploy-nbg1.yml     ← deploy full stack to nbg1 on push to main
+│       ├── deploy-hil1.yml     ← deploy BIND config to hil1 on bind/secondary-hil1 change
+│       └── deploy-hel1.yml     ← deploy BIND config to hel1 on bind/secondary-hel1 change
 ├── mariadb/
 │   ├── data/                   ← MariaDB data dir (not committed)
 │   └── init/001_schema.sql     ← full schema, runs once on first start
@@ -186,6 +199,52 @@ bcrypt.hash('yourpassword', 12).then(h =>
 
 ---
 
+## Deployment (GitHub Actions)
+
+Three workflows handle deployment on every push to `main`:
+
+| Workflow | Trigger | Target | What it deploys |
+|---|---|---|---|
+| `deploy-nbg1.yml` | Any change except secondary configs | `nbg1.inforant.net` | Full Docker Compose stack |
+| `deploy-hil1.yml` | `bind/secondary-hil1/**` changed | `hil1.dns.infrant.de` | BIND config only |
+| `deploy-hel1.yml` | `bind/secondary-hel1/**` changed | `hel1.dns.inforant.de` | BIND config only |
+
+### Required GitHub Secrets & Variables
+
+In **Settings → Secrets and variables → Actions**:
+
+| Name | Type | Value |
+|---|---|---|
+| `SSH_PRIVATE_KEY` | Secret | Ed25519 private key with root access to all three servers |
+| `SSH_PATH_NBG1` | Variable | `root@nbg1.inforant.net:/root/bind` |
+| `SSH_PATH_HIL1` | Variable | `root@hil1.dns.infrant.de:/root/bind` |
+| `SSH_PATH_HEL1` | Variable | `root@hel1.dns.inforant.de:/root/bind` |
+
+### One-time server setup
+
+Each server needs the corresponding public SSH key in `/root/.ssh/authorized_keys`. The nbg1 server also needs Docker and Docker Compose installed.
+
+For the secondary servers, BIND must be installed and the initial TSIG key + `named.conf` placed before the first deploy:
+
+```bash
+# On hil1 and hel1 (run once):
+apt-get install -y bind9
+mkdir -p /root/bind
+# Copy tsig.key manually (never committed to git)
+scp bind/tsig.key root@hil1.dns.infrant.de:/root/bind/tsig.key
+scp bind/tsig.key root@hel1.dns.inforant.de:/root/bind/tsig.key
+```
+
+The `named.conf` on each secondary should point to the files deployed by CI:
+
+```
+include "/root/bind/tsig.key";
+include "/root/bind/named.conf.options";
+include "/root/bind/named.conf.local";
+```
+
+---
+
 ## Zone Render Pipeline
 
 Every record mutation (create / update / delete) calls `enqueueRender(domainId)` in the API, which inserts or updates a row in `zone_render_queue` with `status = 'pending'`.
@@ -197,7 +256,7 @@ The worker polls every 2 seconds and processes pending jobs:
 3. **Serial** — `SELECT last_serial FOR UPDATE`, compute `YYYYMMDDnn`, update atomically
 4. **Render** — pure TypeScript function builds the zone file string: `$ORIGIN`, `$TTL`, SOA, NS records (from env), then all records
 5. **Validate** — `named-checkzone <fqdn> <tmpfile>` — non-zero exit marks the job failed
-6. **Sync conf** — regenerate `named.conf.local` for primary (and all secondaries) and run `rndc reconfig` — ensures newly created domains are known to BIND before reload
+6. **Sync conf** — regenerate `named.conf.local` for the primary and run `rndc reconfig` — ensures newly created domains are known to BIND before reload. Secondaries pick up new zones automatically via NOTIFY/AXFR.
 7. **Deploy** — write to `<fqdn>.zone.tmp`, then `rename()` to `<fqdn>.zone` (atomic)
 8. **Reload** — `rndc -s bind-primary -p 953 reload <fqdn>`
 9. **Mark clean** — update `domains.zone_status = 'clean'`, queue row `status = 'done'`
@@ -376,7 +435,7 @@ docker compose logs -f worker
 | `NS_RECORDS` | worker | Comma-separated NS FQDNs for zone rendering |
 | `SOA_MNAME` | worker | SOA primary nameserver (trailing dot) |
 | `SOA_RNAME` | worker | SOA hostmaster email in DNS format (trailing dot) |
-| `SECONDARY_HOSTS` | worker | Comma-separated secondary BIND hostnames for rndc |
+| `SECONDARY_IPS` | worker | Comma-separated public IPs of real secondary servers for `also-notify` |
 | `PUBLIC_API_URL` | web | Full URL the browser uses to reach the API |
 | `API_INTERNAL_URL` | worker | Internal Docker URL for the API (`http://api:3000`) |
 | `NAMED_CHECKZONE_BIN` | worker | Override path to `named-checkzone` binary |
