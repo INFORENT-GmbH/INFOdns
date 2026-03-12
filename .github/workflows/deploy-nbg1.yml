@@ -46,6 +46,8 @@ jobs:
             --exclude='bind/secondary2/' \
             --exclude='bind/secondary3/' \
             --exclude='.env' \
+            --exclude='bind/rndc.key' \
+            --exclude='bind/tsig.key' \
             --exclude='mariadb/data/' \
             --exclude='web/node_modules/' \
             --exclude='api/node_modules/' \
