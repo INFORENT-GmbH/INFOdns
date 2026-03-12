@@ -22,7 +22,7 @@ jobs:
       - name: Set up SSH
         run: |
           install -m 600 -D /dev/null ~/.ssh/id_ed25519
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          printf '%s' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_ed25519
           ssh-keyscan -H hel1.dns.inforant.de >> ~/.ssh/known_hosts
 
       - name: Parse host and path from SSH_PATH_HEL1
