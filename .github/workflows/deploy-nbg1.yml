@@ -58,6 +58,8 @@ jobs:
         run: |
           ssh ${{ steps.parse.outputs.host }} "
             cd ${{ steps.parse.outputs.path }} &&
+            mkdir -p bind/primary/zones &&
+            chmod 777 bind/primary/zones bind/primary &&
             docker compose pull --quiet 2>/dev/null || true &&
             docker compose up -d --build --remove-orphans
           "

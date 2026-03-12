@@ -80,6 +80,7 @@ services:
       - ./bind/rndc.key:/etc/rndc/rndc.key:ro
     networks:
       - internal
+      - public
 
   # ── Web UI ───────────────────────────────────────────────────
   web:
