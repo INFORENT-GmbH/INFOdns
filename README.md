@@ -107,7 +107,9 @@ INFOdns/
 │       ├── api/client.ts       ← axios instance + all API call functions
 │       ├── components/
 │       │   ├── Layout.tsx      ← nav bar, useWs(accessToken) mounted here
-│       │   └── ZoneStatusBadge.tsx
+│       │   ├── ZoneStatusBadge.tsx
+│       │   ├── LabelChip.tsx   ← colored label chip with auto/hex color logic
+│       │   └── ColorPicker.tsx ← hex color picker dropdown (presets + wheel + free input)
 │       └── pages/
 │           ├── LoginPage.tsx
 │           ├── DomainsPage.tsx
@@ -338,6 +340,39 @@ All three fields are optional and ANDed together. Always specify `name` when tar
 - **Approve** triggers the worker to execute in batches of 50 domains
 - Each domain is isolated — one failure does not stop the batch
 - Zone renders are enqueued per domain after mutations
+
+---
+
+## Domain Labels
+
+Domains support key=value labels (similar to Hetzner Cloud tags) for organization and filtering.
+
+- Labels are stored in the `domain_labels` table — multiple labels per domain, duplicate keys allowed
+- Each label has an optional hex color (`#rrggbb`); if omitted, a color is auto-generated deterministically from the key
+- Text color is automatically chosen (white or dark) based on luminance of the background
+
+### Managing labels
+
+On the **domain detail page**, labels appear below the meta block:
+- Click **+ New / + Neu** to open the add form (key + value + optional color)
+- Click any label chip to edit it inline (key, value, color)
+- Click ✕ on a chip to remove it
+- The color picker shows 10 pastel hex presets, a color wheel, and a free hex input
+
+### Filtering by label in the domain list
+
+The label filter input in the domains list accepts:
+- `key` — matches domains that have any label with that key
+- `key=value` — matches domains with that exact key/value pair
+
+The filter only applies on Enter or when a datalist suggestion is selected — partial text does not trigger filtering.
+
+### API
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/domains/labels` | Returns all distinct `{key, values[]}` for autocomplete |
+| `PUT` | `/api/v1/domains/:id/labels` | Full-replace labels for a domain (body: `{ labels: [{key, value, color?}] }`) |
 
 ---
 

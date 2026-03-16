@@ -73,6 +73,17 @@ CREATE TABLE domains (
   FOREIGN KEY (customer_id) REFERENCES customers(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── domain_labels ────────────────────────────────────────────
+CREATE TABLE domain_labels (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  domain_id   INT UNSIGNED NOT NULL,
+  label_key   VARCHAR(63)  NOT NULL,
+  label_value VARCHAR(63)  NOT NULL DEFAULT '',
+  color       VARCHAR(20)  NULL DEFAULT NULL,
+  INDEX idx_domain_label (domain_id, label_key),
+  FOREIGN KEY (domain_id) REFERENCES domains(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── dns_records ──────────────────────────────────────────────
 CREATE TABLE dns_records (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

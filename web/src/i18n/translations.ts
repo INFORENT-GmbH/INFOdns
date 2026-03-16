@@ -47,15 +47,17 @@ export const translations = {
     changes:     'Changes',
 
     // Domains page
-    domains_title:          'Domains',
-    domains_searchPlaceholder: 'Search FQDN…',
-    domains_addDomain:      '+ Add Domain',
-    domains_fqdnPlaceholder: 'FQDN (e.g. example.com)',
+    domains_title:               'Domains',
+    domains_searchPlaceholder:   'Search FQDN…',
+    domains_labelFilterPlaceholder: 'Filter by label…',
+    domains_addDomain:           '+ Add Domain',
+    domains_fqdnPlaceholder:     'FQDN (e.g. example.com)',
     domains_customerIdPlaceholder: 'Customer ID',
-    domains_lastRendered:   'Last Rendered',
-    domains_zone:           'Zone',
-    domains_noneFound:      'No domains found',
-    domains_loadError:      'Failed to load domains',
+    domains_lastRendered:        'Last Rendered',
+    domains_zone:                'Zone',
+    domains_labels:              'Labels',
+    domains_noneFound:           'No domains found',
+    domains_loadError:           'Failed to load domains',
 
     // Domain detail
     domainDetail_backLink:         '← Domains',
@@ -77,6 +79,12 @@ export const translations = {
     domainDetail_revert:           'Revert',
     domainDetail_restore:          'Restore',
     domainDetail_bulkEditBtn:      (n: number) => `${n} domain${n === 1 ? '' : 's'} — bulk edit`,
+    domainDetail_labels:           'Labels',
+    domainDetail_labelColor:       'Color',
+    domainDetail_labelKeyPh:       'key',
+    domainDetail_labelValuePh:     'value',
+    domainDetail_labelNew:         '+ New',
+    domainDetail_labelAdd:         'Add',
 
     // Bulk jobs
     bulk_title:             'Bulk Jobs',
@@ -245,15 +253,17 @@ export const translations = {
     changes:     'Änderungen',
 
     // Domains page
-    domains_title:          'Domains',
-    domains_searchPlaceholder: 'FQDN suchen…',
-    domains_addDomain:      '+ Domain hinzufügen',
-    domains_fqdnPlaceholder: 'FQDN (z.B. example.com)',
+    domains_title:               'Domains',
+    domains_searchPlaceholder:   'FQDN suchen…',
+    domains_labelFilterPlaceholder: 'Nach Label filtern…',
+    domains_addDomain:           '+ Domain hinzufügen',
+    domains_fqdnPlaceholder:     'FQDN (z.B. example.com)',
     domains_customerIdPlaceholder: 'Kunden-ID',
-    domains_lastRendered:   'Zuletzt gerendert',
-    domains_zone:           'Zone',
-    domains_noneFound:      'Keine Domains gefunden',
-    domains_loadError:      'Fehler beim Laden der Domains',
+    domains_lastRendered:        'Zuletzt gerendert',
+    domains_zone:                'Zone',
+    domains_labels:              'Labels',
+    domains_noneFound:           'Keine Domains gefunden',
+    domains_loadError:           'Fehler beim Laden der Domains',
 
     // Domain detail
     domainDetail_backLink:         '← Domains',
@@ -275,6 +285,12 @@ export const translations = {
     domainDetail_revert:           'Zurücksetzen',
     domainDetail_restore:          'Wiederherstellen',
     domainDetail_bulkEditBtn:      (n: number) => `${n} Domain${n === 1 ? '' : 's'} — Massenbearbeitung`,
+    domainDetail_labels:           'Labels',
+    domainDetail_labelColor:       'Farbe',
+    domainDetail_labelKeyPh:       'Schlüssel',
+    domainDetail_labelValuePh:     'Wert',
+    domainDetail_labelNew:         '+ Neu',
+    domainDetail_labelAdd:         'Hinzufügen',
 
     // Bulk jobs
     bulk_title:             'Massenaufgaben',

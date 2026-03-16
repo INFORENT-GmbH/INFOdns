@@ -28,18 +28,79 @@ const UpdateDomainBody = z.object({
   notes: z.string().optional(),
 })
 
+const LabelSchema = z.object({
+  key: z.string().regex(/^[a-zA-Z0-9_\-.\/]{1,63}$/),
+  value: z.string().max(63).default(''),
+  color: z.string().max(20).nullable().optional(),
+})
+
+const UpdateLabelsBody = z.object({
+  labels: z.array(LabelSchema),
+})
+
+async function fetchLabels(domainIds: number[]): Promise<Map<number, { id: number; key: string; value: string; color: string | null }[]>> {
+  if (domainIds.length === 0) return new Map()
+  const rows = await query(
+    `SELECT id, domain_id, label_key AS \`key\`, label_value AS \`value\`, color
+     FROM domain_labels WHERE domain_id IN (${domainIds.map(() => '?').join(',')})
+     ORDER BY label_key, id`,
+    domainIds
+  ) as any[]
+  const map = new Map<number, { id: number; key: string; value: string; color: string | null }[]>()
+  for (const r of rows) {
+    if (!map.has(r.domain_id)) map.set(r.domain_id, [])
+    map.get(r.domain_id)!.push({ id: r.id, key: r.key, value: r.value, color: r.color ?? null })
+  }
+  return map
+}
+
 /** Inject ownership filter for customer role */
 function ownerFilter(req: any): string {
   return req.user.role === 'customer' ? ` AND d.customer_id = ${Number(req.user.customerId)}` : ''
 }
 
 export async function domainRoutes(app: FastifyInstance) {
+  // GET /domains/labels  — distinct label keys + values visible to this user
+  app.get('/domains/labels', { preHandler: requireAuth }, async (req: any, reply) => {
+    const ownerJoin = req.user.role === 'customer'
+      ? ` JOIN domains d ON d.id = dl.domain_id AND d.customer_id = ${Number(req.user.customerId)}`
+      : ''
+    const rows = await query(
+      `SELECT dl.label_key AS \`key\`, dl.label_value AS \`value\`
+       FROM domain_labels dl${ownerJoin}
+       GROUP BY dl.label_key, dl.label_value
+       ORDER BY dl.label_key, dl.label_value`,
+      []
+    ) as any[]
+    // Group into { key, values: string[] }[]
+    const map = new Map<string, Set<string>>()
+    for (const r of rows) {
+      if (!map.has(r.key)) map.set(r.key, new Set())
+      if (r.value !== '') map.get(r.key)!.add(r.value)
+    }
+    return Array.from(map.entries()).map(([key, vals]) => ({ key, values: Array.from(vals) }))
+  })
+
   // GET /domains
   app.get('/domains', { preHandler: requireAuth }, async (req: any, reply) => {
-    const { search, customer_id, page = '1', limit = '50' } = req.query as Record<string, string>
+    const { search, customer_id, label, page = '1', limit = '50' } = req.query as Record<string, string>
     const offset = (Number(page) - 1) * Number(limit)
     const params: unknown[] = []
+    let join = ''
     let where = "WHERE d.status != 'deleted'"
+
+    if (label) {
+      const eqIdx = label.indexOf('=')
+      const lKey = eqIdx >= 0 ? label.slice(0, eqIdx) : label
+      const lVal = eqIdx >= 0 ? label.slice(eqIdx + 1) : null
+      if (lVal !== null) {
+        where += ` AND EXISTS (SELECT 1 FROM domain_labels _lf WHERE _lf.domain_id = d.id AND _lf.label_key = ? AND _lf.label_value = ?)`
+        params.push(lKey, lVal)
+      } else {
+        where += ` AND EXISTS (SELECT 1 FROM domain_labels _lf WHERE _lf.domain_id = d.id AND _lf.label_key = ?)`
+        params.push(lKey)
+      }
+    }
 
     if (req.user.role === 'customer') {
       where += ` AND d.customer_id = ?`
@@ -56,13 +117,14 @@ export async function domainRoutes(app: FastifyInstance) {
     const rows = await query(
       `SELECT d.id, d.fqdn, d.status, d.zone_status, d.last_serial, d.last_rendered_at,
               d.default_ttl, d.customer_id, c.name AS customer_name, d.created_at
-       FROM domains d JOIN customers c ON c.id = d.customer_id
+       FROM domains d JOIN customers c ON c.id = d.customer_id${join}
        ${where}
        ORDER BY d.fqdn
        LIMIT ? OFFSET ?`,
       [...params, Number(limit), offset]
-    )
-    return rows
+    ) as any[]
+    const labelMap = await fetchLabels(rows.map((r: any) => r.id))
+    return rows.map((r: any) => ({ ...r, labels: labelMap.get(r.id) ?? [] }))
   })
 
   // POST /domains  (operator/admin; customer creates via operator)
@@ -95,9 +157,10 @@ export async function domainRoutes(app: FastifyInstance) {
        )
        WHERE d.id = ? AND d.status != 'deleted'${ownerFilter(req)}`,
       [req.params.id]
-    )
+    ) as any
     if (!row) return reply.status(404).send({ code: 'NOT_FOUND' })
-    return row
+    const labelMap = await fetchLabels([row.id])
+    return { ...row, labels: labelMap.get(row.id) ?? [] }
   })
 
   // PUT /domains/:id
@@ -123,6 +186,32 @@ export async function domainRoutes(app: FastifyInstance) {
     await writeAuditLog({ req, entityType: 'domain', entityId: Number(req.params.id), domainId: Number(req.params.id), action: 'update', oldValue: old, newValue: updated })
     await enqueueRender(Number(req.params.id))
     return updated
+  })
+
+  // PUT /domains/:id/labels
+  app.put<{ Params: { id: string } }>('/domains/:id/labels', { preHandler: requireAuth }, async (req: any, reply) => {
+    const domain = await queryOne(
+      `SELECT id FROM domains WHERE id = ? AND status != 'deleted'${ownerFilter(req)}`,
+      [req.params.id]
+    )
+    if (!domain) return reply.status(404).send({ code: 'NOT_FOUND' })
+
+    const body = UpdateLabelsBody.safeParse(req.body)
+    if (!body.success) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: body.error.message })
+
+    const domainId = Number(req.params.id)
+    await execute('DELETE FROM domain_labels WHERE domain_id = ?', [domainId])
+    for (const { key, value, color } of body.data.labels) {
+      await execute(
+        'INSERT INTO domain_labels (domain_id, label_key, label_value, color) VALUES (?, ?, ?, ?)',
+        [domainId, key, value, color ?? null]
+      )
+    }
+    const labels = await query(
+      'SELECT id, label_key AS `key`, label_value AS `value`, color FROM domain_labels WHERE domain_id = ? ORDER BY label_key, id',
+      [domainId]
+    )
+    return labels
   })
 
   // DELETE /domains/:id  (soft delete)

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { getDomains, createDomain, type Domain } from '../api/client'
+import { getDomains, createDomain, getLabelSuggestions, type Domain } from '../api/client'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
+import LabelChip from '../components/LabelChip'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
 
@@ -10,14 +11,27 @@ export default function DomainsPage() {
   const { user } = useAuth()
   const { t } = useI18n()
   const [search, setSearch] = useState('')
+  const [labelInput, setLabelInput] = useState('')
+  const [labelFilter, setLabelFilter] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [newFqdn, setNewFqdn] = useState('')
   const [newCustomerId, setNewCustomerId] = useState('')
   const [creating, setCreating] = useState(false)
 
+  const { data: labelSuggestions = [] } = useQuery({
+    queryKey: ['label-suggestions'],
+    queryFn: () => getLabelSuggestions().then(r => r.data),
+    staleTime: 30_000,
+  })
+
   const { data: domains = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['domains', search],
-    queryFn: () => getDomains(search ? { search } : undefined).then(r => r.data),
+    queryKey: ['domains', search, labelFilter],
+    queryFn: () => {
+      const params: Record<string, string> = {}
+      if (search) params.search = search
+      if (labelFilter) params.label = labelFilter
+      return getDomains(Object.keys(params).length ? params : undefined).then(r => r.data)
+    },
   })
 
   async function handleCreate(e: React.FormEvent) {
@@ -49,6 +63,28 @@ export default function DomainsPage() {
             onChange={e => setSearch(e.target.value)}
             style={styles.searchInput}
           />
+          <datalist id="domain-label-filter-list">
+            {labelSuggestions.flatMap(s => [
+              <option key={s.key} value={s.key} />,
+              ...s.values.map(v => <option key={`${s.key}=${v}`} value={`${s.key}=${v}`} />),
+            ])}
+          </datalist>
+          <input
+            list="domain-label-filter-list"
+            placeholder={t('domains_labelFilterPlaceholder')}
+            value={labelInput}
+            onChange={e => {
+              const v = e.target.value
+              setLabelInput(v)
+              const suggestions = labelSuggestions.flatMap(s => [s.key, ...s.values.map(val => `${s.key}=${val}`)])
+              if (suggestions.includes(v)) setLabelFilter(v)
+            }}
+            onKeyDown={e => { if (e.key === 'Enter') setLabelFilter(labelInput.trim()) }}
+            style={{ ...styles.searchInput, outline: labelFilter ? '2px solid #2563eb' : undefined }}
+          />
+          {labelInput && (
+            <button onClick={() => { setLabelInput(''); setLabelFilter('') }} style={styles.btnClear} title="Clear label filter">✕</button>
+          )}
           {isAdminOrOp && (
             <button onClick={() => setShowCreate(v => !v)} style={styles.btnPrimary}>
               {t('domains_addDomain')}
@@ -93,6 +129,7 @@ export default function DomainsPage() {
             <th style={styles.th}>{t('customer')}</th>
             <th style={styles.th}>{t('status')}</th>
             <th style={styles.th}>{t('domains_zone')}</th>
+            <th style={styles.th}>{t('domains_labels')}</th>
             <th style={styles.th}>{t('serial')}</th>
             <th style={styles.th}>{t('domains_lastRendered')}</th>
           </tr>
@@ -106,6 +143,18 @@ export default function DomainsPage() {
               <td style={styles.td}>{d.customer_name}</td>
               <td style={styles.td}>{d.status}</td>
               <td style={styles.td}><ZoneStatusBadge status={d.zone_status} /></td>
+              <td style={styles.td}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {(d.labels ?? []).map(l => {
+                    const val = l.value ? `${l.key}=${l.value}` : l.key
+                    return (
+                      <span key={l.id} onClick={() => { setLabelInput(val); setLabelFilter(val) }} style={{ cursor: 'pointer' }}>
+                        <LabelChip label={l} />
+                      </span>
+                    )
+                  })}
+                </div>
+              </td>
               <td style={styles.td}><code>{d.last_serial || '—'}</code></td>
               <td style={styles.td}>
                 {d.last_rendered_at
@@ -115,7 +164,7 @@ export default function DomainsPage() {
             </tr>
           ))}
           {!isLoading && domains.length === 0 && (
-            <tr><td colSpan={6} style={{ ...styles.td, textAlign: 'center', ...styles.muted }}>{t('domains_noneFound')}</td></tr>
+            <tr><td colSpan={7} style={{ ...styles.td, textAlign: 'center', ...styles.muted }}>{t('domains_noneFound')}</td></tr>
           )}
         </tbody>
       </table>
@@ -132,6 +181,7 @@ const styles: Record<string, React.CSSProperties> = {
   input: { padding: '.375rem .75rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem', flex: 1 },
   btnPrimary: { padding: '.375rem .875rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
   btnSecondary: { padding: '.375rem .875rem', background: '#fff', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem', cursor: 'pointer' },
+  btnClear: { padding: '.25rem .5rem', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '.875rem', lineHeight: 1 },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
   tr: { borderBottom: '1px solid #e5e7eb' },

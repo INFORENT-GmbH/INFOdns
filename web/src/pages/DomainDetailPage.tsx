@@ -4,9 +4,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getDomain, getRecords, createRecord, deleteRecord,
   createBulkJob, previewBulkJob, approveBulkJob, searchByRecord,
-  type DnsRecord,
+  updateDomainLabels, getLabelSuggestions, type DnsRecord, type Label,
 } from '../api/client'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
+import LabelChip from '../components/LabelChip'
+import ColorPicker from '../components/ColorPicker'
 import { useI18n } from '../i18n/I18nContext'
 
 const INLINE_STYLES = `
@@ -75,6 +77,14 @@ export default function DomainDetailPage() {
   const applyingRef = useRef(false)
   const [applyError, setApplyError] = useState<string | null>(null)
 
+  const [labelKey, setLabelKey] = useState('')
+  const [labelValue, setLabelValue] = useState('')
+  const [editingLabelId, setEditingLabelId] = useState<number | null>(null)
+  const [editKey, setEditKey] = useState('')
+  const [editValue, setEditValue] = useState('')
+  const [editColor, setEditColor] = useState<string | null>(null)
+  const [savingLabels, setSavingLabels] = useState(false)
+
   const { data: domain, isLoading: loadingDomain } = useQuery({
     queryKey: ['domain', domainId],
     queryFn: () => getDomain(domainId).then(r => r.data),
@@ -83,6 +93,12 @@ export default function DomainDetailPage() {
   const { data: records = [], isLoading: loadingRecords } = useQuery({
     queryKey: ['records', domainId],
     queryFn: () => getRecords(domainId).then(r => r.data),
+  })
+
+  const { data: labelSuggestions = [] } = useQuery({
+    queryKey: ['label-suggestions'],
+    queryFn: () => getLabelSuggestions().then(r => r.data),
+    staleTime: 30_000,
   })
 
   // ── existing record helpers ──────────────────────────────────────────────
@@ -235,6 +251,62 @@ export default function DomainDetailPage() {
     setApplyError(null)
   }
 
+  // ── label helpers ─────────────────────────────────────────────────────────
+
+  const labels: Label[] = (domain as any)?.labels ?? []
+
+  function patchLabelsCache(next: Label[]) {
+    qc.setQueryData(['domain', domainId], (old: any) => old ? { ...old, labels: next } : old)
+  }
+
+  async function handleAddLabel(e: React.FormEvent) {
+    e.preventDefault()
+    if (!labelKey.trim() || savingLabels) return
+    const next = [...labels, { id: 0, key: labelKey.trim(), value: labelValue.trim() }]
+    patchLabelsCache(next)
+    setLabelKey('')
+    setLabelValue('')
+    setSavingLabels(true)
+    try {
+      await updateDomainLabels(domainId, next)
+      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+    } catch {
+      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+    } finally {
+      setSavingLabels(false)
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (!editKey.trim() || savingLabels) return
+    const next = labels.map(l => l.id === editingLabelId ? { ...l, key: editKey.trim(), value: editValue.trim(), color: editColor } : l)
+    patchLabelsCache(next)
+    setEditingLabelId(null)
+    setSavingLabels(true)
+    try {
+      await updateDomainLabels(domainId, next)
+      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+    } catch {
+      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+    } finally {
+      setSavingLabels(false)
+    }
+  }
+
+  async function handleRemoveLabel(id: number) {
+    if (savingLabels) return
+    const next = labels.filter(l => l.id !== id)
+    patchLabelsCache(next)
+    setSavingLabels(true)
+    try {
+      await updateDomainLabels(domainId, next)
+    } catch {
+      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+    } finally {
+      setSavingLabels(false)
+    }
+  }
+
   // ── render ───────────────────────────────────────────────────────────────
 
   if (loadingDomain) return <p>{t('loading')}</p>
@@ -267,6 +339,56 @@ export default function DomainDetailPage() {
         <span>{t('domainDetail_defaultTtl')} <strong>{domain.default_ttl}s</strong></span>
         <span>{t('serial')}: <code>{domain.last_serial || '—'}</code></span>
         <span>{t('domainDetail_lastRendered')} {domain.last_rendered_at ? new Date(domain.last_rendered_at).toLocaleString() : t('never')}</span>
+      </div>
+
+      <div style={styles.labelsSection}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
+          <span style={styles.labelsTitle}>{t('domainDetail_labels')}</span>
+          {labels.map(l => l.id === editingLabelId ? (
+            <span key={l.id} style={{ display: 'inline-flex', gap: 3, alignItems: 'center' }}>
+              <datalist id={`edit-keys-${l.id}`}>
+                {labelSuggestions.map(s => <option key={s.key} value={s.key} />)}
+              </datalist>
+              <datalist id={`edit-vals-${l.id}`}>
+                {(labelSuggestions.find(s => s.key === editKey)?.values ?? []).map(v => <option key={v} value={v} />)}
+              </datalist>
+              <input list={`edit-keys-${l.id}`} value={editKey} onChange={e => setEditKey(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditingLabelId(null) }}
+                style={styles.labelInput} autoFocus />
+              <input list={`edit-vals-${l.id}`} value={editValue} onChange={e => setEditValue(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditingLabelId(null) }}
+                style={styles.labelInput} />
+              <ColorPicker value={editColor} labelKey={editKey} onChange={setEditColor} label={t('domainDetail_labelColor')} />
+              <button onClick={handleSaveEdit} disabled={!editKey.trim() || savingLabels} style={styles.labelAddBtn}>{t('save')}</button>
+              <button onClick={() => setEditingLabelId(null)} style={styles.labelAddBtn}>{t('cancel')}</button>
+            </span>
+          ) : (
+            <span key={l.id} onClick={() => { setEditingLabelId(l.id); setEditKey(l.key); setEditValue(l.value); setEditColor(l.color ?? null) }} style={{ cursor: 'text' }}>
+              <LabelChip label={l} onRemove={e => { e.stopPropagation(); handleRemoveLabel(l.id) }} />
+            </span>
+          ))}
+          {labelKey === '' && labelValue === ''
+            ? <button type="button" onClick={() => setLabelKey(' ')} style={styles.labelNewBtn}>{t('domainDetail_labelNew')}</button>
+            : <form onSubmit={handleAddLabel} style={{ display: 'flex', gap: '.25rem', alignItems: 'center' }}>
+                <datalist id="label-keys-list">
+                  {labelSuggestions.map(s => <option key={s.key} value={s.key} />)}
+                </datalist>
+                <datalist id="label-values-list">
+                  {(labelSuggestions.find(s => s.key === labelKey)?.values ?? []).map(v => <option key={v} value={v} />)}
+                </datalist>
+                <input list="label-keys-list" placeholder={t('domainDetail_labelKeyPh')} value={labelKey.trim()}
+                  onChange={e => setLabelKey(e.target.value)} style={styles.labelInput} autoFocus />
+                <input list="label-values-list" placeholder={t('domainDetail_labelValuePh')} value={labelValue}
+                  onChange={e => setLabelValue(e.target.value)} style={styles.labelInput} />
+                <button type="submit" disabled={!labelKey.trim() || savingLabels} style={styles.labelAddBtn}>
+                  {t('domainDetail_labelAdd')}
+                </button>
+                <button type="button" onClick={() => { setLabelKey(''); setLabelValue('') }} style={styles.labelAddBtn}>
+                  {t('cancel')}
+                </button>
+              </form>
+          }
+        </div>
       </div>
 
       <div style={styles.tableHeader}>
@@ -397,6 +519,11 @@ const styles: Record<string, React.CSSProperties> = {
   h3: { margin: 0, fontSize: '1rem', fontWeight: 600 },
   errorBanner: { background: '#fee2e2', color: '#b91c1c', padding: '.75rem 1rem', borderRadius: 6, marginBottom: '1rem', fontSize: '.875rem' },
   meta: { display: 'flex', gap: '1.5rem', marginBottom: '1.25rem', fontSize: '.875rem', color: '#374151', flexWrap: 'wrap' },
+  labelsSection: { marginBottom: '1.25rem', padding: '.625rem .875rem', background: '#f9fafb', borderRadius: 6, border: '1px solid #e5e7eb' },
+  labelsTitle: { fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const },
+  labelInput: { padding: '2px 6px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.8125rem', width: 110 },
+  labelAddBtn: { padding: '2px 8px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.8125rem', cursor: 'pointer' },
+  labelNewBtn: { padding: '1px 8px', background: 'none', border: '1px dashed #d1d5db', borderRadius: 12, fontSize: '.75rem', color: '#6b7280', cursor: 'pointer' },
   tableHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.75rem' },
   dirtyHint: { fontSize: '.8125rem', color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 12 },
   table: { width: '100%', borderCollapse: 'collapse' },

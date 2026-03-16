@@ -63,6 +63,13 @@ api.interceptors.response.use(
 
 // ── Typed API helpers ────────────────────────────────────────
 
+export interface Label {
+  id: number
+  key: string
+  value: string
+  color?: string | null
+}
+
 export interface Domain {
   id: number
   fqdn: string
@@ -74,6 +81,7 @@ export interface Domain {
   customer_id: number
   customer_name: string
   created_at: string
+  labels: Label[]
 }
 
 export interface DnsRecord {
@@ -162,6 +170,12 @@ export const updateDomain = (id: number, data: Partial<Domain>) =>
 
 export const deleteDomain = (id: number) =>
   api.delete(`/domains/${id}`)
+
+export const updateDomainLabels = (id: number, labels: Label[]) =>
+  api.put<Label[]>(`/domains/${id}/labels`, { labels })
+
+export const getLabelSuggestions = () =>
+  api.get<{ key: string; values: string[] }[]>('/domains/labels')
 
 // Records
 export const getRecords = (domainId: number) =>
