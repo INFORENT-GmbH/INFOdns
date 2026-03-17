@@ -43,6 +43,6 @@ jobs:
       - name: Reload BIND on ns3
         run: |
           ssh ${{ steps.parse.outputs.host }} "
-            named-checkconf ${{ steps.parse.outputs.path }}/named.conf &&
-            rndc reconfig
+            /usr/sbin/named-checkconf ${{ steps.parse.outputs.path }}/named.conf &&
+            /usr/sbin/rndc reconfig
           "
