@@ -21,6 +21,20 @@ services:
       retries: 10
       start_period: 30s
 
+  # PHPMYADMIN with auto login on port 8080
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+      PMA_USER: infodns
+      PMA_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "8080:80"
+    networks:
+      - internal
+      - public
+
   # ── API ─────────────────────────────────────────────────────
   api:
     build: ./api

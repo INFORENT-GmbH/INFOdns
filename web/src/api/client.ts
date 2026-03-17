@@ -176,8 +176,15 @@ export const deleteDomain = (id: number) =>
 export const updateDomainLabels = (id: number, labels: Label[]) =>
   api.put<Label[]>(`/domains/${id}/labels`, { labels })
 
+export interface LabelSuggestion {
+  key: string
+  values: string[]
+  color: string | null
+  admin_only: boolean
+}
+
 export const getLabelSuggestions = (customerId?: number) =>
-  api.get<{ key: string; values: string[] }[]>('/domains/labels', {
+  api.get<LabelSuggestion[]>('/domains/labels', {
     params: customerId != null ? { customer_id: customerId } : undefined,
   })
 

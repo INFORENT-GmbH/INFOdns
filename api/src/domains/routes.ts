@@ -59,32 +59,6 @@ async function fetchLabels(domainIds: number[], isAdmin = false): Promise<Map<nu
   return map
 }
 
-/** Find an existing label row or create it; return its id. */
-async function findOrCreateLabel(
-  customerIdForLabel: number | null,
-  key: string,
-  value: string,
-  color: string | null | undefined,
-  adminOnly: boolean
-): Promise<number> {
-  const existing = await queryOne(
-    adminOnly
-      ? 'SELECT id, color FROM labels WHERE label_key = ? AND label_value = ? AND admin_only = 1 AND customer_id IS NULL'
-      : 'SELECT id, color FROM labels WHERE label_key = ? AND label_value = ? AND admin_only = 0 AND customer_id = ?',
-    adminOnly ? [key, value] : [key, value, customerIdForLabel]
-  ) as any
-  if (existing) {
-    if (color !== undefined && color !== existing.color) {
-      await execute('UPDATE labels SET color = ? WHERE id = ?', [color ?? null, existing.id])
-    }
-    return existing.id
-  }
-  const result = await execute(
-    'INSERT INTO labels (customer_id, label_key, label_value, color, admin_only) VALUES (?, ?, ?, ?, ?)',
-    [adminOnly ? null : customerIdForLabel, key, value, color ?? null, adminOnly ? 1 : 0]
-  )
-  return result.insertId
-}
 
 /** Inject ownership filter for customer role */
 function ownerFilter(req: any): string {
@@ -112,18 +86,18 @@ export async function domainRoutes(app: FastifyInstance) {
     }
 
     const rows = await query(
-      `SELECT l.label_key AS \`key\`, l.label_value AS \`value\`
+      `SELECT l.label_key AS \`key\`, l.label_value AS \`value\`, MAX(l.color) AS color, MAX(l.admin_only) AS admin_only
        FROM labels l ${where}
        GROUP BY l.label_key, l.label_value
        ORDER BY l.label_key, l.label_value`,
       params
     ) as any[]
-    const map = new Map<string, Set<string>>()
+    const map = new Map<string, { values: Set<string>; color: string | null; admin_only: boolean }>()
     for (const r of rows) {
-      if (!map.has(r.key)) map.set(r.key, new Set())
-      if (r.value !== '') map.get(r.key)!.add(r.value)
+      if (!map.has(r.key)) map.set(r.key, { values: new Set(), color: r.color ?? null, admin_only: !!r.admin_only })
+      if (r.value !== '') map.get(r.key)!.values.add(r.value)
     }
-    return Array.from(map.entries()).map(([key, vals]) => ({ key, values: Array.from(vals) }))
+    return Array.from(map.entries()).map(([key, { values, color, admin_only }]) => ({ key, values: Array.from(values), color, admin_only }))
   })
 
   // GET /domains
@@ -249,36 +223,57 @@ export async function domainRoutes(app: FastifyInstance) {
     const isAdmin = req.user.role === 'admin'
     const customerIdForLabel = domain.customer_id as number
 
-    // Resolve (or create) a labels row for each requested label
     const labelIds: number[] = []
     for (const { id: existingId, key, value, color, admin_only } of body.data.labels) {
       const useAdminOnly = isAdmin && !!admin_only
+      let labelId: number
+
       if (existingId > 0) {
-        // Update the canonical row in-place
-        const custId = useAdminOnly ? null : (await queryOne('SELECT customer_id FROM labels WHERE id = ?', [existingId]) as any)?.customer_id ?? customerIdForLabel
-        await execute(
-          'UPDATE labels SET label_key = ?, label_value = ?, color = ?, admin_only = ?, customer_id = ? WHERE id = ?',
-          [key, value, color ?? null, useAdminOnly ? 1 : 0, custId, existingId]
-        )
-        labelIds.push(existingId)
-      } else {
-        const id = await findOrCreateLabel(customerIdForLabel, key, value, color, useAdminOnly)
-        labelIds.push(id)
-      }
-      // admin_only is a key-level flag — propagate to all other rows with the same key.
-      // On un-mark: only flip admin_only=0, leave customer_id as-is (stays global/NULL).
-      if (isAdmin) {
+        // Update existing canonical row.
+        // When marking admin-only: move to global (customer_id = NULL).
+        // When un-marking: leave customer_id as-is — don't include it in the UPDATE.
         if (useAdminOnly) {
           await execute(
-            'UPDATE labels SET admin_only = 1, customer_id = NULL WHERE label_key = ? AND id != ?',
-            [key, labelIds[labelIds.length - 1]]
+            'UPDATE labels SET label_key=?, label_value=?, color=?, admin_only=1, customer_id=NULL WHERE id=?',
+            [key, value, color ?? null, existingId]
           )
         } else {
           await execute(
-            'UPDATE labels SET admin_only = 0 WHERE label_key = ? AND id != ?',
-            [key, labelIds[labelIds.length - 1]]
+            'UPDATE labels SET label_key=?, label_value=?, color=?, admin_only=0 WHERE id=?',
+            [key, value, color ?? null, existingId]
           )
         }
+        labelId = existingId
+      } else {
+        // New label: find existing by key+value+scope, or insert.
+        const existing = await queryOne(
+          useAdminOnly
+            ? 'SELECT id FROM labels WHERE label_key=? AND label_value=? AND admin_only=1 AND customer_id IS NULL'
+            : 'SELECT id FROM labels WHERE label_key=? AND label_value=? AND admin_only=0 AND customer_id=?',
+          useAdminOnly ? [key, value] : [key, value, customerIdForLabel]
+        ) as any
+        if (existing) {
+          if (color !== undefined) await execute('UPDATE labels SET color=? WHERE id=?', [color ?? null, existing.id])
+          labelId = existing.id
+        } else {
+          const r = await execute(
+            'INSERT INTO labels (customer_id, label_key, label_value, color, admin_only) VALUES (?, ?, ?, ?, ?)',
+            [useAdminOnly ? null : customerIdForLabel, key, value, color ?? null, useAdminOnly ? 1 : 0]
+          )
+          labelId = r.insertId
+        }
+      }
+
+      labelIds.push(labelId)
+
+      // admin_only is a key-level flag — propagate to all other rows with the same key
+      if (isAdmin) {
+        await execute(
+          useAdminOnly
+            ? 'UPDATE labels SET admin_only=1, customer_id=NULL WHERE label_key=? AND id!=?'
+            : 'UPDATE labels SET admin_only=0 WHERE label_key=? AND id!=?',
+          [key, labelId]
+        )
       }
     }
 

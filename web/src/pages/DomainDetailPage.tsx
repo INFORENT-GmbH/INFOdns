@@ -4,10 +4,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getDomain, getRecords, createRecord, deleteRecord,
   createBulkJob, previewBulkJob, approveBulkJob, searchByRecord,
-  updateDomainLabels, getLabelSuggestions, type DnsRecord, type Label, type Domain,
+  updateDomainLabels, getLabelSuggestions, type DnsRecord, type Label, type Domain, type LabelSuggestion,
 } from '../api/client'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
-import LabelChip from '../components/LabelChip'
+import LabelChip, { getLabelColors } from '../components/LabelChip'
 import ColorPicker from '../components/ColorPicker'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
@@ -89,6 +89,8 @@ export default function DomainDetailPage() {
   const [editColor, setEditColor] = useState<string | null>(null)
   const [editAdminOnly, setEditAdminOnly] = useState(false)
   const [savingLabels, setSavingLabels] = useState(false)
+  const [showAddKeyDrop, setShowAddKeyDrop] = useState(false)
+  const [showEditKeyDrop, setShowEditKeyDrop] = useState(false)
 
   const { data: domain, isLoading: loadingDomain } = useQuery<Domain>({
     queryKey: ['domain', domainId],
@@ -275,11 +277,15 @@ export default function DomainDetailPage() {
     setLabelValue('')
     setAddAdminOnly(false)
     setSavingLabels(true)
+    const invalidate = () => {
+      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      qc.invalidateQueries({ queryKey: ['label-suggestions', domain?.customer_id] })
+    }
     try {
       await updateDomainLabels(domainId, next)
-      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      invalidate()
     } catch {
-      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      invalidate()
     } finally {
       setSavingLabels(false)
     }
@@ -293,11 +299,15 @@ export default function DomainDetailPage() {
     patchLabelsCache(next)
     setEditingLabelId(null)
     setSavingLabels(true)
+    const invalidate = () => {
+      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      qc.invalidateQueries({ queryKey: ['label-suggestions', domain?.customer_id] })
+    }
     try {
       await updateDomainLabels(domainId, next)
-      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      invalidate()
     } catch {
-      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      invalidate()
     } finally {
       setSavingLabels(false)
     }
@@ -312,9 +322,32 @@ export default function DomainDetailPage() {
       await updateDomainLabels(domainId, next)
     } catch {
       qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      qc.invalidateQueries({ queryKey: ['label-suggestions', domain?.customer_id] })
     } finally {
       setSavingLabels(false)
     }
+  }
+
+  function KeySuggestionDrop({ input, show, onPick }: { input: string; show: boolean; onPick: (s: LabelSuggestion) => void }) {
+    const filtered = labelSuggestions.filter(s => !input.trim() || s.key.toLowerCase().includes(input.trim().toLowerCase()))
+    if (!show || filtered.length === 0) return null
+    return (
+      <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 20, background: '#fff', border: '1px solid #d1d5db', borderRadius: 4, boxShadow: '0 4px 6px -1px rgba(0,0,0,.1)', minWidth: 160, maxHeight: 200, overflowY: 'auto' }}>
+        {filtered.map(s => {
+          const { bg } = getLabelColors(s.color, s.key)
+          return (
+            <div key={s.key} onMouseDown={() => onPick(s)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px', cursor: 'pointer', fontSize: '.8125rem' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
+              onMouseLeave={e => (e.currentTarget.style.background = '')}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: bg, flexShrink: 0, border: '1px solid rgba(0,0,0,.08)' }} />
+              {s.admin_only && <span style={{ opacity: 0.5, fontSize: '.65rem' }}>🔒</span>}
+              <span>{s.key}</span>
+            </div>
+          )
+        })}
+      </div>
+    )
   }
 
   // ── render ───────────────────────────────────────────────────────────────
@@ -356,15 +389,16 @@ export default function DomainDetailPage() {
           <span style={styles.labelsTitle}>{t('domainDetail_labels')}</span>
           {labels.map(l => l.id === editingLabelId ? (
             <span key={l.id} style={{ display: 'inline-flex', gap: 3, alignItems: 'center' }}>
-              <datalist id={`edit-keys-${l.id}`}>
-                {labelSuggestions.map(s => <option key={s.key} value={s.key} />)}
-              </datalist>
               <datalist id={`edit-vals-${l.id}`}>
                 {(labelSuggestions.find(s => s.key === editKey)?.values ?? []).map(v => <option key={v} value={v} />)}
               </datalist>
-              <input list={`edit-keys-${l.id}`} value={editKey} onChange={e => setEditKey(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditingLabelId(null) }}
-                style={styles.labelInput} autoFocus />
+              <span style={{ position: 'relative' }}>
+                <input value={editKey} onChange={e => setEditKey(e.target.value)}
+                  onFocus={() => setShowEditKeyDrop(true)} onBlur={() => setTimeout(() => setShowEditKeyDrop(false), 150)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditingLabelId(null) }}
+                  style={styles.labelInput} autoFocus />
+                <KeySuggestionDrop input={editKey} show={showEditKeyDrop} onPick={s => { setEditKey(s.key); setShowEditKeyDrop(false) }} />
+              </span>
               <input list={`edit-vals-${l.id}`} value={editValue} onChange={e => setEditValue(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditingLabelId(null) }}
                 style={styles.labelInput} />
@@ -386,14 +420,16 @@ export default function DomainDetailPage() {
           {labelKey === '' && labelValue === ''
             ? <button type="button" onClick={() => setLabelKey(' ')} style={styles.labelNewBtn}>{t('domainDetail_labelNew')}</button>
             : <form onSubmit={handleAddLabel} style={{ display: 'flex', gap: '.25rem', alignItems: 'center' }}>
-                <datalist id="label-keys-list">
-                  {labelSuggestions.map(s => <option key={s.key} value={s.key} />)}
-                </datalist>
                 <datalist id="label-values-list">
                   {(labelSuggestions.find(s => s.key === labelKey)?.values ?? []).map(v => <option key={v} value={v} />)}
                 </datalist>
-                <input list="label-keys-list" placeholder={t('domainDetail_labelKeyPh')} value={labelKey.trim()}
-                  onChange={e => setLabelKey(e.target.value)} style={styles.labelInput} autoFocus />
+                <span style={{ position: 'relative' }}>
+                  <input placeholder={t('domainDetail_labelKeyPh')} value={labelKey.trim()}
+                    onChange={e => setLabelKey(e.target.value)}
+                    onFocus={() => setShowAddKeyDrop(true)} onBlur={() => setTimeout(() => setShowAddKeyDrop(false), 150)}
+                    style={styles.labelInput} autoFocus />
+                  <KeySuggestionDrop input={labelKey} show={showAddKeyDrop} onPick={s => { setLabelKey(s.key); setShowAddKeyDrop(false) }} />
+                </span>
                 <input list="label-values-list" placeholder={t('domainDetail_labelValuePh')} value={labelValue}
                   onChange={e => setLabelValue(e.target.value)} style={styles.labelInput} />
                 {isAdmin && (
