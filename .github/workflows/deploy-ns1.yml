@@ -81,7 +81,7 @@ jobs:
         run: |
           ssh ${{ steps.parse.outputs.host }} "
             cd ${{ steps.parse.outputs.path }}
-            docker run --rm -v \$(pwd)/bind:/bind alpine sh -c '[ -d /bind/rndc.key ] && rm -rf /bind/rndc.key; [ -d /bind/tsig.key ] && rm -rf /bind/tsig.key; [ -d /bind/primary/named.conf.local ] && rm -rf /bind/primary/named.conf.local; exit 0'
+            docker run --rm --privileged -v \$(pwd)/bind:/bind alpine sh -c '[ -d /bind/rndc.key ] && rm -rf /bind/rndc.key; [ -d /bind/tsig.key ] && rm -rf /bind/tsig.key; [ -d /bind/primary/named.conf.local ] && rm -rf /bind/primary/named.conf.local; exit 0'
             if [ ! -f bind/rndc.key ]; then
               echo 'Generating rndc.key...'
               SECRET=\$(openssl rand -base64 32)

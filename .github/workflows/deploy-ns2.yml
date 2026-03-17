@@ -7,6 +7,10 @@ on:
       - 'bind/secondary2/**'
       - 'bind/tsig.key'
       - '.github/workflows/deploy-ns2.yml'
+  workflow_run:
+    workflows: ["Deploy — ns1 (primary)"]
+    types: [completed]
+    branches: [main]
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -15,6 +19,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
+    if: ${{ github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Checkout
