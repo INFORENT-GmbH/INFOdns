@@ -32,7 +32,7 @@ jobs:
       - name: Set up SSH
         run: |
           install -m 600 -D /dev/null ~/.ssh/id_ed25519
-          printf '%s' "${{ secrets.SSH_KEY_NS3 }}" > ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_KEY_NS3 }}" > ~/.ssh/id_ed25519
           ssh-keyscan -H "${{ steps.parse.outputs.hostname }}" >> ~/.ssh/known_hosts
 
       - name: Sync BIND config to ns3
