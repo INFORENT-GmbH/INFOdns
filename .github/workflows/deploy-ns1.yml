@@ -131,6 +131,8 @@ jobs:
             cd ${{ steps.parse.outputs.path }} &&
             mkdir -p bind/primary/zones &&
             chmod 777 bind/primary/zones bind/primary &&
+            [ -d bind/primary/named.conf.local ] && rm -rf bind/primary/named.conf.local; true &&
+            [ -f bind/primary/named.conf.local ] || touch bind/primary/named.conf.local &&
             docker compose pull --quiet 2>/dev/null || true &&
             docker compose up -d --build --remove-orphans
           "
