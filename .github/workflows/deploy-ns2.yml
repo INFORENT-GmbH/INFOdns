@@ -24,14 +24,16 @@ jobs:
         id: parse
         run: |
           SSH_PATH="${{ vars.SSH_PATH_NS2 }}"
-          echo "host=${SSH_PATH%%:*}" >> $GITHUB_OUTPUT
+          SSH_HOST="${SSH_PATH%%:*}"
+          echo "host=${SSH_HOST}" >> $GITHUB_OUTPUT
+          echo "hostname=${SSH_HOST#*@}" >> $GITHUB_OUTPUT
           echo "path=${SSH_PATH#*:}" >> $GITHUB_OUTPUT
 
       - name: Set up SSH
         run: |
           install -m 600 -D /dev/null ~/.ssh/id_ed25519
           printf '%s' "${{ secrets.SSH_KEY_NS2 }}" > ~/.ssh/id_ed25519
-          ssh-keyscan -H "${{ steps.parse.outputs.host }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${{ steps.parse.outputs.hostname }}" >> ~/.ssh/known_hosts
 
       - name: Sync BIND config to ns2
         run: |
