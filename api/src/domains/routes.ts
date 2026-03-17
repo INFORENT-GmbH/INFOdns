@@ -32,26 +32,57 @@ const LabelSchema = z.object({
   key: z.string().regex(/^[a-zA-Z0-9_\-.\/]{1,63}$/),
   value: z.string().max(63).default(''),
   color: z.string().max(20).nullable().optional(),
+  admin_only: z.boolean().optional().default(false),
 })
 
 const UpdateLabelsBody = z.object({
   labels: z.array(LabelSchema),
 })
 
-async function fetchLabels(domainIds: number[]): Promise<Map<number, { id: number; key: string; value: string; color: string | null }[]>> {
+async function fetchLabels(domainIds: number[], isAdmin = false): Promise<Map<number, { id: number; key: string; value: string; color: string | null; admin_only: boolean }[]>> {
   if (domainIds.length === 0) return new Map()
+  const adminFilter = isAdmin ? '' : ' AND l.admin_only = 0'
   const rows = await query(
-    `SELECT id, domain_id, label_key AS \`key\`, label_value AS \`value\`, color
-     FROM domain_labels WHERE domain_id IN (${domainIds.map(() => '?').join(',')})
-     ORDER BY label_key, id`,
+    `SELECT l.id, dl.domain_id, l.label_key AS \`key\`, l.label_value AS \`value\`, l.color, l.admin_only
+     FROM domain_labels dl
+     JOIN labels l ON l.id = dl.label_id
+     WHERE dl.domain_id IN (${domainIds.map(() => '?').join(',')})${adminFilter}
+     ORDER BY l.label_key, l.id`,
     domainIds
   ) as any[]
-  const map = new Map<number, { id: number; key: string; value: string; color: string | null }[]>()
+  const map = new Map<number, { id: number; key: string; value: string; color: string | null; admin_only: boolean }[]>()
   for (const r of rows) {
     if (!map.has(r.domain_id)) map.set(r.domain_id, [])
-    map.get(r.domain_id)!.push({ id: r.id, key: r.key, value: r.value, color: r.color ?? null })
+    map.get(r.domain_id)!.push({ id: r.id, key: r.key, value: r.value, color: r.color ?? null, admin_only: !!r.admin_only })
   }
   return map
+}
+
+/** Find an existing label row or create it; return its id. */
+async function findOrCreateLabel(
+  customerIdForLabel: number | null,
+  key: string,
+  value: string,
+  color: string | null | undefined,
+  adminOnly: boolean
+): Promise<number> {
+  const existing = await queryOne(
+    adminOnly
+      ? 'SELECT id, color FROM labels WHERE label_key = ? AND label_value = ? AND admin_only = 1 AND customer_id IS NULL'
+      : 'SELECT id, color FROM labels WHERE label_key = ? AND label_value = ? AND admin_only = 0 AND customer_id = ?',
+    adminOnly ? [key, value] : [key, value, customerIdForLabel]
+  ) as any
+  if (existing) {
+    if (color !== undefined && color !== existing.color) {
+      await execute('UPDATE labels SET color = ? WHERE id = ?', [color ?? null, existing.id])
+    }
+    return existing.id
+  }
+  const result = await execute(
+    'INSERT INTO labels (customer_id, label_key, label_value, color, admin_only) VALUES (?, ?, ?, ?, ?)',
+    [adminOnly ? null : customerIdForLabel, key, value, color ?? null, adminOnly ? 1 : 0]
+  )
+  return result.insertId
 }
 
 /** Inject ownership filter for customer role */
@@ -60,19 +91,32 @@ function ownerFilter(req: any): string {
 }
 
 export async function domainRoutes(app: FastifyInstance) {
-  // GET /domains/labels  — distinct label keys + values visible to this user
+  // GET /domains/labels  — distinct label keys + values scoped to a customer
   app.get('/domains/labels', { preHandler: requireAuth }, async (req: any, reply) => {
-    const ownerJoin = req.user.role === 'customer'
-      ? ` JOIN domains d ON d.id = dl.domain_id AND d.customer_id = ${Number(req.user.customerId)}`
-      : ''
+    const isAdmin = req.user.role === 'admin'
+    const { customer_id } = req.query as Record<string, string>
+
+    const params: unknown[] = []
+    let where: string
+    if (req.user.role === 'customer') {
+      where = 'WHERE l.customer_id = ? AND l.admin_only = 0'
+      params.push(req.user.customerId)
+    } else if (customer_id) {
+      where = isAdmin
+        ? 'WHERE (l.customer_id = ? AND l.admin_only = 0) OR (l.admin_only = 1 AND l.customer_id IS NULL)'
+        : 'WHERE l.customer_id = ? AND l.admin_only = 0'
+      params.push(Number(customer_id))
+    } else {
+      where = isAdmin ? '' : 'WHERE l.admin_only = 0'
+    }
+
     const rows = await query(
-      `SELECT dl.label_key AS \`key\`, dl.label_value AS \`value\`
-       FROM domain_labels dl${ownerJoin}
-       GROUP BY dl.label_key, dl.label_value
-       ORDER BY dl.label_key, dl.label_value`,
-      []
+      `SELECT l.label_key AS \`key\`, l.label_value AS \`value\`
+       FROM labels l ${where}
+       GROUP BY l.label_key, l.label_value
+       ORDER BY l.label_key, l.label_value`,
+      params
     ) as any[]
-    // Group into { key, values: string[] }[]
     const map = new Map<string, Set<string>>()
     for (const r of rows) {
       if (!map.has(r.key)) map.set(r.key, new Set())
@@ -94,10 +138,10 @@ export async function domainRoutes(app: FastifyInstance) {
       const lKey = eqIdx >= 0 ? label.slice(0, eqIdx) : label
       const lVal = eqIdx >= 0 ? label.slice(eqIdx + 1) : null
       if (lVal !== null) {
-        where += ` AND EXISTS (SELECT 1 FROM domain_labels _lf WHERE _lf.domain_id = d.id AND _lf.label_key = ? AND _lf.label_value = ?)`
+        where += ` AND EXISTS (SELECT 1 FROM domain_labels _dl JOIN labels _l ON _l.id = _dl.label_id WHERE _dl.domain_id = d.id AND _l.label_key = ? AND _l.label_value = ?)`
         params.push(lKey, lVal)
       } else {
-        where += ` AND EXISTS (SELECT 1 FROM domain_labels _lf WHERE _lf.domain_id = d.id AND _lf.label_key = ?)`
+        where += ` AND EXISTS (SELECT 1 FROM domain_labels _dl JOIN labels _l ON _l.id = _dl.label_id WHERE _dl.domain_id = d.id AND _l.label_key = ?)`
         params.push(lKey)
       }
     }
@@ -123,7 +167,7 @@ export async function domainRoutes(app: FastifyInstance) {
        LIMIT ? OFFSET ?`,
       [...params, Number(limit), offset]
     ) as any[]
-    const labelMap = await fetchLabels(rows.map((r: any) => r.id))
+    const labelMap = await fetchLabels(rows.map((r: any) => r.id), (req as any).user.role === 'admin')
     return rows.map((r: any) => ({ ...r, labels: labelMap.get(r.id) ?? [] }))
   })
 
@@ -159,7 +203,8 @@ export async function domainRoutes(app: FastifyInstance) {
       [req.params.id]
     ) as any
     if (!row) return reply.status(404).send({ code: 'NOT_FOUND' })
-    const labelMap = await fetchLabels([row.id])
+    const isAdmin = (req as any).user.role === 'admin'
+    const labelMap = await fetchLabels([row.id], isAdmin)
     return { ...row, labels: labelMap.get(row.id) ?? [] }
   })
 
@@ -191,27 +236,43 @@ export async function domainRoutes(app: FastifyInstance) {
   // PUT /domains/:id/labels
   app.put<{ Params: { id: string } }>('/domains/:id/labels', { preHandler: requireAuth }, async (req: any, reply) => {
     const domain = await queryOne(
-      `SELECT id FROM domains WHERE id = ? AND status != 'deleted'${ownerFilter(req)}`,
+      `SELECT id, customer_id FROM domains WHERE id = ? AND status != 'deleted'${ownerFilter(req)}`,
       [req.params.id]
-    )
+    ) as any
     if (!domain) return reply.status(404).send({ code: 'NOT_FOUND' })
 
     const body = UpdateLabelsBody.safeParse(req.body)
     if (!body.success) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: body.error.message })
 
     const domainId = Number(req.params.id)
-    await execute('DELETE FROM domain_labels WHERE domain_id = ?', [domainId])
-    for (const { key, value, color } of body.data.labels) {
+    const isAdmin = req.user.role === 'admin'
+    const customerIdForLabel = domain.customer_id as number
+
+    // Resolve (or create) a labels row for each requested label
+    const labelIds: number[] = []
+    for (const { key, value, color, admin_only } of body.data.labels) {
+      const useAdminOnly = isAdmin && !!admin_only
+      const id = await findOrCreateLabel(customerIdForLabel, key, value, color, useAdminOnly)
+      labelIds.push(id)
+    }
+
+    // Full-replace assignments, preserving admin-only ones for non-admins
+    if (isAdmin) {
+      await execute('DELETE FROM domain_labels WHERE domain_id = ?', [domainId])
+    } else {
       await execute(
-        'INSERT INTO domain_labels (domain_id, label_key, label_value, color) VALUES (?, ?, ?, ?)',
-        [domainId, key, value, color ?? null]
+        `DELETE dl FROM domain_labels dl
+         JOIN labels l ON l.id = dl.label_id
+         WHERE dl.domain_id = ? AND l.admin_only = 0`,
+        [domainId]
       )
     }
-    const labels = await query(
-      'SELECT id, label_key AS `key`, label_value AS `value`, color FROM domain_labels WHERE domain_id = ? ORDER BY label_key, id',
-      [domainId]
-    )
-    return labels
+    for (const labelId of labelIds) {
+      await execute('INSERT IGNORE INTO domain_labels (domain_id, label_id) VALUES (?, ?)', [domainId, labelId])
+    }
+
+    const labelMap = await fetchLabels([domainId], isAdmin)
+    return labelMap.get(domainId) ?? []
   })
 
   // DELETE /domains/:id  (soft delete)

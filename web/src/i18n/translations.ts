@@ -85,6 +85,7 @@ export const translations = {
     domainDetail_labelValuePh:     'value',
     domainDetail_labelNew:         '+ New',
     domainDetail_labelAdd:         'Add',
+    domainDetail_labelAdminOnly:   'Admin only',
 
     // Bulk jobs
     bulk_title:             'Bulk Jobs',
@@ -291,6 +292,7 @@ export const translations = {
     domainDetail_labelValuePh:     'Wert',
     domainDetail_labelNew:         '+ Neu',
     domainDetail_labelAdd:         'Hinzufügen',
+    domainDetail_labelAdminOnly:   'Nur Admins',
 
     // Bulk jobs
     bulk_title:             'Massenaufgaben',

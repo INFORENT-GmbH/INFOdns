@@ -68,6 +68,7 @@ export interface Label {
   key: string
   value: string
   color?: string | null
+  admin_only?: boolean
 }
 
 export interface Domain {
@@ -82,6 +83,7 @@ export interface Domain {
   customer_name: string
   created_at: string
   labels: Label[]
+  zone_error?: string | null
 }
 
 export interface DnsRecord {
@@ -174,8 +176,10 @@ export const deleteDomain = (id: number) =>
 export const updateDomainLabels = (id: number, labels: Label[]) =>
   api.put<Label[]>(`/domains/${id}/labels`, { labels })
 
-export const getLabelSuggestions = () =>
-  api.get<{ key: string; values: string[] }[]>('/domains/labels')
+export const getLabelSuggestions = (customerId?: number) =>
+  api.get<{ key: string; values: string[] }[]>('/domains/labels', {
+    params: customerId != null ? { customer_id: customerId } : undefined,
+  })
 
 // Records
 export const getRecords = (domainId: number) =>

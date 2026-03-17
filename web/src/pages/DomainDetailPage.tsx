@@ -4,12 +4,13 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getDomain, getRecords, createRecord, deleteRecord,
   createBulkJob, previewBulkJob, approveBulkJob, searchByRecord,
-  updateDomainLabels, getLabelSuggestions, type DnsRecord, type Label,
+  updateDomainLabels, getLabelSuggestions, type DnsRecord, type Label, type Domain,
 } from '../api/client'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import LabelChip from '../components/LabelChip'
 import ColorPicker from '../components/ColorPicker'
 import { useI18n } from '../i18n/I18nContext'
+import { useAuth } from '../context/AuthContext'
 
 const INLINE_STYLES = `
   .inline-field:hover { border-color: #d1d5db !important; background: #fff !important; }
@@ -65,6 +66,8 @@ export default function DomainDetailPage() {
   const domainId = Number(id)
   const qc = useQueryClient()
   const { t } = useI18n()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
 
   // edits: changes to existing records keyed by record id
   const [edits, setEdits] = useState<Record<number, EditRow>>({})
@@ -79,13 +82,15 @@ export default function DomainDetailPage() {
 
   const [labelKey, setLabelKey] = useState('')
   const [labelValue, setLabelValue] = useState('')
+  const [addAdminOnly, setAddAdminOnly] = useState(false)
   const [editingLabelId, setEditingLabelId] = useState<number | null>(null)
   const [editKey, setEditKey] = useState('')
   const [editValue, setEditValue] = useState('')
   const [editColor, setEditColor] = useState<string | null>(null)
+  const [editAdminOnly, setEditAdminOnly] = useState(false)
   const [savingLabels, setSavingLabels] = useState(false)
 
-  const { data: domain, isLoading: loadingDomain } = useQuery({
+  const { data: domain, isLoading: loadingDomain } = useQuery<Domain>({
     queryKey: ['domain', domainId],
     queryFn: () => getDomain(domainId).then(r => r.data),
   })
@@ -96,9 +101,10 @@ export default function DomainDetailPage() {
   })
 
   const { data: labelSuggestions = [] } = useQuery({
-    queryKey: ['label-suggestions'],
-    queryFn: () => getLabelSuggestions().then(r => r.data),
+    queryKey: ['label-suggestions', domain?.customer_id],
+    queryFn: () => getLabelSuggestions(domain?.customer_id).then(r => r.data),
     staleTime: 30_000,
+    enabled: !!domain,
   })
 
   // ── existing record helpers ──────────────────────────────────────────────
@@ -169,7 +175,7 @@ export default function DomainDetailPage() {
       // 1. Create new records directly (API enqueues render)
       for (const row of rowsToCreate) {
         const ttlNum = row.ttl === '' ? undefined : Number(row.ttl)
-        let body: any = { name: row.name.trim(), type: row.type, value: row.value.trim() }
+        const body: Partial<DnsRecord> = { name: row.name.trim(), type: row.type, value: row.value.trim() }
         if (ttlNum !== undefined) body.ttl = ttlNum
         if (row.type === 'MX') {
           const parts = row.value.trim().split(/\s+/)
@@ -227,14 +233,15 @@ export default function DomainDetailPage() {
       setNewRows(prev => prev.filter(r => !submittedIds.has(r._newId)))
       qc.invalidateQueries({ queryKey: ['records', domainId] })
       qc.invalidateQueries({ queryKey: ['domain', domainId] })
-    } catch (e: any) {
-      const data = e?.response?.data
-      let msg: string = data?.message ?? data?.error ?? e.message ?? 'Failed to apply changes'
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { message?: string; error?: string } }; message?: string }
+      const data = err?.response?.data
+      let msg: string = data?.message ?? data?.error ?? err.message ?? 'Failed to apply changes'
       // Zod errors come back as a JSON string — unwrap to readable text
       try {
-        const parsed = JSON.parse(msg)
+        const parsed: unknown = JSON.parse(msg)
         if (Array.isArray(parsed)) {
-          msg = parsed.map((z: any) => `${z.path?.join('.') || 'field'}: ${z.message}`).join(', ')
+          msg = parsed.map((z: { path?: string[]; message?: string }) => `${z.path?.join('.') || 'field'}: ${z.message}`).join(', ')
         }
       } catch { /* not JSON, use as-is */ }
       setApplyError(msg)
@@ -253,19 +260,20 @@ export default function DomainDetailPage() {
 
   // ── label helpers ─────────────────────────────────────────────────────────
 
-  const labels: Label[] = (domain as any)?.labels ?? []
+  const labels: Label[] = domain?.labels ?? []
 
   function patchLabelsCache(next: Label[]) {
-    qc.setQueryData(['domain', domainId], (old: any) => old ? { ...old, labels: next } : old)
+    qc.setQueryData<Domain>(['domain', domainId], old => old ? { ...old, labels: next } : old)
   }
 
   async function handleAddLabel(e: React.FormEvent) {
     e.preventDefault()
     if (!labelKey.trim() || savingLabels) return
-    const next = [...labels, { id: 0, key: labelKey.trim(), value: labelValue.trim() }]
+    const next = [...labels, { id: 0, key: labelKey.trim(), value: labelValue.trim(), admin_only: isAdmin && addAdminOnly }]
     patchLabelsCache(next)
     setLabelKey('')
     setLabelValue('')
+    setAddAdminOnly(false)
     setSavingLabels(true)
     try {
       await updateDomainLabels(domainId, next)
@@ -279,7 +287,9 @@ export default function DomainDetailPage() {
 
   async function handleSaveEdit() {
     if (!editKey.trim() || savingLabels) return
-    const next = labels.map(l => l.id === editingLabelId ? { ...l, key: editKey.trim(), value: editValue.trim(), color: editColor } : l)
+    const next = labels.map(l => l.id === editingLabelId
+      ? { ...l, key: editKey.trim(), value: editValue.trim(), color: editColor, admin_only: isAdmin ? editAdminOnly : l.admin_only }
+      : l)
     patchLabelsCache(next)
     setEditingLabelId(null)
     setSavingLabels(true)
@@ -326,16 +336,16 @@ export default function DomainDetailPage() {
       {domain.zone_status === 'error' && (
         <div style={styles.errorBanner}>
           <strong>{t('domainDetail_zoneFailed')}</strong>
-          {(domain as any).zone_error && (
+          {domain.zone_error && (
             <pre style={{ margin: '.5rem 0 0', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: '.8125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-              {(domain as any).zone_error}
+              {domain.zone_error}
             </pre>
           )}
         </div>
       )}
 
       <div style={styles.meta}>
-        <span>{t('customer')}: <strong>{(domain as any).customer_name}</strong></span>
+        <span>{t('customer')}: <strong>{domain.customer_name}</strong></span>
         <span>{t('domainDetail_defaultTtl')} <strong>{domain.default_ttl}s</strong></span>
         <span>{t('serial')}: <code>{domain.last_serial || '—'}</code></span>
         <span>{t('domainDetail_lastRendered')} {domain.last_rendered_at ? new Date(domain.last_rendered_at).toLocaleString() : t('never')}</span>
@@ -359,11 +369,17 @@ export default function DomainDetailPage() {
                 onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditingLabelId(null) }}
                 style={styles.labelInput} />
               <ColorPicker value={editColor} labelKey={editKey} onChange={setEditColor} label={t('domainDetail_labelColor')} />
+              {isAdmin && (
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '.75rem', color: '#6b7280', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={editAdminOnly} onChange={e => setEditAdminOnly(e.target.checked)} style={{ margin: 0 }} />
+                  {t('domainDetail_labelAdminOnly')}
+                </label>
+              )}
               <button onClick={handleSaveEdit} disabled={!editKey.trim() || savingLabels} style={styles.labelAddBtn}>{t('save')}</button>
               <button onClick={() => setEditingLabelId(null)} style={styles.labelAddBtn}>{t('cancel')}</button>
             </span>
           ) : (
-            <span key={l.id} onClick={() => { setEditingLabelId(l.id); setEditKey(l.key); setEditValue(l.value); setEditColor(l.color ?? null) }} style={{ cursor: 'text' }}>
+            <span key={l.id} onClick={() => { setEditingLabelId(l.id); setEditKey(l.key); setEditValue(l.value); setEditColor(l.color ?? null); setEditAdminOnly(!!l.admin_only) }} style={{ cursor: 'text' }}>
               <LabelChip label={l} onRemove={e => { e.stopPropagation(); handleRemoveLabel(l.id) }} />
             </span>
           ))}
@@ -380,6 +396,12 @@ export default function DomainDetailPage() {
                   onChange={e => setLabelKey(e.target.value)} style={styles.labelInput} autoFocus />
                 <input list="label-values-list" placeholder={t('domainDetail_labelValuePh')} value={labelValue}
                   onChange={e => setLabelValue(e.target.value)} style={styles.labelInput} />
+                {isAdmin && (
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '.75rem', color: '#6b7280', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={addAdminOnly} onChange={e => setAddAdminOnly(e.target.checked)} style={{ margin: 0 }} />
+                    {t('domainDetail_labelAdminOnly')}
+                  </label>
+                )}
                 <button type="submit" disabled={!labelKey.trim() || savingLabels} style={styles.labelAddBtn}>
                   {t('domainDetail_labelAdd')}
                 </button>

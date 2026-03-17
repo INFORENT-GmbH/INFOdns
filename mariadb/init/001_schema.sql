@@ -73,15 +73,27 @@ CREATE TABLE domains (
   FOREIGN KEY (customer_id) REFERENCES customers(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ── domain_labels ────────────────────────────────────────────
-CREATE TABLE domain_labels (
+-- ── labels ───────────────────────────────────────────────────
+-- One canonical row per distinct key+value combination.
+-- customer_id = NULL means admin-only global (not customer-scoped).
+CREATE TABLE labels (
   id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  domain_id   INT UNSIGNED NOT NULL,
+  customer_id INT UNSIGNED NULL,
   label_key   VARCHAR(63)  NOT NULL,
   label_value VARCHAR(63)  NOT NULL DEFAULT '',
   color       VARCHAR(20)  NULL DEFAULT NULL,
-  INDEX idx_domain_label (domain_id, label_key),
-  FOREIGN KEY (domain_id) REFERENCES domains(id) ON DELETE CASCADE
+  admin_only  TINYINT(1)   NOT NULL DEFAULT 0,
+  FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── domain_labels ────────────────────────────────────────────
+-- Assignment table: which labels are attached to which domain.
+CREATE TABLE domain_labels (
+  domain_id INT UNSIGNED NOT NULL,
+  label_id  INT UNSIGNED NOT NULL,
+  PRIMARY KEY (domain_id, label_id),
+  FOREIGN KEY (domain_id) REFERENCES domains(id) ON DELETE CASCADE,
+  FOREIGN KEY (label_id)  REFERENCES labels(id)  ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── dns_records ──────────────────────────────────────────────
