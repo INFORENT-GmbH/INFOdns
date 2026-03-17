@@ -47,8 +47,8 @@ jobs:
             --exclude='bind/secondary2/' \
             --exclude='bind/secondary3/' \
             --exclude='.env' \
-            --exclude='bind/rndc.key' \
-            --exclude='bind/tsig.key' \
+            --exclude='bind/keys/rndc.key' \
+            --exclude='bind/keys/tsig.key' \
             --exclude='mariadb/data/' \
             --exclude='web/node_modules/' \
             --exclude='api/node_modules/' \
@@ -81,21 +81,20 @@ jobs:
         run: |
           ssh ${{ steps.parse.outputs.host }} "
             cd ${{ steps.parse.outputs.path }}
-            docker run --rm --privileged -v \$(pwd)/bind:/bind alpine sh -c '[ -d /bind/rndc.key ] && rm -rf /bind/rndc.key; [ -d /bind/tsig.key ] && rm -rf /bind/tsig.key; [ -d /bind/primary/named.conf.local ] && rm -rf /bind/primary/named.conf.local; exit 0'
-            if [ ! -f bind/rndc.key ]; then
+            if [ ! -f bind/keys/rndc.key ]; then
               echo 'Generating rndc.key...'
               SECRET=\$(openssl rand -base64 32)
-              printf 'key \"rndc-key\" {\n\talgorithm hmac-sha256;\n\tsecret \"%s\";\n};\n' \"\$SECRET\" > bind/rndc.key
-              chmod 600 bind/rndc.key
+              printf 'key \"rndc-key\" {\n\talgorithm hmac-sha256;\n\tsecret \"%s\";\n};\n' \"\$SECRET\" > bind/keys/rndc.key
+              chmod 600 bind/keys/rndc.key
               echo 'rndc.key created.'
             else
               echo 'rndc.key already exists — skipping'
             fi
-            if [ ! -f bind/tsig.key ]; then
+            if [ ! -f bind/keys/tsig.key ]; then
               echo 'Generating tsig.key...'
               SECRET=\$(openssl rand -base64 32)
-              printf 'key \"tsig-secondary\" {\n\talgorithm hmac-sha256;\n\tsecret \"%s\";\n};\n' \"\$SECRET\" > bind/tsig.key
-              chmod 600 bind/tsig.key
+              printf 'key \"tsig-secondary\" {\n\talgorithm hmac-sha256;\n\tsecret \"%s\";\n};\n' \"\$SECRET\" > bind/keys/tsig.key
+              chmod 600 bind/keys/tsig.key
               echo 'tsig.key created.'
             else
               echo 'tsig.key already exists — skipping'
@@ -105,7 +104,7 @@ jobs:
 
       - name: Distribute tsig.key to ns2 and ns3 if missing
         run: |
-          ssh ${{ steps.parse.outputs.host }} "cat ${{ steps.parse.outputs.path }}/bind/tsig.key" > /tmp/tsig.key
+          ssh ${{ steps.parse.outputs.host }} "cat ${{ steps.parse.outputs.path }}/bind/keys/tsig.key" > /tmp/tsig.key
 
           if ssh -i ~/.ssh/id_ns2 ${{ steps.parse-secondaries.outputs.ns2_host }} \
               "[ ! -f /etc/bind/tsig.key ]"; then

@@ -2,8 +2,10 @@
 .env
 
 # Generated BIND keys — never commit
-bind/tsig.key
+bind/keys/rndc.key
+bind/keys/tsig.key
 bind/rndc.key
+bind/tsig.key
 
 # Generated zone files and named.conf.local (runtime state)
 bind/primary/zones/

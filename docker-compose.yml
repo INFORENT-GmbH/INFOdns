@@ -91,7 +91,7 @@ services:
     volumes:
       - ./bind/primary/zones:/bind/primary/zones
       - ./bind/primary:/bind/primary/conf
-      - ./bind/rndc.key:/etc/rndc/rndc.key:ro
+      - ./bind/keys:/etc/rndc:ro
     networks:
       - internal
       - public
@@ -117,8 +117,7 @@ services:
       - ./bind/primary/named.conf:/etc/bind/named.conf:ro
       - ./bind/primary/named.conf.options:/etc/bind/named.conf.options:ro
       - ./bind/primary/named.conf.local:/etc/bind/named.conf.local:ro
-      - ./bind/tsig.key:/etc/bind/tsig.key:ro
-      - ./bind/rndc.key:/etc/bind/rndc.key:ro
+      - ./bind/keys:/etc/bind/keys:ro
       - ./bind/primary/zones:/var/lib/bind/zones
     networks:
       - internal          # NOT on public network — hidden primary
