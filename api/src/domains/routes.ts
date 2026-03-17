@@ -29,6 +29,7 @@ const UpdateDomainBody = z.object({
 })
 
 const LabelSchema = z.object({
+  id: z.number().int().optional().default(0),
   key: z.string().regex(/^[a-zA-Z0-9_\-.\/]{1,63}$/),
   value: z.string().max(63).default(''),
   color: z.string().max(20).nullable().optional(),
@@ -250,10 +251,35 @@ export async function domainRoutes(app: FastifyInstance) {
 
     // Resolve (or create) a labels row for each requested label
     const labelIds: number[] = []
-    for (const { key, value, color, admin_only } of body.data.labels) {
+    for (const { id: existingId, key, value, color, admin_only } of body.data.labels) {
       const useAdminOnly = isAdmin && !!admin_only
-      const id = await findOrCreateLabel(customerIdForLabel, key, value, color, useAdminOnly)
-      labelIds.push(id)
+      if (existingId > 0) {
+        // Update the canonical row in-place
+        const custId = useAdminOnly ? null : (await queryOne('SELECT customer_id FROM labels WHERE id = ?', [existingId]) as any)?.customer_id ?? customerIdForLabel
+        await execute(
+          'UPDATE labels SET label_key = ?, label_value = ?, color = ?, admin_only = ?, customer_id = ? WHERE id = ?',
+          [key, value, color ?? null, useAdminOnly ? 1 : 0, custId, existingId]
+        )
+        labelIds.push(existingId)
+      } else {
+        const id = await findOrCreateLabel(customerIdForLabel, key, value, color, useAdminOnly)
+        labelIds.push(id)
+      }
+      // admin_only is a key-level flag — propagate to all other rows with the same key.
+      // On un-mark: only flip admin_only=0, leave customer_id as-is (stays global/NULL).
+      if (isAdmin) {
+        if (useAdminOnly) {
+          await execute(
+            'UPDATE labels SET admin_only = 1, customer_id = NULL WHERE label_key = ? AND id != ?',
+            [key, labelIds[labelIds.length - 1]]
+          )
+        } else {
+          await execute(
+            'UPDATE labels SET admin_only = 0 WHERE label_key = ? AND id != ?',
+            [key, labelIds[labelIds.length - 1]]
+          )
+        }
+      }
     }
 
     // Full-replace assignments, preserving admin-only ones for non-admins
