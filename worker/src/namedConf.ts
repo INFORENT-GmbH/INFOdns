@@ -22,7 +22,7 @@ const CONF_BASE    = process.env.CONF_BASE             ?? '/bind'
 const PRIMARY_HOST = process.env.BIND_PRIMARY_HOST     ?? 'bind-primary'
 const RNDC_PORT    = process.env.BIND_PRIMARY_RNDC_PORT ?? '953'
 
-// Real secondary server IPs (hil1, hel1) for also-notify — no Docker hostnames needed
+// Real secondary server IPs (ns1, ns2) for also-notify — no Docker hostnames needed
 const SECONDARY_IPS: string[] = (process.env.SECONDARY_IPS ?? '')
   .split(',').map(s => s.trim()).filter(Boolean)
 

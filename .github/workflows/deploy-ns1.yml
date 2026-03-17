@@ -1,12 +1,12 @@
-name: Deploy — hel1 (secondary)
+name: Deploy — ns1 (secondary)
 
 on:
   push:
     branches: [main]
     paths:
-      - 'bind/secondary-hel1/**'
+      - 'bind/secondary1/**'
       - 'bind/tsig.key'
-      - '.github/workflows/deploy-hel1.yml'
+      - '.github/workflows/deploy-ns1.yml'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -20,25 +20,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up SSH
-        run: |
-          install -m 600 -D /dev/null ~/.ssh/id_ed25519
-          printf '%s' "${{ secrets.SSH_KEY }}" | base64 -d > ~/.ssh/id_ed25519
-          ssh-keyscan -H hel1.dns.inforant.de >> ~/.ssh/known_hosts
-
-      - name: Parse host and path from SSH_PATH_HEL1
+      - name: Parse host and path from SSH_PATH_NS1
         id: parse
         run: |
-          SSH_PATH="${{ vars.SSH_PATH_HEL1 }}"
+          SSH_PATH="${{ vars.SSH_PATH_NS1 }}"
           echo "host=${SSH_PATH%%:*}" >> $GITHUB_OUTPUT
           echo "path=${SSH_PATH#*:}" >> $GITHUB_OUTPUT
 
-      - name: Sync BIND config to hel1
+      - name: Set up SSH
+        run: |
+          install -m 600 -D /dev/null ~/.ssh/id_ed25519
+          printf '%s' "${{ secrets.SSH_KEY_NS1 }}" | base64 -d > ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ steps.parse.outputs.host }}" >> ~/.ssh/known_hosts
+
+      - name: Sync BIND config to ns1
         run: |
           rsync -az --delete \
-            bind/secondary-hel1/ ${{ vars.SSH_PATH_HEL1 }}/
+            bind/secondary1/ ${{ vars.SSH_PATH_NS1 }}/
 
-      - name: Reload BIND on hel1
+      - name: Reload BIND on ns1
         run: |
           ssh ${{ steps.parse.outputs.host }} "
             named-checkconf ${{ steps.parse.outputs.path }}/named.conf &&

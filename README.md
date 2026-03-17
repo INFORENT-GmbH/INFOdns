@@ -55,9 +55,9 @@ The two public secondaries run on real external servers deployed separately:
 
 | Server | Hostname | IP | Role |
 |---|---|---|---|
-| nbg1 | `nbg1.dns.inforant.de` | `168.119.122.226` | Hidden primary (Docker stack) |
-| hil1 | `hil1.dns.infrant.de` | `5.78.139.169` | Public secondary |
-| hel1 | `hel1.dns.inforant.de` | `89.167.67.148` | Public secondary |
+| ns1 | `ns1.dns.inforant.de` | `168.119.122.226` | Hidden primary (Docker stack) |
+| ns3 | `ns3.dns.infrant.de` | `5.78.139.169` | Public secondary |
+| ns2 | `ns2.dns.inforant.de` | `89.167.67.148` | Public secondary |
 
 ---
 
@@ -119,16 +119,16 @@ INFOdns/
 │           ├── UsersPage.tsx
 │           └── AuditLogPage.tsx
 ├── bind/
-│   ├── primary/                ← named.conf, zones/ (written by worker), deployed to nbg1
-│   ├── secondary-hil1/         ← named.conf.options (static), deployed to hil1 by CI
-│   ├── secondary-hel1/         ← named.conf.options (static), deployed to hel1 by CI
+│   ├── primary/                ← named.conf, zones/ (written by worker), deployed to ns1
+│   ├── secondary-ns3/         ← named.conf.options (static), deployed to ns3 by CI
+│   ├── secondary-ns2/         ← named.conf.options (static), deployed to ns2 by CI
 │   ├── tsig.key                ← TSIG for AXFR auth (not committed, deploy manually)
 │   └── rndc.key                ← rndc control key (not committed, deploy manually)
 ├── .github/
 │   └── workflows/
-│       ├── deploy-nbg1.yml     ← deploy full stack to nbg1 on push to main
-│       ├── deploy-hil1.yml     ← deploy BIND config to hil1 on bind/secondary-hil1 change
-│       └── deploy-hel1.yml     ← deploy BIND config to hel1 on bind/secondary-hel1 change
+│       ├── deploy-ns1.yml     ← deploy full stack to ns1 on push to main
+│       ├── deploy-ns3.yml     ← deploy BIND config to ns3 on bind/secondary-ns3 change
+│       └── deploy-ns2.yml     ← deploy BIND config to ns2 on bind/secondary-ns2 change
 ├── mariadb/
 │   ├── data/                   ← MariaDB data dir (not committed)
 │   └── init/001_schema.sql     ← full schema, runs once on first start
@@ -207,9 +207,9 @@ Three workflows handle deployment on every push to `main`:
 
 | Workflow | Trigger | Target | What it deploys |
 |---|---|---|---|
-| `deploy-nbg1.yml` | Any change except secondary configs | `nbg1.inforant.net` | Full Docker Compose stack |
-| `deploy-hil1.yml` | `bind/secondary-hil1/**` changed | `hil1.dns.infrant.de` | BIND config only |
-| `deploy-hel1.yml` | `bind/secondary-hel1/**` changed | `hel1.dns.inforant.de` | BIND config only |
+| `deploy-ns1.yml` | Any change except secondary configs | `ns1.inforant.net` | Full Docker Compose stack |
+| `deploy-ns3.yml` | `bind/secondary-ns3/**` changed | `ns3.dns.infrant.de` | BIND config only |
+| `deploy-ns2.yml` | `bind/secondary-ns2/**` changed | `ns2.dns.inforant.de` | BIND config only |
 
 ### Required GitHub Secrets & Variables
 
@@ -218,23 +218,23 @@ In **Settings → Secrets and variables → Actions**:
 | Name | Type | Value |
 |---|---|---|
 | `SSH_PRIVATE_KEY` | Secret | Ed25519 private key with root access to all three servers |
-| `SSH_PATH_NBG1` | Variable | `root@nbg1.inforant.net:/root/bind` |
-| `SSH_PATH_HIL1` | Variable | `root@hil1.dns.infrant.de:/root/bind` |
-| `SSH_PATH_HEL1` | Variable | `root@hel1.dns.inforant.de:/root/bind` |
+| `SSH_PATH_NS1` | Variable | `root@ns1.inforant.net:/root/bind` |
+| `SSH_PATH_NS3` | Variable | `root@ns3.dns.infrant.de:/root/bind` |
+| `SSH_PATH_NS2` | Variable | `root@ns2.dns.inforant.de:/root/bind` |
 
 ### One-time server setup
 
-Each server needs the corresponding public SSH key in `/root/.ssh/authorized_keys`. The nbg1 server also needs Docker and Docker Compose installed.
+Each server needs the corresponding public SSH key in `/root/.ssh/authorized_keys`. The ns1 server also needs Docker and Docker Compose installed.
 
 For the secondary servers, BIND must be installed and the initial TSIG key + `named.conf` placed before the first deploy:
 
 ```bash
-# On hil1 and hel1 (run once):
+# On ns3 and ns2 (run once):
 apt-get install -y bind9
 mkdir -p /root/bind
 # Copy tsig.key manually (never committed to git)
-scp bind/tsig.key root@hil1.dns.infrant.de:/root/bind/tsig.key
-scp bind/tsig.key root@hel1.dns.inforant.de:/root/bind/tsig.key
+scp bind/tsig.key root@ns3.dns.infrant.de:/root/bind/tsig.key
+scp bind/tsig.key root@ns2.dns.inforant.de:/root/bind/tsig.key
 ```
 
 The `named.conf` on each secondary should point to the files deployed by CI:

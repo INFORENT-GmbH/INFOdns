@@ -1,0 +1,46 @@
+name: Deploy — ns2 (secondary)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bind/secondary2/**'
+      - 'bind/tsig.key'
+      - '.github/workflows/deploy-ns2.yml'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Parse host and path from SSH_PATH_NS2
+        id: parse
+        run: |
+          SSH_PATH="${{ vars.SSH_PATH_NS2 }}"
+          echo "host=${SSH_PATH%%:*}" >> $GITHUB_OUTPUT
+          echo "path=${SSH_PATH#*:}" >> $GITHUB_OUTPUT
+
+      - name: Set up SSH
+        run: |
+          install -m 600 -D /dev/null ~/.ssh/id_ed25519
+          printf '%s' "${{ secrets.SSH_KEY_NS2 }}" | base64 -d > ~/.ssh/id_ed25519
+          ssh-keyscan -H "${{ steps.parse.outputs.host }}" >> ~/.ssh/known_hosts
+
+      - name: Sync BIND config to ns2
+        run: |
+          rsync -az --delete \
+            bind/secondary2/ ${{ vars.SSH_PATH_NS2 }}/
+
+      - name: Reload BIND on ns2
+        run: |
+          ssh ${{ steps.parse.outputs.host }} "
+            named-checkconf ${{ steps.parse.outputs.path }}/named.conf &&
+            rndc reconfig
+          "

@@ -74,7 +74,7 @@ services:
       BIND_PRIMARY_HOST: bind-primary
       BIND_PRIMARY_RNDC_PORT: 953
       RNDC_KEY_FILE: /etc/rndc/rndc.key
-      # Real secondary IPs for also-notify in named.conf.local (hil1, hel1)
+      # Real secondary IPs for also-notify in named.conf.local (ns3, ns2)
       SECONDARY_IPS: ${SECONDARY_IPS:-5.78.139.169,89.167.67.148}
       NS_RECORDS: ${NS_RECORDS}          # comma-separated NS FQDNs for zone rendering
       SOA_MNAME: ${SOA_MNAME}
@@ -107,9 +107,9 @@ services:
     networks:
       - public
 
-  # ── Hidden Primary BIND (nbg1 — 168.119.122.226) ────────────
-  # Secondaries run on real external servers: hil1 (5.78.139.169), hel1 (89.167.67.148)
-  # They are deployed separately — see bind/secondary-hil1/ and bind/secondary-hel1/
+  # ── Hidden Primary BIND (ns1 — 168.119.122.226) ────────────
+  # Secondaries run on real external servers: ns3 (5.78.139.169), ns2 (89.167.67.148)
+  # They are deployed separately — see bind/secondary-ns3/ and bind/secondary-ns2/
   bind-primary:
     image: internetsystemsconsortium/bind9:9.18
     restart: unless-stopped
