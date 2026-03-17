@@ -81,6 +81,8 @@ jobs:
         run: |
           ssh ${{ steps.parse.outputs.host }} "
             cd ${{ steps.parse.outputs.path }}
+            [ -d bind/rndc.key ] && rm -rf bind/rndc.key
+            [ -d bind/tsig.key ] && rm -rf bind/tsig.key
             if [ ! -f bind/rndc.key ]; then
               echo 'Generating rndc.key...'
               SECRET=\$(openssl rand -base64 32)
