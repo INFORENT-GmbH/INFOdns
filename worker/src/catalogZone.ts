@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
 
-const SOA_MNAME = process.env.SOA_MNAME ?? 'ns1.dns.inforent.de.'
-const SOA_RNAME = process.env.SOA_RNAME ?? 'hostmaster.dns.inforent.de.'
+const SOA_MNAME = process.env.SOA_MNAME ?? 'ns1.ns.inforant.de.'
+const SOA_RNAME = process.env.SOA_RNAME ?? 'hostmaster.inforant.de.'
 
 /**
  * Generate a unique label for a member zone in the catalog.

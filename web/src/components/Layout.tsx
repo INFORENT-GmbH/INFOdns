@@ -9,8 +9,8 @@ import logo from '../assets/logo.png'
 
 const nsLabels: Record<string, { display: string; fqdn?: string }> = {
   ns1: { display: 'primary' },
-  ns2: { display: 'ilreah', fqdn: 'ilreah.ns.inforent.de' },
-  ns3: { display: 'ulren', fqdn: 'ulren.ns.inforent.de' },
+  ns2: { display: 'ilreah', fqdn: 'ilreah.ns.inforant.de' },
+  ns3: { display: 'ulren', fqdn: 'ulren.ns.inforant.de' },
 }
 
 export default function Layout() {

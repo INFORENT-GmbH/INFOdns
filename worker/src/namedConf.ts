@@ -23,7 +23,7 @@ async function writeConf(destPath: string, content: string): Promise<void> {
 const CONF_BASE      = process.env.CONF_BASE             ?? '/bind'
 const PRIMARY_HOST   = process.env.BIND_PRIMARY_HOST     ?? 'bind-primary'
 const RNDC_PORT      = process.env.BIND_PRIMARY_RNDC_PORT ?? '953'
-const CATALOG_ZONE   = process.env.CATALOG_ZONE          ?? 'catalog.dns.inforent.de'
+const CATALOG_ZONE   = process.env.CATALOG_ZONE          ?? 'catalog.dns.inforant.de'
 const ZONE_DIR       = process.env.ZONE_DIR              ?? '/bind/primary/zones'
 
 // Real secondary server IPs (ns1, ns2) for also-notify — no Docker hostnames needed
