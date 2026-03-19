@@ -186,15 +186,19 @@ export default function DomainsPage() {
             {colDropdownOpen && (
               <div style={styles.colDropdown}>
                 {ALL_COLUMNS.map(col => (
-                  <label key={col} style={styles.colDropdownItem}>
+                  <div
+                    key={col}
+                    style={styles.colDropdownItem}
+                    onMouseDown={e => { e.preventDefault(); toggleCol(col) }}
+                  >
                     <input
                       type="checkbox"
                       checked={visibleCols.includes(col)}
-                      onChange={() => toggleCol(col)}
-                      style={{ marginRight: 6 }}
+                      readOnly
+                      style={{ marginRight: 6, pointerEvents: 'none' }}
                     />
                     {colLabels[col]}
-                  </label>
+                  </div>
                 ))}
               </div>
             )}
