@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../context/AuthContext'
@@ -6,11 +7,19 @@ import { useI18n } from '../i18n/I18nContext'
 import { getNsStatus } from '../api/client'
 import logo from '../assets/logo.png'
 
+const nsLabels: Record<string, { display: string; fqdn: string }> = {
+  ns1: { display: 'NS1', fqdn: 'ns1.inforent.de' },
+  ns2: { display: 'ilreah', fqdn: 'ilreah.ns.inforent.de' },
+  ns3: { display: 'ulren', fqdn: 'ulren.ns.inforent.de' },
+}
+
 export default function Layout() {
   const { user, accessToken, logout } = useAuth()
   const { t, locale, setLocale } = useI18n()
   const wsStatus = useWs(accessToken)
   const navigate = useNavigate()
+  const [copiedNs, setCopiedNs] = useState<string | null>(null)
+  const [hoveredNs, setHoveredNs] = useState<string | null>(null)
   const { data: nsStatus } = useQuery({
     queryKey: ['ns-status'],
     queryFn: () => getNsStatus().then(r => r.data),
@@ -50,11 +59,29 @@ export default function Layout() {
       <div style={styles.nsBar}>
         {visibleNs.map(name => {
           const s = nsStatus?.[name]
+          const label = nsLabels[name] ?? { display: name.toUpperCase(), fqdn: name }
           return (
-            <span key={name} style={styles.nsEntry}>
+            <span
+              key={name}
+              style={{ ...styles.nsEntry, cursor: 'pointer', position: 'relative' }}
+              onMouseEnter={() => setHoveredNs(name)}
+              onMouseLeave={() => setHoveredNs(null)}
+              onClick={() => {
+                navigator.clipboard.writeText(label.fqdn)
+                setCopiedNs(name)
+                setTimeout(() => setCopiedNs(prev => prev === name ? null : prev), 1500)
+              }}
+            >
               <span style={{ color: !s ? '#9ca3af' : s.ok ? '#16a34a' : '#dc2626' }}>●</span>
-              {' '}{name.toUpperCase()}
+              {' '}{label.display}
               {s && <span style={styles.nsLatency}>{s.ok ? `${s.latencyMs}ms` : 'down'}</span>}
+              {copiedNs === name && <span style={styles.nsCopied}>✓</span>}
+              {hoveredNs === name && copiedNs !== name && (
+                <span style={styles.nsTooltip}>{label.fqdn} — click to copy</span>
+              )}
+              {copiedNs === name && hoveredNs === name && (
+                <span style={styles.nsTooltip}>Copied!</span>
+              )}
             </span>
           )
         })}
@@ -93,6 +120,8 @@ const styles: Record<string, React.CSSProperties> = {
   nsBar:     { display: 'flex', gap: '1.5rem', padding: '.25rem 1.5rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', color: '#6b7280' },
   nsEntry:   { display: 'flex', alignItems: 'center', gap: '.25rem' },
   nsLatency: { color: '#9ca3af', marginLeft: '.25rem' },
+  nsCopied:  { color: '#16a34a', marginLeft: '.25rem', fontSize: '.7rem' },
+  nsTooltip: { position: 'absolute' as const, top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 10, pointerEvents: 'none' as const },
   wsToast:   { display: 'flex', alignItems: 'center', gap: '.5rem', background: '#1e293b', color: '#f8fafc', fontSize: '.8125rem', padding: '.5rem 1.5rem', position: 'sticky' as const, top: 0, zIndex: 50 },
   wsSpinner: { display: 'inline-block', width: 10, height: 10, border: '2px solid #94a3b8', borderTopColor: '#f8fafc', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 },
 }
