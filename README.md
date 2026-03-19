@@ -32,7 +32,7 @@ An internal DNS management panel modelled on AutoDNS. Staff and customers manage
 1. User edits a record in the Web UI
 2. API validates, writes to MariaDB, enqueues a render job
 3. Worker renders the zone file, validates with `named-checkzone`, atomically replaces the file, runs `rndc reload`
-4. Primary sends NOTIFY → secondaries pull via AXFR/IXFR
+4. Worker updates the catalog zone (RFC 9432) → primary sends NOTIFY → secondaries automatically discover and pull all member zones via AXFR
 5. Worker broadcasts a WebSocket event → UI status badge updates live
 
 The Worker is the **only** process that writes zone files or calls rndc.
@@ -92,7 +92,8 @@ INFOdns/
 │       ├── renderZone.ts       ← pure function: DB records → BIND zone string
 │       ├── validateZone.ts     ← shells out to named-checkzone
 │       ├── deployZone.ts       ← atomic file replace + rndc reload
-│       ├── namedConf.ts        ← named.conf.local generator + rndc reconfig
+│       ├── namedConf.ts        ← named.conf.local generator + catalog zone deploy + rndc reconfig
+│       ├── catalogZone.ts     ← renders catalog zone (RFC 9432) for automatic secondary discovery
 │       ├── serialNumber.ts     ← YYYYMMDDnn serial inside a DB transaction
 │       ├── bulkExecutor.ts     ← processes approved bulk jobs in batches
 │       ├── broadcast.ts        ← fire-and-forget POST to /internal/broadcast
@@ -120,8 +121,8 @@ INFOdns/
 │           └── AuditLogPage.tsx
 ├── bind/
 │   ├── primary/                ← named.conf, zones/ (written by worker), deployed to ns1
-│   ├── secondary-ns3/         ← named.conf.options (static), deployed to ns3 by CI
-│   ├── secondary-ns2/         ← named.conf.options (static), deployed to ns2 by CI
+│   ├── secondary3/            ← named.conf + options + catalog zone config, deployed to ns3 by CI
+│   ├── secondary2/            ← named.conf + options + catalog zone config, deployed to ns2 by CI
 │   ├── tsig.key                ← TSIG for AXFR auth (not committed, deploy manually)
 │   └── rndc.key                ← rndc control key (not committed, deploy manually)
 ├── .github/
@@ -208,8 +209,8 @@ Three workflows handle deployment on every push to `main`:
 | Workflow | Trigger | Target | What it deploys |
 |---|---|---|---|
 | `deploy-ns1.yml` | Any change except secondary configs | `ns1.inforant.net` | Full Docker Compose stack |
-| `deploy-ns3.yml` | `bind/secondary-ns3/**` changed | `ns3.dns.infrant.de` | BIND config only |
-| `deploy-ns2.yml` | `bind/secondary-ns2/**` changed | `ns2.dns.inforant.de` | BIND config only |
+| `deploy-ns3.yml` | `bind/secondary3/**` changed | `ns3.dns.infrant.de` | BIND config only (to `/etc/bind/`) |
+| `deploy-ns2.yml` | `bind/secondary2/**` changed | `ns2.dns.inforant.de` | BIND config only (to `/etc/bind/`) |
 
 ### Required GitHub Secrets & Variables
 
@@ -243,12 +244,12 @@ scp bind/tsig.key inforent@ns2.dns.inforant.de:/etc/bind/tsig.key
 scp bind/tsig.key inforent@ns3.dns.infrant.de:/etc/bind/tsig.key
 ```
 
-The `named.conf` on each secondary should point to the files deployed by CI:
+The CI workflow syncs `bind/secondary2/` (or `secondary3/`) directly to `/etc/bind/` on the server. The config includes a catalog zone entry — secondaries automatically discover and pull all member zones from ns1 without needing per-zone configuration.
 
 ```
-include "/root/bind/tsig.key";
-include "/root/bind/named.conf.options";
-include "/root/bind/named.conf.local";
+include "/etc/bind/tsig.key";
+include "/etc/bind/named.conf.options";
+include "/etc/bind/named.conf.local";
 ```
 
 ---
@@ -264,7 +265,7 @@ The worker polls every 2 seconds and processes pending jobs:
 3. **Serial** — `SELECT last_serial FOR UPDATE`, compute `YYYYMMDDnn`, update atomically
 4. **Render** — pure TypeScript function builds the zone file string: `$ORIGIN`, `$TTL`, SOA, NS records (from env), then all records
 5. **Validate** — `named-checkzone <fqdn> <tmpfile>` — non-zero exit marks the job failed
-6. **Sync conf** — regenerate `named.conf.local` for the primary and run `rndc reconfig` — ensures newly created domains are known to BIND before reload. Secondaries pick up new zones automatically via NOTIFY/AXFR.
+6. **Sync conf** — regenerate `named.conf.local` for the primary, render + deploy the catalog zone (RFC 9432), and run `rndc reconfig` + `rndc reload catalog.dns.inforent.de` — ensures newly created domains are known to BIND before reload. Secondaries discover new zones automatically via the catalog zone (no manual config needed).
 7. **Deploy** — write to `<fqdn>.zone.tmp`, then `rename()` to `<fqdn>.zone` (atomic)
 8. **Reload** — `rndc -s bind-primary -p 953 reload <fqdn>`
 9. **Mark clean** — update `domains.zone_status = 'clean'`, queue row `status = 'done'`

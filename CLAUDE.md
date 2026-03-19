@@ -11,6 +11,7 @@ All phases complete and working:
 - RBAC: admin / operator / customer (ownership enforced at SQL level)
 - Domain + record CRUD with per-type Zod validators
 - Zone render pipeline: Worker polls queue → renders zone → named-checkzone → atomic file replace → rndc reload
+- Catalog zones (RFC 9432): secondaries auto-discover member zones from primary — no manual per-zone config on secondaries
 - Bulk editing: add / replace / delete / upsert / change_ttl across many domains
 - WebSocket live updates: domain_status, record_changed, bulk_job_progress
 - Audit log
@@ -46,7 +47,8 @@ UNIQUE KEY on `domain_id` — only one pending job per domain. Rapid edits coale
 | `worker/src/index.ts` | Poll loop + processJob orchestration |
 | `worker/src/renderZone.ts` | Pure function: DB records → BIND zone string |
 | `worker/src/deployZone.ts` | Atomic file replace + rndc reload |
-| `worker/src/namedConf.ts` | named.conf.local generator + rndc reconfig |
+| `worker/src/namedConf.ts` | named.conf.local + catalog zone generator + rndc reconfig |
+| `worker/src/catalogZone.ts` | Renders catalog zone (RFC 9432) for automatic secondary discovery |
 | `worker/src/broadcast.ts` | Fire-and-forget POST to /internal/broadcast |
 | `worker/src/bulkExecutor.ts` | Processes approved bulk jobs in batches of 50 |
 | `api/src/ws/hub.ts` | In-process WS client registry |

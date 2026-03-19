@@ -11,7 +11,7 @@ const RNDC_PORT     = process.env.BIND_PRIMARY_RNDC_PORT ?? '953'
 const RNDC_KEY_FILE = process.env.RNDC_KEY_FILE          ?? '/etc/rndc/rndc.key'
 
 /** Write content to a tmp file, fsync, then atomically rename to destPath. */
-async function writeAtomic(destPath: string, content: string): Promise<void> {
+export async function writeAtomic(destPath: string, content: string): Promise<void> {
   const tmpPath = `${destPath}.tmp`
   const fh = await open(tmpPath, 'w')
   try {
