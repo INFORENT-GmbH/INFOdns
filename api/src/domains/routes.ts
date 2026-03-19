@@ -266,13 +266,43 @@ export async function domainRoutes(app: FastifyInstance) {
 
       labelIds.push(labelId)
 
-      // admin_only is a key-level flag — propagate to all other rows with the same key
+      // color + admin_only are key-level — propagate to all rows with the same key
       if (isAdmin) {
+        if (useAdminOnly) {
+          await execute(
+            'UPDATE labels SET admin_only=1, customer_id=NULL, color=? WHERE label_key=? AND id!=?',
+            [color ?? null, key, labelId]
+          )
+          // Consolidate duplicate rows (same key+value) that now share scope
+          const dupeRows = await query(
+            'SELECT id, label_value FROM labels WHERE label_key = ? ORDER BY id',
+            [key]
+          ) as { id: number; label_value: string }[]
+          const byValue = new Map<string, number[]>()
+          for (const r of dupeRows) {
+            if (!byValue.has(r.label_value)) byValue.set(r.label_value, [])
+            byValue.get(r.label_value)!.push(r.id)
+          }
+          for (const [, ids] of byValue) {
+            if (ids.length <= 1) continue
+            const canonical = ids.includes(labelId) ? labelId : ids[0]
+            const dupeIds = ids.filter(i => i !== canonical)
+            for (const dupeId of dupeIds) {
+              await execute('UPDATE domain_labels SET label_id = ? WHERE label_id = ?', [canonical, dupeId])
+            }
+            await execute(`DELETE FROM labels WHERE id IN (${dupeIds.map(() => '?').join(',')})`, dupeIds)
+          }
+        } else {
+          // Un-mark admin_only globally, but scope color to same customer
+          await execute('UPDATE labels SET admin_only=0 WHERE label_key=? AND id!=?', [key, labelId])
+          await execute('UPDATE labels SET color=? WHERE label_key=? AND customer_id=? AND id!=?',
+            [color ?? null, key, customerIdForLabel, labelId])
+        }
+      } else {
+        // Non-admin: still propagate color within same customer scope
         await execute(
-          useAdminOnly
-            ? 'UPDATE labels SET admin_only=1, customer_id=NULL WHERE label_key=? AND id!=?'
-            : 'UPDATE labels SET admin_only=0 WHERE label_key=? AND id!=?',
-          [key, labelId]
+          'UPDATE labels SET color=? WHERE label_key=? AND customer_id=? AND id!=?',
+          [color ?? null, key, customerIdForLabel, labelId]
         )
       }
     }
