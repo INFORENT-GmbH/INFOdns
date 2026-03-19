@@ -51,8 +51,15 @@ jobs:
         run: |
           rsync -az --delete \
             --exclude='zones/' \
+            --exclude='tsig.key' \
             --rsync-path='sudo rsync' \
             bind/secondary2/ ${{ steps.parse.outputs.host }}:/etc/bind/
+
+      - name: Sync tsig.key to /etc/bind on ns2
+        run: |
+          rsync -az \
+            --rsync-path='sudo rsync' \
+            bind/tsig.key ${{ steps.parse.outputs.host }}:/etc/bind/tsig.key
 
       - name: Validate and reload BIND on ns2
         run: |
