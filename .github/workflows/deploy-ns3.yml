@@ -51,6 +51,7 @@ jobs:
           rsync -az --delete \
             --exclude='zones/' \
             --exclude='tsig.key' \
+            --exclude='rndc.key' \
             --rsync-path='sudo rsync' \
             bind/secondary3/ ${{ steps.parse.outputs.host }}:/etc/bind/
 

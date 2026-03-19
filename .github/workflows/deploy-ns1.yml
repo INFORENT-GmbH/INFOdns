@@ -128,6 +128,30 @@ jobs:
 
           rm -f /tmp/tsig.key
 
+      - name: Distribute rndc.key to ns2 and ns3 if missing
+        run: |
+          ssh ${{ steps.parse.outputs.host }} "cat ${{ steps.parse.outputs.path }}/bind/keys/rndc.key" > /tmp/rndc.key
+
+          if ssh -i ~/.ssh/id_ns2 ${{ steps.parse-secondaries.outputs.ns2_host }} \
+              "[ ! -f /etc/bind/rndc.key ]"; then
+            rsync -e "ssh -i ~/.ssh/id_ns2" --rsync-path='sudo rsync' \
+              /tmp/rndc.key ${{ steps.parse-secondaries.outputs.ns2_host }}:/etc/bind/rndc.key
+            echo "rndc.key written to ns2"
+          else
+            echo "rndc.key already exists on ns2 — skipping"
+          fi
+
+          if ssh -i ~/.ssh/id_ns3 ${{ steps.parse-secondaries.outputs.ns3_host }} \
+              "[ ! -f /etc/bind/rndc.key ]"; then
+            rsync -e "ssh -i ~/.ssh/id_ns3" --rsync-path='sudo rsync' \
+              /tmp/rndc.key ${{ steps.parse-secondaries.outputs.ns3_host }}:/etc/bind/rndc.key
+            echo "rndc.key written to ns3"
+          else
+            echo "rndc.key already exists on ns3 — skipping"
+          fi
+
+          rm -f /tmp/rndc.key
+
       - name: Deploy on ns1
         run: |
           ssh ${{ steps.parse.outputs.host }} "

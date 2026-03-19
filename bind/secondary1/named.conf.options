@@ -16,6 +16,10 @@ options {
     dnssec-validation no;
 };
 
+controls {
+    inet 127.0.0.1 port 953 allow { 127.0.0.1; } keys { "rndc-key"; };
+};
+
 logging {
     channel default_log {
         stderr;
