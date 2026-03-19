@@ -48,6 +48,7 @@ jobs:
       - name: Reload BIND on ns2
         run: |
           ssh ${{ steps.parse.outputs.host }} "
+            export PATH=/usr/sbin:/usr/local/sbin:\$PATH &&
             named-checkconf ${{ steps.parse.outputs.path }}/named.conf &&
             rndc reconfig
           "
