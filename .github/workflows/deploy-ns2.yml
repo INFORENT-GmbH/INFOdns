@@ -58,6 +58,9 @@ jobs:
       - name: Validate and reload BIND on ns2
         run: |
           ssh ${{ steps.parse.outputs.host }} "
+            sudo mkdir -p /var/lib/bind/zones &&
+            sudo chown bind:bind /var/lib/bind/zones &&
             sudo named-checkconf &&
-            sudo rndc reconfig
+            sudo systemctl enable bind9 &&
+            sudo systemctl restart bind9
           "
