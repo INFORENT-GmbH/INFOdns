@@ -61,6 +61,5 @@ jobs:
             sudo mkdir -p /var/lib/bind/zones &&
             sudo chown bind:bind /var/lib/bind/zones &&
             sudo named-checkconf &&
-            sudo systemctl enable bind9 &&
             sudo systemctl restart bind9
           "
