@@ -25,14 +25,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Parse host and path from SSH_PATH_NS3
+      - name: Parse host from SSH_PATH_NS3
         id: parse
         run: |
           SSH_PATH="${{ vars.SSH_PATH_NS3 }}"
           SSH_HOST="${SSH_PATH%%:*}"
           echo "host=${SSH_HOST}" >> $GITHUB_OUTPUT
           echo "hostname=${SSH_HOST#*@}" >> $GITHUB_OUTPUT
-          echo "path=${SSH_PATH#*:}" >> $GITHUB_OUTPUT
 
       - name: Set up SSH
         run: |
@@ -48,15 +47,16 @@ jobs:
             fi
           "
 
-      - name: Sync BIND config to ns3
+      - name: Sync BIND config to /etc/bind on ns3
         run: |
           rsync -az --delete \
             --exclude='zones/' \
-            bind/secondary3/ ${{ vars.SSH_PATH_NS3 }}/
+            --rsync-path='sudo rsync' \
+            bind/secondary3/ ${{ steps.parse.outputs.host }}:/etc/bind/
 
       - name: Validate and reload BIND on ns3
         run: |
           ssh ${{ steps.parse.outputs.host }} "
-            named-checkconf ${{ steps.parse.outputs.path }}/named.conf &&
-            rndc reconfig
+            sudo named-checkconf &&
+            sudo rndc reconfig
           "

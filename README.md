@@ -226,11 +226,11 @@ In **Settings → Secrets and variables → Actions**:
 
 Each server needs the corresponding public SSH key in `/root/.ssh/authorized_keys`. The ns1 server also needs Docker and Docker Compose installed.
 
-On the secondary servers, the deploy user (`inforent`) needs passwordless sudo for `apt-get` so the CI workflow can install BIND if missing:
+On the secondary servers, the deploy user (`inforent`) needs passwordless sudo so the CI workflow can sync config to `/etc/bind/`, install BIND, and run `rndc`:
 
 ```bash
 # On ns2 and ns3 (run once as root):
-echo 'inforent ALL=(ALL) NOPASSWD:/usr/bin/apt-get' | tee /etc/sudoers.d/inforent
+echo 'inforent ALL=(ALL) NOPASSWD:ALL' | tee /etc/sudoers.d/inforent
 ```
 
 The initial TSIG key must be placed manually before the first deploy:
