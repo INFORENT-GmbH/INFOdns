@@ -181,6 +181,17 @@ CREATE TABLE audit_logs (
   INDEX idx_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── ns_checks ────────────────────────────────────────────────
+-- One row per health check per nameserver (every 2s), kept for history/alerting
+CREATE TABLE ns_checks (
+  id         BIGINT UNSIGNED   AUTO_INCREMENT PRIMARY KEY,
+  ns_name    VARCHAR(10)       NOT NULL,
+  ok         TINYINT(1)        NOT NULL,
+  latency_ms SMALLINT UNSIGNED NULL,
+  checked_at DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_ns_checked (ns_name, checked_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── seed: global SOA template ────────────────────────────────
 INSERT INTO soa_templates (customer_id, mname, rname, refresh, retry, expire, minimum_ttl)
 VALUES (NULL, 'ns1.example.com.', 'hostmaster.example.com.', 3600, 900, 604800, 300);

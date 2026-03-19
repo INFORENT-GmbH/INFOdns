@@ -28,3 +28,4 @@ export type WsEvent =
   | { type: 'domain_status'; domainId: number; fqdn: string; zone_status: string; last_serial?: number; last_rendered_at?: string | null; zone_error?: string | null }
   | { type: 'bulk_job_progress'; jobId: number; status: string; processed_domains: number; affected_domains: number }
   | { type: 'record_changed'; domainId: number }
+  | { type: 'ns_status'; status: Record<string, { ok: boolean; latencyMs: number | null; checkedAt: string }> }

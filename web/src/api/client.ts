@@ -222,6 +222,11 @@ export const getBulkJobDomains = (id: number) => api.get(`/bulk-jobs/${id}/domai
 export const searchByRecord = (params: { type: string; name?: string; value?: string }) =>
   api.get('/domains/search-by-record', { params })
 
+// NS Status
+export interface NsStatusEntry { ok: boolean; latencyMs: number | null; checkedAt: string }
+export type NsStatus = Record<string, NsStatusEntry>
+export const getNsStatus = () => api.get<NsStatus>('/ns-status')
+
 // Audit logs
 export interface AuditLogPage {
   data: AuditLog[]

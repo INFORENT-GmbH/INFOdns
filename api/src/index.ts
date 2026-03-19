@@ -14,6 +14,7 @@ import { auditRoutes } from './audit/routes.js'
 import { bulkRoutes } from './bulk/routes.js'
 import { wsRoutes } from './ws/routes.js'
 import { internalRoutes } from './ws/internal.js'
+import { nsStatusRoutes, startNsStatusPoller } from './ns-status/index.js'
 
 const app = Fastify({ logger: true, trustProxy: true })
 
@@ -41,6 +42,9 @@ app.get('/ready', async (_req, reply) => {
   }
 })
 
+// ── NS status poller ─────────────────────────────────────────
+startNsStatusPoller()
+
 // ── Internal broadcast endpoint (worker → hub) ────────────────
 await app.register(internalRoutes)
 
@@ -54,6 +58,7 @@ await app.register(async (v1) => {
   await v1.register(auditRoutes)
   await v1.register(bulkRoutes)
   await v1.register(wsRoutes)
+  await v1.register(nsStatusRoutes)
 }, { prefix: '/api/v1' })
 
 // ── Start ────────────────────────────────────────────────────

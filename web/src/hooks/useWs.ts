@@ -5,6 +5,7 @@ type WsEvent =
   | { type: 'domain_status'; domainId: number; fqdn: string; zone_status: string; last_serial?: number; last_rendered_at?: string | null; zone_error?: string | null }
   | { type: 'bulk_job_progress'; jobId: number; status: string; processed_domains: number; affected_domains: number }
   | { type: 'record_changed'; domainId: number }
+  | { type: 'ns_status'; status: Record<string, { ok: boolean; latencyMs: number | null; checkedAt: string }> }
 
 export type WsStatus = 'connected' | 'disconnected' | 'reconnecting'
 
@@ -73,6 +74,10 @@ export function useWs(token: string | null): WsStatus {
               return { ...old, status: event.status, processed_domains: event.processed_domains }
             })
             qc.invalidateQueries({ queryKey: ['bulk-jobs'] })
+            break
+
+          case 'ns_status':
+            qc.setQueryData(['ns-status'], event.status)
             break
         }
       }
