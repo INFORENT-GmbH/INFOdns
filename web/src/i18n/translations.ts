@@ -59,6 +59,7 @@ export const translations = {
     domains_labels:              'Labels',
     domains_noneFound:           'No domains found',
     domains_loadError:           'Failed to load domains',
+    domains_columns:             'Columns',
 
     // Domain detail
     domainDetail_backLink:         '← Domains',
@@ -267,6 +268,7 @@ export const translations = {
     domains_labels:              'Labels',
     domains_noneFound:           'Keine Domains gefunden',
     domains_loadError:           'Fehler beim Laden der Domains',
+    domains_columns:             'Spalten',
 
     // Domain detail
     domainDetail_backLink:         '← Domains',

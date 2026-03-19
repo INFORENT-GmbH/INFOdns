@@ -2,10 +2,34 @@ import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getDomains, createDomain, getCustomers, getLabelSuggestions, type Domain } from '../api/client'
-import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import LabelChip from '../components/LabelChip'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
+
+const COOKIE_KEY = 'infodns_domain_cols'
+const ALL_COLUMNS = ['fqdn', 'customer', 'status', 'zone', 'labels', 'serial', 'lastRendered'] as const
+type ColId = typeof ALL_COLUMNS[number]
+const DEFAULT_COLUMNS: ColId[] = ['fqdn', 'customer', 'zone', 'labels']
+
+function readColsCookie(): ColId[] {
+  const m = document.cookie.match(new RegExp(`(?:^|; )${COOKIE_KEY}=([^;]*)`))
+  if (!m) return DEFAULT_COLUMNS
+  try {
+    const parsed = JSON.parse(decodeURIComponent(m[1])) as string[]
+    const valid = parsed.filter((c): c is ColId => (ALL_COLUMNS as readonly string[]).includes(c))
+    return valid.length ? valid : DEFAULT_COLUMNS
+  } catch { return DEFAULT_COLUMNS }
+}
+
+function writeColsCookie(cols: ColId[]) {
+  document.cookie = `${COOKIE_KEY}=${encodeURIComponent(JSON.stringify(cols))}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`
+}
+
+const zoneIcons: Record<string, { icon: string; color: string; title: string }> = {
+  clean: { icon: '✓', color: '#16a34a', title: 'clean' },
+  dirty: { icon: '⏳', color: '#ca8a04', title: 'pending' },
+  error: { icon: '✕', color: '#dc2626', title: 'error' },
+}
 
 export default function DomainsPage() {
   const { user } = useAuth()
@@ -18,6 +42,9 @@ export default function DomainsPage() {
   const [newFqdn, setNewFqdn] = useState('')
   const [newCustomerId, setNewCustomerId] = useState('')
   const [creating, setCreating] = useState(false)
+  const [visibleCols, setVisibleCols] = useState<ColId[]>(readColsCookie)
+  const [colDropdownOpen, setColDropdownOpen] = useState(false)
+  const colDropdownRef = useRef<HTMLDivElement>(null)
 
   const isAdminOrOp = user?.role === 'admin' || user?.role === 'operator'
 
@@ -58,6 +85,27 @@ export default function DomainsPage() {
       setCreating(false)
     }
   }
+
+  function toggleCol(col: ColId) {
+    setVisibleCols(prev => {
+      const next = prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]
+      const result = next.length ? next : prev
+      writeColsCookie(result)
+      return result
+    })
+  }
+
+  const colLabels: Record<ColId, string> = {
+    fqdn: 'FQDN',
+    customer: t('customer'),
+    status: t('status'),
+    zone: t('domains_zone'),
+    labels: t('domains_labels'),
+    serial: t('serial'),
+    lastRendered: t('domains_lastRendered'),
+  }
+
+  const show = (col: ColId) => visibleCols.includes(col)
 
   return (
     <div>
@@ -126,6 +174,31 @@ export default function DomainsPage() {
               </div>
             )}
           </div>
+          <div ref={colDropdownRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setColDropdownOpen(v => !v)}
+              onBlur={e => { if (!colDropdownRef.current?.contains(e.relatedTarget as Node)) setColDropdownOpen(false) }}
+              style={{ ...styles.btnSecondary, fontSize: '.8rem', padding: '.3rem .6rem' }}
+            >
+              {t('domains_columns')} ▼
+            </button>
+            {colDropdownOpen && (
+              <div style={styles.colDropdown}>
+                {ALL_COLUMNS.map(col => (
+                  <label key={col} style={styles.colDropdownItem}>
+                    <input
+                      type="checkbox"
+                      checked={visibleCols.includes(col)}
+                      onChange={() => toggleCol(col)}
+                      style={{ marginRight: 6 }}
+                    />
+                    {colLabels[col]}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
           {isAdminOrOp && (
             <button onClick={() => setShowCreate(v => !v)} style={styles.btnPrimary}>
               {t('domains_addDomain')}
@@ -169,25 +242,29 @@ export default function DomainsPage() {
       <table style={styles.table}>
         <thead>
           <tr>
-            <th style={styles.th}>FQDN</th>
-            <th style={styles.th}>{t('customer')}</th>
-            <th style={styles.th}>{t('status')}</th>
-            <th style={styles.th}>{t('domains_zone')}</th>
-            <th style={styles.th}>{t('domains_labels')}</th>
-            <th style={styles.th}>{t('serial')}</th>
-            <th style={styles.th}>{t('domains_lastRendered')}</th>
+            {show('fqdn') && <th style={styles.th}>FQDN</th>}
+            {show('customer') && <th style={styles.th}>{t('customer')}</th>}
+            {show('status') && <th style={styles.th}>{t('status')}</th>}
+            {show('zone') && <th style={styles.th}>{t('domains_zone')}</th>}
+            {show('labels') && <th style={styles.th}>{t('domains_labels')}</th>}
+            {show('serial') && <th style={styles.th}>{t('serial')}</th>}
+            {show('lastRendered') && <th style={styles.th}>{t('domains_lastRendered')}</th>}
           </tr>
         </thead>
         <tbody>
-          {domains.map((d: Domain) => (
+          {domains.map((d: Domain) => {
+            const zi = zoneIcons[d.zone_status] ?? { icon: '?', color: '#9ca3af', title: d.zone_status }
+            return (
             <tr key={d.id} style={styles.tr}>
-              <td style={styles.td}>
+              {show('fqdn') && <td style={styles.td}>
                 <Link to={`/domains/${d.id}`} style={styles.link}>{d.fqdn}</Link>
-              </td>
-              <td style={styles.td}>{d.customer_name}</td>
-              <td style={styles.td}>{d.status}</td>
-              <td style={styles.td}><ZoneStatusBadge status={d.zone_status} /></td>
-              <td style={styles.td}>
+              </td>}
+              {show('customer') && <td style={styles.td}>{d.customer_name}</td>}
+              {show('status') && <td style={styles.td}>{d.status}</td>}
+              {show('zone') && <td style={{ ...styles.td, textAlign: 'center' }}>
+                <span title={zi.title} style={{ color: zi.color, fontSize: '1rem', fontWeight: 700 }}>{zi.icon}</span>
+              </td>}
+              {show('labels') && <td style={styles.td}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                   {(d.labels ?? []).map(l => {
                     const val = l.value ? `${l.key}=${l.value}` : l.key
@@ -198,17 +275,17 @@ export default function DomainsPage() {
                     )
                   })}
                 </div>
-              </td>
-              <td style={styles.td}><code>{d.last_serial || '—'}</code></td>
-              <td style={styles.td}>
+              </td>}
+              {show('serial') && <td style={styles.td}><code>{d.last_serial || '—'}</code></td>}
+              {show('lastRendered') && <td style={styles.td}>
                 {d.last_rendered_at
                   ? new Date(d.last_rendered_at).toLocaleString()
                   : <span style={styles.muted}>{t('never')}</span>}
-              </td>
+              </td>}
             </tr>
-          ))}
+          )})}
           {!isLoading && domains.length === 0 && (
-            <tr><td colSpan={7} style={{ ...styles.td, textAlign: 'center', ...styles.muted }}>{t('domains_noneFound')}</td></tr>
+            <tr><td colSpan={visibleCols.length} style={{ ...styles.td, textAlign: 'center', ...styles.muted }}>{t('domains_noneFound')}</td></tr>
           )}
         </tbody>
       </table>
@@ -235,4 +312,6 @@ const styles: Record<string, React.CSSProperties> = {
   errorText: { color: '#b91c1c' },
   labelDropdown: { position: 'absolute' as const, top: '100%', left: 0, right: 0, marginTop: 2, background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.1)', zIndex: 20, maxHeight: 240, overflowY: 'auto' as const, padding: '4px 0' },
   labelDropdownItem: { display: 'flex', alignItems: 'center', width: '100%', padding: '.375rem .75rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' as const, fontSize: '.875rem' },
+  colDropdown: { position: 'absolute' as const, top: '100%', right: 0, marginTop: 2, background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.1)', zIndex: 20, padding: '6px 0', minWidth: 160 },
+  colDropdownItem: { display: 'flex', alignItems: 'center', padding: '.3rem .75rem', fontSize: '.8rem', cursor: 'pointer', whiteSpace: 'nowrap' as const },
 }
