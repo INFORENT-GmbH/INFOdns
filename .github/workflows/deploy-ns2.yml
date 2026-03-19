@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - 'bind/secondary2/**'
-      - 'bind/tsig.key'
       - '.github/workflows/deploy-ns2.yml'
   workflow_run:
     workflows: ["Deploy — ns1 (primary)"]
@@ -54,12 +53,6 @@ jobs:
             --exclude='tsig.key' \
             --rsync-path='sudo rsync' \
             bind/secondary2/ ${{ steps.parse.outputs.host }}:/etc/bind/
-
-      - name: Sync tsig.key to /etc/bind on ns2
-        run: |
-          rsync -az \
-            --rsync-path='sudo rsync' \
-            bind/tsig.key ${{ steps.parse.outputs.host }}:/etc/bind/tsig.key
 
       - name: Validate and reload BIND on ns2
         run: |
