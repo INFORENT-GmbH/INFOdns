@@ -37,6 +37,7 @@ export async function deployZone(fqdn: string, content: string): Promise<void> {
 
 export async function rndcReload(fqdn: string): Promise<void> {
   await execFileAsync('rndc', [
+    '-4',
     '-s', RNDC_HOST,
     '-p', RNDC_PORT,
     '-k', RNDC_KEY_FILE,
@@ -46,6 +47,7 @@ export async function rndcReload(fqdn: string): Promise<void> {
 
 export async function rndcReconfig(host: string, port = RNDC_PORT): Promise<void> {
   await execFileAsync('rndc', [
+    '-4',
     '-s', host,
     '-p', port,
     '-k', RNDC_KEY_FILE,

@@ -23,6 +23,7 @@ key "tsig-secondary" {
 	secret "$TSIG_SECRET";
 };
 EOF
+  chmod 644 "$KEYS_DIR/tsig.key"
   echo "Written: $KEYS_DIR/tsig.key"
 fi
 
@@ -38,6 +39,7 @@ key "rndc-key" {
 	secret "$RNDC_SECRET";
 };
 EOF
+  chmod 644 "$KEYS_DIR/rndc.key"
   echo "Written: $KEYS_DIR/rndc.key"
 fi
 

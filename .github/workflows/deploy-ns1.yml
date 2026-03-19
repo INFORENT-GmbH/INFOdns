@@ -85,18 +85,20 @@ jobs:
               echo 'Generating rndc.key...'
               SECRET=\$(openssl rand -base64 32)
               printf 'key \"rndc-key\" {\n\talgorithm hmac-sha256;\n\tsecret \"%s\";\n};\n' \"\$SECRET\" > bind/keys/rndc.key
-              chmod 600 bind/keys/rndc.key
+              chmod 644 bind/keys/rndc.key
               echo 'rndc.key created.'
             else
+              chmod 644 bind/keys/rndc.key
               echo 'rndc.key already exists — skipping'
             fi
             if [ ! -f bind/keys/tsig.key ]; then
               echo 'Generating tsig.key...'
               SECRET=\$(openssl rand -base64 32)
               printf 'key \"tsig-secondary\" {\n\talgorithm hmac-sha256;\n\tsecret \"%s\";\n};\n' \"\$SECRET\" > bind/keys/tsig.key
-              chmod 600 bind/keys/tsig.key
+              chmod 644 bind/keys/tsig.key
               echo 'tsig.key created.'
             else
+              chmod 644 bind/keys/tsig.key
               echo 'tsig.key already exists — skipping'
             fi
             [ -f bind/primary/named.conf.local ] || touch bind/primary/named.conf.local
