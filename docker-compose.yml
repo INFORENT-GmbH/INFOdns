@@ -52,7 +52,7 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       INTERNAL_SECRET: ${INTERNAL_SECRET}
       NODE_ENV: ${NODE_ENV:-production}
-      NS1_IP: ${NS1_IP:-80.243.196.37}
+      BIND_PRIMARY_HOST: bind-primary
       NS2_IP: ${NS2_IP:-80.243.196.38}
       NS3_IP: ${NS3_IP:-80.243.196.39}
     ports:

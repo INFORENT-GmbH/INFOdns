@@ -6,13 +6,12 @@ import { execute } from '../db.js'
 
 interface NsEntry { ok: boolean; latencyMs: number | null; checkedAt: string }
 
-const hosts: [string, string][] = (
-  [
-    ['ns1', process.env.NS1_IP ?? ''],
-    ['ns2', process.env.NS2_IP ?? ''],
-    ['ns3', process.env.NS3_IP ?? ''],
-  ] as [string, string][]
-).filter(([, ip]) => ip !== '')
+const NS1_LOCAL = process.env.BIND_PRIMARY_HOST ?? ''
+
+const remoteHosts: [string, string][] = ([
+  ['ns2', process.env.NS2_IP ?? ''],
+  ['ns3', process.env.NS3_IP ?? ''],
+] as [string, string][]).filter(([, ip]) => ip !== '')
 
 const cache: Record<string, NsEntry> = {}
 const prevOk: Record<string, boolean> = {}
@@ -31,7 +30,31 @@ function checkTcp(host: string, timeoutMs = 3000): Promise<number> {
 async function refreshAll() {
   let changed = false
 
-  await Promise.all(hosts.map(async ([name, ip]) => {
+  // ns1: check locally via Docker network (bind-primary)
+  if (NS1_LOCAL) {
+    const checkedAt = new Date().toISOString()
+    let ok: boolean
+    let latencyMs: number | null
+    try {
+      latencyMs = await checkTcp(NS1_LOCAL)
+      ok = true
+    } catch {
+      latencyMs = null
+      ok = false
+    }
+    cache['ns1'] = { ok, latencyMs, checkedAt }
+    if (prevOk['ns1'] !== ok) {
+      changed = true
+      prevOk['ns1'] = ok
+    }
+    execute(
+      'INSERT INTO ns_checks (ns_name, ok, latency_ms) VALUES (?, ?, ?)',
+      ['ns1', ok ? 1 : 0, latencyMs]
+    ).catch(() => {})
+  }
+
+  // ns2, ns3: check via external IPs
+  await Promise.all(remoteHosts.map(async ([name, ip]) => {
     const checkedAt = new Date().toISOString()
     let ok: boolean
     let latencyMs: number | null

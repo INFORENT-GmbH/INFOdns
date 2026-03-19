@@ -7,8 +7,8 @@ import { useI18n } from '../i18n/I18nContext'
 import { getNsStatus } from '../api/client'
 import logo from '../assets/logo.png'
 
-const nsLabels: Record<string, { display: string; fqdn: string }> = {
-  ns1: { display: 'NS1', fqdn: 'ns1.inforent.de' },
+const nsLabels: Record<string, { display: string; fqdn?: string }> = {
+  ns1: { display: 'primary' },
   ns2: { display: 'ilreah', fqdn: 'ilreah.ns.inforent.de' },
   ns3: { display: 'ulren', fqdn: 'ulren.ns.inforent.de' },
 }
@@ -59,15 +59,17 @@ export default function Layout() {
       <div style={styles.nsBar}>
         {visibleNs.map(name => {
           const s = nsStatus?.[name]
-          const label = nsLabels[name] ?? { display: name.toUpperCase(), fqdn: name }
+          const label = nsLabels[name] ?? { display: name.toUpperCase() }
+          const hasFqdn = !!label.fqdn
           return (
             <span
               key={name}
-              style={{ ...styles.nsEntry, cursor: 'pointer', position: 'relative' }}
-              onMouseEnter={() => setHoveredNs(name)}
+              style={{ ...styles.nsEntry, cursor: hasFqdn ? 'pointer' : 'default', position: 'relative' }}
+              onMouseEnter={() => hasFqdn && setHoveredNs(name)}
               onMouseLeave={() => setHoveredNs(null)}
               onClick={() => {
-                navigator.clipboard.writeText(label.fqdn)
+                if (!hasFqdn) return
+                navigator.clipboard.writeText(label.fqdn!)
                 setCopiedNs(name)
                 setTimeout(() => setCopiedNs(prev => prev === name ? null : prev), 1500)
               }}
