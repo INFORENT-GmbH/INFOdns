@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { getDomains, createDomain, getLabelSuggestions, type Domain } from '../api/client'
+import { getDomains, createDomain, getCustomers, getLabelSuggestions, type Domain } from '../api/client'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import LabelChip from '../components/LabelChip'
 import { useAuth } from '../context/AuthContext'
@@ -19,10 +19,18 @@ export default function DomainsPage() {
   const [newCustomerId, setNewCustomerId] = useState('')
   const [creating, setCreating] = useState(false)
 
+  const isAdminOrOp = user?.role === 'admin' || user?.role === 'operator'
+
   const { data: labelSuggestions = [] } = useQuery({
     queryKey: ['label-suggestions'],
     queryFn: () => getLabelSuggestions().then(r => r.data),
     staleTime: 30_000,
+  })
+
+  const { data: customers = [] } = useQuery({
+    queryKey: ['customers'],
+    queryFn: () => getCustomers().then(r => r.data),
+    enabled: isAdminOrOp,
   })
 
   const { data: domains = [], isLoading, error, refetch } = useQuery({
@@ -50,8 +58,6 @@ export default function DomainsPage() {
       setCreating(false)
     }
   }
-
-  const isAdminOrOp = user?.role === 'admin' || user?.role === 'operator'
 
   return (
     <div>
@@ -137,14 +143,17 @@ export default function DomainsPage() {
             required
             style={styles.input}
           />
-          <input
-            placeholder={t('domains_customerIdPlaceholder')}
-            type="number"
+          <select
             value={newCustomerId}
             onChange={e => setNewCustomerId(e.target.value)}
             required
-            style={{ ...styles.input, width: 120 }}
-          />
+            style={{ ...styles.input, width: 200 }}
+          >
+            <option value="">{t('domains_selectCustomer')}</option>
+            {customers.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
           <button type="submit" disabled={creating} style={styles.btnPrimary}>
             {creating ? t('creating') : t('create')}
           </button>
