@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getDomains, createDomain, getLabelSuggestions, type Domain } from '../api/client'
@@ -11,8 +11,9 @@ export default function DomainsPage() {
   const { user } = useAuth()
   const { t } = useI18n()
   const [search, setSearch] = useState('')
-  const [labelInput, setLabelInput] = useState('')
   const [labelFilter, setLabelFilter] = useState('')
+  const [labelDropdownOpen, setLabelDropdownOpen] = useState(false)
+  const labelDropdownRef = useRef<HTMLDivElement>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [newFqdn, setNewFqdn] = useState('')
   const [newCustomerId, setNewCustomerId] = useState('')
@@ -63,28 +64,62 @@ export default function DomainsPage() {
             onChange={e => setSearch(e.target.value)}
             style={styles.searchInput}
           />
-          <datalist id="domain-label-filter-list">
-            {labelSuggestions.flatMap(s => [
-              <option key={s.key} value={s.key} />,
-              ...s.values.map(v => <option key={`${s.key}=${v}`} value={`${s.key}=${v}`} />),
-            ])}
-          </datalist>
-          <input
-            list="domain-label-filter-list"
-            placeholder={t('domains_labelFilterPlaceholder')}
-            value={labelInput}
-            onChange={e => {
-              const v = e.target.value
-              setLabelInput(v)
-              const suggestions = labelSuggestions.flatMap(s => [s.key, ...s.values.map(val => `${s.key}=${val}`)])
-              if (suggestions.includes(v)) setLabelFilter(v)
-            }}
-            onKeyDown={e => { if (e.key === 'Enter') setLabelFilter(labelInput.trim()) }}
-            style={{ ...styles.searchInput, outline: labelFilter ? '2px solid #2563eb' : undefined }}
-          />
-          {labelInput && (
-            <button onClick={() => { setLabelInput(''); setLabelFilter('') }} style={styles.btnClear} title="Clear label filter">✕</button>
-          )}
+          <div ref={labelDropdownRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setLabelDropdownOpen(v => !v)}
+              onBlur={e => { if (!labelDropdownRef.current?.contains(e.relatedTarget as Node)) setLabelDropdownOpen(false) }}
+              style={{
+                ...styles.searchInput,
+                width: 240,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                background: '#fff',
+                textAlign: 'left',
+                outline: labelFilter ? '2px solid #2563eb' : undefined,
+              }}
+            >
+              {labelFilter
+                ? <LabelChip label={{ id: 0, key: labelFilter.includes('=') ? labelFilter.split('=')[0] : labelFilter, value: labelFilter.includes('=') ? labelFilter.split('=').slice(1).join('=') : '', color: labelSuggestions.find(s => s.key === (labelFilter.includes('=') ? labelFilter.split('=')[0] : labelFilter))?.color ?? null }} />
+                : <span style={{ color: '#9ca3af' }}>{t('domains_labelFilterPlaceholder')}</span>}
+              <span style={{ fontSize: '.65rem', color: '#9ca3af', marginLeft: 4 }}>{labelFilter ? '' : '▼'}</span>
+            </button>
+            {labelFilter && (
+              <button
+                onClick={() => { setLabelFilter(''); setLabelDropdownOpen(false) }}
+                style={{ ...styles.btnClear, position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)' }}
+                title="Clear label filter"
+              >✕</button>
+            )}
+            {labelDropdownOpen && (
+              <div style={styles.labelDropdown}>
+                {labelSuggestions.flatMap(s => {
+                  const items: { key: string; value: string; filter: string; color: string | null }[] = []
+                  items.push({ key: s.key, value: '', filter: s.key, color: s.color })
+                  for (const v of s.values) items.push({ key: s.key, value: v, filter: `${s.key}=${v}`, color: s.color })
+                  return items
+                }).map(item => (
+                  <button
+                    key={item.filter}
+                    type="button"
+                    onMouseDown={e => {
+                      e.preventDefault()
+                      setLabelFilter(item.filter)
+                      setLabelDropdownOpen(false)
+                    }}
+                    style={styles.labelDropdownItem}
+                  >
+                    <LabelChip label={{ id: 0, key: item.key, value: item.value, color: item.color }} />
+                  </button>
+                ))}
+                {labelSuggestions.length === 0 && (
+                  <div style={{ padding: '.5rem .75rem', color: '#9ca3af', fontSize: '.8rem' }}>No labels</div>
+                )}
+              </div>
+            )}
+          </div>
           {isAdminOrOp && (
             <button onClick={() => setShowCreate(v => !v)} style={styles.btnPrimary}>
               {t('domains_addDomain')}
@@ -148,7 +183,7 @@ export default function DomainsPage() {
                   {(d.labels ?? []).map(l => {
                     const val = l.value ? `${l.key}=${l.value}` : l.key
                     return (
-                      <span key={l.id} onClick={() => { setLabelInput(val); setLabelFilter(val) }} style={{ cursor: 'pointer' }}>
+                      <span key={l.id} onClick={() => { setLabelFilter(val) }} style={{ cursor: 'pointer' }}>
                         <LabelChip label={l} />
                       </span>
                     )
@@ -189,4 +224,6 @@ const styles: Record<string, React.CSSProperties> = {
   link: { color: '#2563eb', textDecoration: 'none', fontWeight: 500 },
   muted: { color: '#9ca3af' },
   errorText: { color: '#b91c1c' },
+  labelDropdown: { position: 'absolute' as const, top: '100%', left: 0, right: 0, marginTop: 2, background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.1)', zIndex: 20, maxHeight: 240, overflowY: 'auto' as const, padding: '4px 0' },
+  labelDropdownItem: { display: 'flex', alignItems: 'center', width: '100%', padding: '.375rem .75rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' as const, fontSize: '.875rem' },
 }
