@@ -1,0 +1,7 @@
+// Catalog zone — member zones are discovered automatically via AXFR
+// Do NOT add individual zone blocks here; they are managed by the catalog.
+zone "catalog.dns.inforent.de" {
+    type secondary;
+    file "/var/lib/bind/zones/catalog.dns.inforent.de.zone";
+    primaries { 80.243.196.37 key tsig-secondary; };
+};
