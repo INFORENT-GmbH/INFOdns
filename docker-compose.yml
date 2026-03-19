@@ -77,8 +77,8 @@ services:
       BIND_PRIMARY_HOST: bind-primary
       BIND_PRIMARY_RNDC_PORT: 953
       RNDC_KEY_FILE: /etc/rndc/rndc.key
-      # Real secondary IPs for also-notify in named.conf.local (ns3, ns2)
-      SECONDARY_IPS: ${SECONDARY_IPS:-5.78.139.169,89.167.67.148}
+      # Real secondary IPs for also-notify in named.conf.local (ilreah, ulren)
+      SECONDARY_IPS: ${SECONDARY_IPS:-80.243.196.38,80.243.196.39}
       NS_RECORDS: ${NS_RECORDS}          # comma-separated NS FQDNs for zone rendering
       SOA_MNAME: ${SOA_MNAME}
       SOA_RNAME: ${SOA_RNAME}
