@@ -110,7 +110,8 @@ jobs:
 
           if ssh -i ~/.ssh/id_ns2 ${{ steps.parse-secondaries.outputs.ns2_host }} \
               "[ ! -f /etc/bind/tsig.key ]"; then
-            rsync -e "ssh -i ~/.ssh/id_ns2" /tmp/tsig.key "${{ vars.SSH_PATH_NS2 }}/tsig.key"
+            rsync -e "ssh -i ~/.ssh/id_ns2" --rsync-path='sudo rsync' \
+              /tmp/tsig.key ${{ steps.parse-secondaries.outputs.ns2_host }}:/etc/bind/tsig.key
             echo "tsig.key written to ns2"
           else
             echo "tsig.key already exists on ns2 — skipping"
@@ -118,7 +119,8 @@ jobs:
 
           if ssh -i ~/.ssh/id_ns3 ${{ steps.parse-secondaries.outputs.ns3_host }} \
               "[ ! -f /etc/bind/tsig.key ]"; then
-            rsync -e "ssh -i ~/.ssh/id_ns3" /tmp/tsig.key "${{ vars.SSH_PATH_NS3 }}/tsig.key"
+            rsync -e "ssh -i ~/.ssh/id_ns3" --rsync-path='sudo rsync' \
+              /tmp/tsig.key ${{ steps.parse-secondaries.outputs.ns3_host }}:/etc/bind/tsig.key
             echo "tsig.key written to ns3"
           else
             echo "tsig.key already exists on ns3 — skipping"
