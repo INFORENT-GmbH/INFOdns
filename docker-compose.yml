@@ -119,7 +119,7 @@ services:
     volumes:
       - ./bind/primary/named.conf:/etc/bind/named.conf:ro
       - ./bind/primary/named.conf.options:/etc/bind/named.conf.options:ro
-      - ./bind/primary/named.conf.local:/etc/bind/named.conf.local:ro
+      - ./bind/primary/named.conf.local:/etc/bind/named.conf.local
       - ./bind/keys:/etc/bind/keys:ro
       - ./bind/primary/zones:/var/lib/bind/zones
     networks:

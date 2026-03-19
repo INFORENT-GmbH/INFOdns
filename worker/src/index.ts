@@ -90,7 +90,12 @@ async function processJob(job: QueueRow): Promise<void> {
   }
 
   // Step 6: Ensure named.conf.local is up-to-date (covers newly added domains)
-  await syncNamedConf()
+  const allDomains = await query<{ fqdn: string }>(
+    "SELECT fqdn FROM domains WHERE status = 'active' ORDER BY fqdn"
+  )
+  const allZones = allDomains.map(r => r.fqdn)
+  console.log(`[worker] Syncing named.conf.local with ${allZones.length} zones (includes ${domain.fqdn}: ${allZones.includes(domain.fqdn)})`)
+  await regenerateNamedConf(allZones)
 
   // Step 7: Atomic file replace + rndc reload
   await deployZone(domain.fqdn, content)

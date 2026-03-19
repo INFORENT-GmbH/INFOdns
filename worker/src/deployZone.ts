@@ -35,22 +35,23 @@ export async function deployZone(fqdn: string, content: string): Promise<void> {
   await rndcReconfig(RNDC_HOST, RNDC_PORT)
 
   // BIND may need a moment after reconfig to register a new zone.
-  // Retry reload up to 3 times with increasing delay.
-  let lastErr: Error | undefined
-  for (let attempt = 0; attempt < 3; attempt++) {
+  // Retry reload up to 5 times with 1s between attempts.
+  for (let attempt = 1; attempt <= 5; attempt++) {
     try {
       await rndcReload(fqdn)
       return
     } catch (err: any) {
-      lastErr = err
-      if (err.message?.includes('not found') && attempt < 2) {
-        await new Promise(r => setTimeout(r, 500 * (attempt + 1)))
+      const notFound = err.message?.includes('not found') || err.stderr?.includes('not found')
+      if (notFound && attempt < 5) {
+        console.log(`[deploy] rndc reload ${fqdn} not found (attempt ${attempt}/5), retrying after ${attempt}s...`)
+        await new Promise(r => setTimeout(r, 1000 * attempt))
+        // Re-issue reconfig in case BIND dropped it
+        await rndcReconfig(RNDC_HOST, RNDC_PORT).catch(() => {})
         continue
       }
       throw err
     }
   }
-  throw lastErr
 }
 
 export async function rndcReload(fqdn: string): Promise<void> {
