@@ -226,15 +226,21 @@ In **Settings → Secrets and variables → Actions**:
 
 Each server needs the corresponding public SSH key in `/root/.ssh/authorized_keys`. The ns1 server also needs Docker and Docker Compose installed.
 
-For the secondary servers, BIND must be installed and the initial TSIG key + `named.conf` placed before the first deploy:
+On the secondary servers, the deploy user (`inforent`) needs passwordless sudo for `apt-get` so the CI workflow can install BIND if missing:
 
 ```bash
-# On ns3 and ns2 (run once):
-apt-get install -y bind9
-mkdir -p /root/bind
+# On ns2 and ns3 (run once as root):
+echo 'inforent ALL=(ALL) NOPASSWD:/usr/bin/apt-get' | tee /etc/sudoers.d/inforent
+```
+
+The initial TSIG key must be placed manually before the first deploy:
+
+```bash
+# On ns2 and ns3 (run once):
+mkdir -p /etc/bind
 # Copy tsig.key manually (never committed to git)
-scp bind/tsig.key root@ns3.dns.infrant.de:/root/bind/tsig.key
-scp bind/tsig.key root@ns2.dns.inforant.de:/root/bind/tsig.key
+scp bind/tsig.key inforent@ns2.dns.inforant.de:/etc/bind/tsig.key
+scp bind/tsig.key inforent@ns3.dns.infrant.de:/etc/bind/tsig.key
 ```
 
 The `named.conf` on each secondary should point to the files deployed by CI:
