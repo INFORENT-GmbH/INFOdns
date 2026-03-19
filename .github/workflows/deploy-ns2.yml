@@ -40,11 +40,23 @@ jobs:
           echo "${{ secrets.SSH_KEY_NS2 }}" > ~/.ssh/id_ed25519
           ssh-keyscan -H "${{ steps.parse.outputs.hostname }}" >> ~/.ssh/known_hosts
 
+      - name: Ensure BIND is installed on ns2
+        run: |
+          ssh ${{ steps.parse.outputs.host }} "
+            if ! command -v named-checkconf >/dev/null 2>&1; then
+              sudo apt-get update -qq && sudo apt-get install -y -qq bind9 bind9-utils
+            fi
+          "
+
       - name: Sync BIND config to ns2
         run: |
           rsync -az --delete \
+            --exclude='zones/' \
             bind/secondary2/ ${{ vars.SSH_PATH_NS2 }}/
 
-      - name: Reload BIND on ns2
+      - name: Validate and reload BIND on ns2
         run: |
-          ssh ${{ steps.parse.outputs.host }} "rndc reconfig"
+          ssh ${{ steps.parse.outputs.host }} "
+            named-checkconf ${{ steps.parse.outputs.path }}/named.conf &&
+            rndc reconfig
+          "

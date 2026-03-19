@@ -40,11 +40,23 @@ jobs:
           echo "${{ secrets.SSH_KEY_NS3 }}" > ~/.ssh/id_ed25519
           ssh-keyscan -H "${{ steps.parse.outputs.hostname }}" >> ~/.ssh/known_hosts
 
+      - name: Ensure BIND is installed on ns3
+        run: |
+          ssh ${{ steps.parse.outputs.host }} "
+            if ! command -v named-checkconf >/dev/null 2>&1; then
+              sudo apt-get update -qq && sudo apt-get install -y -qq bind9 bind9-utils
+            fi
+          "
+
       - name: Sync BIND config to ns3
         run: |
           rsync -az --delete \
+            --exclude='zones/' \
             bind/secondary3/ ${{ vars.SSH_PATH_NS3 }}/
 
-      - name: Reload BIND on ns3
+      - name: Validate and reload BIND on ns3
         run: |
-          ssh ${{ steps.parse.outputs.host }} "rndc reconfig"
+          ssh ${{ steps.parse.outputs.host }} "
+            named-checkconf ${{ steps.parse.outputs.path }}/named.conf &&
+            rndc reconfig
+          "
