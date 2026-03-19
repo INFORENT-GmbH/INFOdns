@@ -26,13 +26,31 @@ export async function writeAtomic(destPath: string, content: string): Promise<vo
 /**
  * Atomically writes a zone file and reloads BIND.
  * Always does reconfig before reload so newly added zones are registered.
+ * Retries reload if BIND hasn't finished processing reconfig yet.
  */
 export async function deployZone(fqdn: string, content: string): Promise<void> {
   const zonePath = join(ZONE_DIR, `${fqdn}.zone`)
 
   await writeAtomic(zonePath, content)
   await rndcReconfig(RNDC_HOST, RNDC_PORT)
-  await rndcReload(fqdn)
+
+  // BIND may need a moment after reconfig to register a new zone.
+  // Retry reload up to 3 times with increasing delay.
+  let lastErr: Error | undefined
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await rndcReload(fqdn)
+      return
+    } catch (err: any) {
+      lastErr = err
+      if (err.message?.includes('not found') && attempt < 2) {
+        await new Promise(r => setTimeout(r, 500 * (attempt + 1)))
+        continue
+      }
+      throw err
+    }
+  }
+  throw lastErr
 }
 
 export async function rndcReload(fqdn: string): Promise<void> {
