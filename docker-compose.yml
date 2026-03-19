@@ -110,9 +110,9 @@ services:
     networks:
       - public
 
-  # ── Hidden Primary BIND (ns1 — 168.119.122.226) ────────────
-  # Secondaries run on real external servers: ns3 (5.78.139.169), ns2 (89.167.67.148)
-  # They are deployed separately — see bind/secondary-ns3/ and bind/secondary-ns2/
+  # ── Hidden Primary BIND (ns1 — 80.243.196.37) ────────────
+  # Secondaries: ilreah (80.243.196.38), ulren (80.243.196.39)
+  # They are deployed separately — see bind/secondary2/ and bind/secondary3/
   bind-primary:
     image: internetsystemsconsortium/bind9:9.18
     restart: unless-stopped
@@ -122,12 +122,14 @@ services:
       - ./bind/primary/named.conf.local:/etc/bind/named.conf.local
       - ./bind/keys:/etc/bind/keys:ro
       - ./bind/primary/zones:/var/lib/bind/zones
+    ports:
+      - "53:53/tcp"       # AXFR zone transfers from secondaries
+      - "53:53/udp"       # NOTIFY to secondaries
     networks:
-      - internal          # NOT on public network — hidden primary
+      - internal          # Worker/API reach BIND via internal network
+      - public            # Secondaries reach BIND for zone transfers + NOTIFY
     expose:
-      - "53/tcp"
-      - "53/udp"
-      - "953/tcp"         # rndc
+      - "953/tcp"         # rndc (internal only)
 
 networks:
   internal:
