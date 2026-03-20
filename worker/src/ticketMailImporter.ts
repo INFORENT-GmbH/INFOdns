@@ -1,19 +1,19 @@
+import { ImapFlow } from 'imapflow'
 import { simpleParser } from 'mailparser'
-import Pop3Command from 'node-pop3'
 import { query, queryOne, execute } from './db.js'
 import { queueMail } from './mailer.js'
 import { broadcastEvent } from './broadcast.js'
 
-const POP3_ENABLED   = process.env.POP3_ENABLED === 'true'
-const POP3_HOST      = process.env.POP3_HOST ?? ''
-const POP3_PORT      = Number(process.env.POP3_PORT ?? 995)
-const POP3_USER      = process.env.POP3_USER ?? ''
-const POP3_PASS      = process.env.POP3_PASS ?? ''
-const POP3_TLS       = process.env.POP3_TLS !== 'false'
-const POP3_INTERVAL  = Number(process.env.POP3_POLL_INTERVAL_SECONDS ?? 60) * 1000
+const IMAP_ENABLED  = process.env.IMAP_ENABLED === 'true'
+const IMAP_HOST     = process.env.IMAP_HOST ?? ''
+const IMAP_PORT     = Number(process.env.IMAP_PORT ?? 993)
+const IMAP_USER     = process.env.IMAP_USER ?? ''
+const IMAP_PASS     = process.env.IMAP_PASS ?? ''
+const IMAP_TLS      = process.env.IMAP_TLS !== 'false'
+const IMAP_INTERVAL = Number(process.env.IMAP_POLL_INTERVAL_SECONDS ?? 60) * 1000
 const APP_PUBLIC_URL = process.env.APP_PUBLIC_URL ?? ''
 
-let lastPop3Poll = 0
+let lastImapPoll = 0
 
 // ── Threading helpers ─────────────────────────────────────────
 
@@ -91,7 +91,7 @@ async function handleParsedEmail(parsed: Awaited<ReturnType<typeof simpleParser>
     }
     await execute('UPDATE support_tickets SET updated_at = NOW() WHERE id = ?', [ticketId])
     broadcastEvent({ type: 'ticket_message_added', ticketId })
-    console.log(`[pop3] Appended message to ticket #${ticketId}`)
+    console.log(`[imap] Appended message to ticket #${ticketId}`)
   } else {
     const customerId = fromAddr ? await lookupCustomerByEmail(fromAddr) : null
 
@@ -125,74 +125,61 @@ async function handleParsedEmail(parsed: Awaited<ReturnType<typeof simpleParser>
       })
     }
 
-    console.log(`[pop3] Created ticket #${newTicketId} from ${fromAddr}`)
+    console.log(`[imap] Created ticket #${newTicketId} from ${fromAddr}`)
   }
 }
 
-// ── POP3 session ──────────────────────────────────────────────
+// ── IMAP session ──────────────────────────────────────────────
 
-async function runPop3Session(): Promise<void> {
-  const pop3 = new Pop3Command({
-    user: POP3_USER,
-    password: POP3_PASS,
-    host: POP3_HOST,
-    port: POP3_PORT,
-    tls: POP3_TLS,
-    timeout: 30_000,
+async function runImapSession(): Promise<void> {
+  const client = new ImapFlow({
+    host: IMAP_HOST,
+    port: IMAP_PORT,
+    secure: IMAP_TLS,
+    auth: { user: IMAP_USER, pass: IMAP_PASS },
+    logger: false,
   })
 
+  await client.connect()
+
+  const lock = await client.getMailboxLock('INBOX')
   try {
-    // UIDL returns [['msgNum', 'uid'], ...]
-    const uidlList = (await pop3.UIDL()) as [string, string][]
-    if (uidlList.length === 0) {
-      await pop3.QUIT()
-      return
-    }
+    const uids = await client.search({ all: true }, { uid: true })
+    if (!uids || uids.length === 0) return
 
-    // Filter already-seen UIDs
-    const allUids = uidlList.map(([, uid]) => uid)
-    const placeholders = allUids.map(() => '?').join(',')
-    const seen = await query<{ uid: string }>(
-      `SELECT uid FROM pop3_seen_uids WHERE uid IN (${placeholders})`,
-      allUids
-    )
-    const seenSet = new Set(seen.map(r => r.uid))
-
-    const toProcess = uidlList.filter(([, uid]) => !seenSet.has(uid))
-
-    for (const [msgNum, uid] of toProcess) {
+    for (const uid of uids as number[]) {
       try {
-        const raw: string = await pop3.RETR(Number(msgNum))
-        const parsed = await simpleParser(raw)
+        const msg = await client.fetchOne(String(uid), { source: true }, { uid: true })
+        if (!msg || !('source' in msg) || !msg.source) continue
+
+        const parsed = await simpleParser(msg.source as Buffer)
         await handleParsedEmail(parsed)
-        await execute('INSERT IGNORE INTO pop3_seen_uids (uid) VALUES (?)', [uid])
-        await pop3.DELE(Number(msgNum))
+        await client.messageDelete(String(uid), { uid: true })
       } catch (err: any) {
-        console.error(`[pop3] Failed to process message ${msgNum} (${uid}):`, err.message)
+        console.error(`[imap] Failed to process UID ${uid}:`, err.message)
       }
     }
-
-    await pop3.QUIT()
-  } catch (err) {
-    try { await pop3.QUIT() } catch {}
-    throw err
+  } finally {
+    lock.release()
   }
+
+  await client.logout()
 }
 
 // ── Public poll function ──────────────────────────────────────
 
-export async function pollPop3(): Promise<void> {
-  if (!POP3_ENABLED) return
-  if (!POP3_HOST || !POP3_USER || !POP3_PASS) return
-  if (Date.now() - lastPop3Poll < POP3_INTERVAL) return
+export async function pollImap(): Promise<void> {
+  if (!IMAP_ENABLED) return
+  if (!IMAP_HOST || !IMAP_USER || !IMAP_PASS) return
+  if (Date.now() - lastImapPoll < IMAP_INTERVAL) return
 
-  lastPop3Poll = Date.now()
-  console.log('[pop3] Polling mailbox…')
+  lastImapPoll = Date.now()
+  console.log('[imap] Polling mailbox…')
 
   try {
-    await runPop3Session()
-    console.log('[pop3] Poll complete')
+    await runImapSession()
+    console.log('[imap] Poll complete')
   } catch (err: any) {
-    console.error('[pop3] Poll failed:', err.message)
+    console.error('[imap] Poll failed:', err.message)
   }
 }

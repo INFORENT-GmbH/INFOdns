@@ -288,6 +288,7 @@ export const translations = {
     ticketDetail_replyPh:     'Type your reply…',
     ticketDetail_noMessages:  'No messages yet',
     ticketDetail_addInternal: 'Mark as internal note',
+    ticketDetail_addFiles:    'Attach files',
   },
 
   de: {
@@ -577,6 +578,7 @@ export const translations = {
     ticketDetail_replyPh:     'Antwort eingeben…',
     ticketDetail_noMessages:  'Noch keine Nachrichten',
     ticketDetail_addInternal: 'Als interne Notiz markieren',
+    ticketDetail_addFiles:    'Dateien anhängen',
   },
 } satisfies Record<Locale, Record<string, string | ((...args: any[]) => string)>>
 

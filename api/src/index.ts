@@ -4,6 +4,7 @@ import fcookie from '@fastify/cookie'
 import fhelmet from '@fastify/helmet'
 import frateLimit from '@fastify/rate-limit'
 import fws from '@fastify/websocket'
+import fmultipart from '@fastify/multipart'
 
 import { authRoutes } from './auth/routes.js'
 import { customerRoutes } from './customers/routes.js'
@@ -25,6 +26,9 @@ await app.register(fhelmet, { global: true })
 await app.register(fcookie)
 await app.register(fjwt, { secret: process.env.JWT_SECRET! })
 await app.register(fws)
+await app.register(fmultipart, {
+  limits: { fileSize: 20 * 1024 * 1024, files: 20 },
+})
 await app.register(frateLimit, {
   global: false,
   max: 10,

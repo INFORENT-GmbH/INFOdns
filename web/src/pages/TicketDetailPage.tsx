@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getTicket, getUsers, updateTicket, addTicketMessage, type TicketMessage } from '../api/client'
+import { getTicket, getUsers, updateTicket, addTicketMessage, uploadAttachments, downloadAttachment, type TicketMessage, type TicketAttachment } from '../api/client'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
 
@@ -19,6 +19,12 @@ const PRIORITY_COLORS: Record<string, { bg: string; fg: string }> = {
   urgent: { bg: '#fee2e2', fg: '#991b1b' },
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 function Badge({ value, colors }: { value: string; colors: Record<string, { bg: string; fg: string }> }) {
   const c = colors[value] ?? { bg: '#f3f4f6', fg: '#374151' }
   return <span style={{ background: c.bg, color: c.fg, padding: '2px 8px', borderRadius: 4, fontSize: '.75rem', fontWeight: 600 }}>{value}</span>
@@ -34,6 +40,7 @@ export default function TicketDetailPage() {
 
   const [replyBody, setReplyBody]       = useState('')
   const [isInternal, setIsInternal]     = useState(false)
+  const [files, setFiles]               = useState<File[]>([])
   const [sending, setSending]           = useState(false)
   const [sendError, setSendError]       = useState<string | null>(null)
   const [updating, setUpdating]         = useState(false)
@@ -68,10 +75,14 @@ export default function TicketDetailPage() {
     setSending(true)
     setSendError(null)
     try {
-      await addTicketMessage(ticketId, { body: replyBody, is_internal: isInternal })
+      const msgResp = await addTicketMessage(ticketId, { body: replyBody, is_internal: isInternal })
+      if (files.length > 0) {
+        await uploadAttachments(ticketId, msgResp.data.id, files)
+      }
       qc.invalidateQueries({ queryKey: ['ticket', ticketId] })
       setReplyBody('')
       setIsInternal(false)
+      setFiles([])
     } catch (err: any) {
       setSendError(err.response?.data?.message ?? 'Error')
     } finally {
@@ -163,6 +174,20 @@ export default function TicketDetailPage() {
               )}
             </div>
             <div style={styles.msgBody}>{msg.body}</div>
+            {msg.attachments?.length > 0 && (
+              <div style={styles.attachList}>
+                {msg.attachments.map((att: TicketAttachment) => (
+                  <button
+                    key={att.id}
+                    style={styles.attachBtn}
+                    onClick={() => downloadAttachment(ticket.id, att.id, att.original_name)}
+                    type="button"
+                  >
+                    📎 {att.original_name} <span style={styles.attachSize}>({formatBytes(att.size)})</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -176,6 +201,23 @@ export default function TicketDetailPage() {
           required
           rows={4}
         />
+        <div style={styles.fileRow}>
+          <label style={styles.fileLabel}>
+            📎 {t('ticketDetail_addFiles')}
+            <input
+              type="file"
+              multiple
+              style={{ display: 'none' }}
+              onChange={e => setFiles(Array.from(e.target.files ?? []).slice(0, 20))}
+            />
+          </label>
+          {files.length > 0 && (
+            <span style={styles.fileNames}>
+              {files.map(f => f.name).join(', ')}
+              <button type="button" style={styles.fileClear} onClick={() => setFiles([])}>✕</button>
+            </span>
+          )}
+        </div>
         {isStaff && (
           <label style={styles.internalToggle}>
             <input
@@ -219,4 +261,11 @@ const styles: Record<string, React.CSSProperties> = {
   internalToggle:  { display: 'flex', alignItems: 'center', gap: '.35rem', fontSize: '.875rem', color: '#374151', cursor: 'pointer' },
   btnSend:         { padding: '.375rem .875rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
   errorText:       { color: '#b91c1c', fontSize: '.875rem', margin: 0 },
+  attachList:      { display: 'flex', flexWrap: 'wrap' as const, gap: '.35rem', marginTop: '.5rem' },
+  attachBtn:       { background: 'none', border: '1px solid #d1d5db', borderRadius: 4, padding: '2px 8px', fontSize: '.8rem', color: '#2563eb', cursor: 'pointer' },
+  attachSize:      { color: '#9ca3af' },
+  fileRow:         { display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' as const },
+  fileLabel:       { padding: '.25rem .6rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.8rem', cursor: 'pointer', color: '#374151' },
+  fileNames:       { fontSize: '.8rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '.35rem' },
+  fileClear:       { background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '.85rem', padding: 0 },
 }

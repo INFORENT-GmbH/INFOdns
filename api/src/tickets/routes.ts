@@ -1,8 +1,14 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import { createReadStream } from 'node:fs'
+import { mkdir, writeFile, unlink, stat } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import path from 'node:path'
 import { query, queryOne, execute } from '../db.js'
 import { requireAuth, requireOperatorOrAdmin } from '../middleware/auth.js'
 import { broadcast } from '../ws/hub.js'
+
+const UPLOAD_DIR = process.env.UPLOAD_DIR ?? '/app/uploads'
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -180,7 +186,19 @@ export async function ticketRoutes(app: FastifyInstance) {
       [id]
     )
 
-    return { ...ticket, messages }
+    const attachments = await query<any>(
+      `SELECT id, ticket_id, message_id, original_name, mime_type, size, created_by, created_at
+       FROM ticket_attachments WHERE ticket_id = ? ORDER BY created_at ASC`,
+      [id]
+    )
+    const attByMsg: Record<number, any[]> = {}
+    for (const a of attachments) {
+      const mid = a.message_id ?? 0
+      ;(attByMsg[mid] ??= []).push(a)
+    }
+    const messagesWithAtt = (messages as any[]).map(m => ({ ...m, attachments: attByMsg[m.id] ?? [] }))
+
+    return { ...ticket, messages: messagesWithAtt }
   })
 
   // PUT /tickets/:id  (staff only)
@@ -302,4 +320,111 @@ export async function ticketRoutes(app: FastifyInstance) {
 
     return reply.status(201).send({ id: result.insertId })
   })
+
+  // ── Attachment helpers ────────────────────────────────────────
+
+  async function ticketAccessCheck(req: any, reply: any, ticketId: number): Promise<boolean> {
+    const ticket = await queryOne<any>('SELECT id, requester_email, customer_id FROM support_tickets WHERE id = ?', [ticketId])
+    if (!ticket) { reply.status(404).send({ code: 'NOT_FOUND' }); return false }
+    if (isStaff(req.user.role)) return true
+    const userRow = await queryOne<{ email: string }>('SELECT email FROM users WHERE id = ?', [req.user.sub])
+    const userEmail = userRow?.email ?? ''
+    const owned = ticket.requester_email === userEmail || await queryOne(
+      'SELECT 1 FROM user_customers WHERE user_id = ? AND customer_id = ?',
+      [req.user.sub, ticket.customer_id]
+    )
+    if (!owned) { reply.status(403).send({ code: 'FORBIDDEN' }); return false }
+    return true
+  }
+
+  // POST /tickets/:id/messages/:msgId/attachments
+  app.post<{ Params: { id: string; msgId: string } }>(
+    '/tickets/:id/messages/:msgId/attachments',
+    { preHandler: requireAuth },
+    async (req: any, reply) => {
+      const ticketId = Number(req.params.id)
+      const msgId    = Number(req.params.msgId)
+      if (!await ticketAccessCheck(req, reply, ticketId)) return
+
+      // Verify message belongs to ticket
+      const msg = await queryOne<{ id: number }>('SELECT id FROM ticket_messages WHERE id = ? AND ticket_id = ?', [msgId, ticketId])
+      if (!msg) return reply.status(404).send({ code: 'NOT_FOUND' })
+
+      const dir = path.join(UPLOAD_DIR, 'tickets', String(ticketId))
+      await mkdir(dir, { recursive: true })
+
+      const saved: any[] = []
+      let fileCount = 0
+
+      try {
+        for await (const part of req.files()) {
+          if (fileCount >= 20) { part.file.resume(); continue }
+          fileCount++
+
+          const chunks: Buffer[] = []
+          for await (const chunk of part.file) chunks.push(chunk as Buffer)
+          const buf = Buffer.concat(chunks)
+
+          const ext      = path.extname(part.filename || '').slice(0, 16)
+          const stored   = `${randomUUID()}${ext}`
+          const filePath = path.join(dir, stored)
+          await writeFile(filePath, buf)
+
+          const result = await execute(
+            `INSERT INTO ticket_attachments (ticket_id, message_id, filename, original_name, mime_type, size, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [ticketId, msgId, stored, part.filename || stored, part.mimetype || 'application/octet-stream', buf.length, req.user.sub]
+          )
+          saved.push({ id: result.insertId, original_name: part.filename, mime_type: part.mimetype, size: buf.length })
+        }
+      } catch (err: any) {
+        if (err.code === 'FST_REQ_FILE_TOO_LARGE') {
+          return reply.status(400).send({ code: 'FILE_TOO_LARGE', message: 'Max file size is 20 MB' })
+        }
+        throw err
+      }
+
+      return reply.status(201).send(saved)
+    }
+  )
+
+  // GET /tickets/:id/attachments
+  app.get<{ Params: { id: string } }>('/tickets/:id/attachments', { preHandler: requireAuth }, async (req: any, reply) => {
+    const ticketId = Number(req.params.id)
+    if (!await ticketAccessCheck(req, reply, ticketId)) return
+    const rows = await query(
+      `SELECT id, ticket_id, message_id, original_name, mime_type, size, created_by, created_at
+       FROM ticket_attachments WHERE ticket_id = ? ORDER BY created_at ASC`,
+      [ticketId]
+    )
+    return rows
+  })
+
+  // GET /tickets/:id/attachments/:fileId  (download)
+  app.get<{ Params: { id: string; fileId: string } }>(
+    '/tickets/:id/attachments/:fileId',
+    { preHandler: requireAuth },
+    async (req: any, reply) => {
+      const ticketId = Number(req.params.id)
+      const fileId   = Number(req.params.fileId)
+      if (!await ticketAccessCheck(req, reply, ticketId)) return
+
+      const att = await queryOne<any>(
+        'SELECT filename, original_name, mime_type FROM ticket_attachments WHERE id = ? AND ticket_id = ?',
+        [fileId, ticketId]
+      )
+      if (!att) return reply.status(404).send({ code: 'NOT_FOUND' })
+
+      const filePath = path.join(UPLOAD_DIR, 'tickets', String(ticketId), att.filename)
+      try {
+        const s = await stat(filePath)
+        reply.header('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(att.original_name)}`)
+        reply.header('Content-Type', att.mime_type)
+        reply.header('Content-Length', s.size)
+        return reply.send(createReadStream(filePath))
+      } catch {
+        return reply.status(404).send({ code: 'FILE_NOT_FOUND' })
+      }
+    }
+  )
 }

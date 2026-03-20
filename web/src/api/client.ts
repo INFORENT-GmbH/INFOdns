@@ -309,6 +309,17 @@ export interface Ticket {
   updated_at: string
 }
 
+export interface TicketAttachment {
+  id: number
+  ticket_id: number
+  message_id: number | null
+  original_name: string
+  mime_type: string
+  size: number
+  created_by: number | null
+  created_at: string
+}
+
 export interface TicketMessage {
   id: number
   ticket_id: number
@@ -319,6 +330,7 @@ export interface TicketMessage {
   is_internal: number
   source: 'web' | 'email'
   created_at: string
+  attachments: TicketAttachment[]
 }
 
 export interface TicketDetail extends Ticket {
@@ -347,3 +359,19 @@ export const updateTicket = (id: number, data: { status?: string; priority?: str
 
 export const addTicketMessage = (id: number, data: { body: string; is_internal?: boolean }) =>
   api.post<{ id: number }>(`/tickets/${id}/messages`, data)
+
+export const uploadAttachments = (ticketId: number, msgId: number, files: File[]) => {
+  const fd = new FormData()
+  files.forEach(f => fd.append('files', f))
+  return api.post<TicketAttachment[]>(`/tickets/${ticketId}/messages/${msgId}/attachments`, fd)
+}
+
+export const downloadAttachment = async (ticketId: number, fileId: number, originalName: string) => {
+  const resp = await api.get(`/tickets/${ticketId}/attachments/${fileId}`, { responseType: 'blob' })
+  const url = URL.createObjectURL(resp.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = originalName
+  a.click()
+  URL.revokeObjectURL(url)
+}

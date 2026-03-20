@@ -7,7 +7,7 @@ import { regenerateNamedConf } from './namedConf.js'
 import { pollBulkJobs } from './bulkExecutor.js'
 import { broadcastEvent } from './broadcast.js'
 import { queueMail, pollMailQueue } from './mailer.js'
-import { pollPop3 } from './ticketMailImporter.js'
+import { pollImap } from './ticketMailImporter.js'
 import { existsSync } from 'fs'
 import { join } from 'path'
 
@@ -236,7 +236,7 @@ setInterval(syncNamedConf, 60_000)
       await poll()
       await pollBulkJobs()
       await pollMailQueue()
-      await pollPop3()
+      await pollImap()
     } catch (err: any) {
       console.error('[worker] Poll error:', err.message)
     }
