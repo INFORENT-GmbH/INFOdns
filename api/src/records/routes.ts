@@ -17,7 +17,7 @@ async function enqueueRender(domainId: number) {
 
 /** Resolve domain and enforce ownership */
 async function resolveDomain(domainId: string, req: any, reply: any) {
-  const ownerClause = req.user.role === 'customer' ? ` AND customer_id = ${Number(req.user.customerId)}` : ''
+  const ownerClause = req.user.role === 'admin' ? '' : ` AND customer_id IN (SELECT customer_id FROM user_customers WHERE user_id = ${Number(req.user.sub)})`
   const domain = await queryOne(
     `SELECT id, customer_id FROM domains WHERE id = ? AND status != 'deleted'${ownerClause}`,
     [domainId]

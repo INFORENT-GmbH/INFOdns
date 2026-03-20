@@ -5,6 +5,7 @@ export interface JwtPayload {
   sub: number        // user id
   role: 'admin' | 'operator' | 'customer'
   customerId: number | null
+  impersonatingId?: number   // real admin user id when impersonating
 }
 
 /** Hash a raw refresh token for DB storage */

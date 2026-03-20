@@ -114,6 +114,7 @@ export interface User {
   full_name: string
   role: 'admin' | 'operator' | 'customer'
   customer_id: number | null
+  customer_ids: number[]
   is_active: number
   created_at: string
 }
@@ -156,6 +157,12 @@ export const login = (email: string, password: string) =>
   api.post<{ accessToken: string }>('/auth/login', { email, password })
 
 export const logout = () => api.post('/auth/logout')
+
+export const impersonateUser = (userId: number) =>
+  api.post<{ accessToken: string }>(`/auth/impersonate/${userId}`)
+
+export const stopImpersonation = () =>
+  api.post<{ accessToken: string }>('/auth/stop-impersonation')
 
 // Domains
 export const getDomains = (params?: Record<string, string>) =>

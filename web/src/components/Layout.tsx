@@ -14,7 +14,7 @@ const nsLabels: Record<string, { display: string; fqdn?: string }> = {
 }
 
 export default function Layout() {
-  const { user, accessToken, logout } = useAuth()
+  const { user, accessToken, logout, stopImpersonation } = useAuth()
   const { t, locale, setLocale } = useI18n()
   const wsStatus = useWs(accessToken)
   const navigate = useNavigate()
@@ -26,6 +26,7 @@ export default function Layout() {
     staleTime: Infinity,
   })
   const visibleNs = user?.role === 'customer' ? ['ns2', 'ns3'] : ['ns1', 'ns2', 'ns3']
+  const isImpersonating = !!user?.impersonatingId
 
   async function handleLogout() {
     await logout()
@@ -94,6 +95,14 @@ export default function Layout() {
           {t('ws_reconnecting')}
         </div>
       )}
+      {isImpersonating && (
+        <div style={styles.impersonationBar}>
+          {t('impersonation_active')}
+          <button onClick={async () => { await stopImpersonation(); navigate('/users') }} style={styles.impersonationBtn}>
+            {t('impersonation_stop')}
+          </button>
+        </div>
+      )}
       <main style={styles.main}>
         <Outlet />
       </main>
@@ -126,4 +135,6 @@ const styles: Record<string, React.CSSProperties> = {
   nsTooltip: { position: 'absolute' as const, top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 10, pointerEvents: 'none' as const },
   wsToast:   { display: 'flex', alignItems: 'center', gap: '.5rem', background: '#1e293b', color: '#f8fafc', fontSize: '.8125rem', padding: '.5rem 1.5rem', position: 'sticky' as const, top: 0, zIndex: 50 },
   wsSpinner: { display: 'inline-block', width: 10, height: 10, border: '2px solid #94a3b8', borderTopColor: '#f8fafc', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 },
+  impersonationBar: { display: 'flex', alignItems: 'center', gap: '.75rem', background: '#fbbf24', color: '#78350f', fontSize: '.8125rem', fontWeight: 600, padding: '.5rem 1.5rem', position: 'sticky' as const, top: 0, zIndex: 49 },
+  impersonationBtn: { background: '#78350f', color: '#fef3c7', border: 'none', borderRadius: 4, padding: '.25rem .75rem', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' },
 }

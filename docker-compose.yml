@@ -57,6 +57,8 @@ services:
       NS3_IP: ${NS3_IP:-80.243.196.39}
     ports:
       - "3000:3000"
+    volumes:
+      - ./mariadb/migrations:/app/migrations:ro
     networks:
       - internal
       - public

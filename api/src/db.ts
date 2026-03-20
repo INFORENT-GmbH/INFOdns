@@ -50,3 +50,54 @@ export async function transaction<T>(fn: (conn: mysql.PoolConnection) => Promise
     conn.release()
   }
 }
+
+/** Run pending SQL migrations from /app/migrations/ on startup. */
+export async function runMigrations(): Promise<void> {
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      filename VARCHAR(255) NOT NULL PRIMARY KEY,
+      applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  const [applied] = await pool.execute<mysql.RowDataPacket[]>(
+    'SELECT filename FROM schema_migrations ORDER BY filename'
+  )
+  const done = new Set(applied.map((r) => r.filename))
+
+  const { readdir, readFile } = await import('fs/promises')
+  const { resolve, join } = await import('path')
+  // Volume-mounted at /app/migrations in production; relative in dev
+  const dir = resolve(process.env.MIGRATIONS_DIR ?? '/app/migrations')
+  let files: string[]
+  try {
+    files = (await readdir(dir)).filter(f => f.endsWith('.sql')).sort()
+  } catch {
+    return // no migrations dir — skip
+  }
+
+  for (const file of files) {
+    if (done.has(file)) continue
+    const sql = await readFile(join(dir, file), 'utf-8')
+    const conn = await pool.getConnection()
+    try {
+      // Execute each statement separately (mysql2 doesn't support multi-statement by default)
+      const statements = sql
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => s.length > 0)
+        // Strip leading SQL comment lines from each chunk
+        .map(s => s.replace(/^(\s*--.*\n?)+/, '').trim())
+        .filter(s => s.length > 0)
+      for (const stmt of statements) {
+        await conn.execute(stmt)
+      }
+      await conn.execute('INSERT INTO schema_migrations (filename) VALUES (?)', [file])
+      console.log(`Migration applied: ${file}`)
+    } catch (err) {
+      console.error(`Migration failed: ${file}`, err)
+      throw err
+    } finally {
+      conn.release()
+    }
+  }
+}

@@ -42,6 +42,10 @@ app.get('/ready', async (_req, reply) => {
   }
 })
 
+// ── Run pending DB migrations ────────────────────────────────
+import { runMigrations } from './db.js'
+await runMigrations()
+
 // ── NS status poller ─────────────────────────────────────────
 startNsStatusPoller()
 

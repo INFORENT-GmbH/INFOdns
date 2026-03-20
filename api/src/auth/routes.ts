@@ -9,6 +9,7 @@ import {
   revokeAllForUser,
   type JwtPayload,
 } from './jwt.js'
+import { requireAdmin, requireAuth } from '../middleware/auth.js'
 
 const LoginBody = z.object({
   email: z.string().email(),
@@ -92,5 +93,41 @@ export async function authRoutes(app: FastifyInstance) {
       if (result) await revokeAllForUser(result.userId)
     }
     reply.clearCookie('refresh_token', { path: '/api/v1/auth/refresh' }).send({ ok: true })
+  })
+
+  // POST /auth/impersonate/:id  (admin only — returns access token acting as target user)
+  app.post<{ Params: { id: string } }>('/auth/impersonate/:id', { preHandler: requireAdmin }, async (req, reply) => {
+    const targetId = Number(req.params.id)
+    if (!Number.isInteger(targetId) || targetId <= 0) return reply.status(400).send({ code: 'INVALID_ID' })
+    if (targetId === req.user.sub) return reply.status(400).send({ code: 'CANNOT_IMPERSONATE_SELF' })
+
+    type Row = { id: number; role: 'admin' | 'operator' | 'customer'; customer_id: number | null; is_active: number }
+    const target = await queryOne<Row>('SELECT id, role, customer_id, is_active FROM users WHERE id = ?', [targetId])
+    if (!target || !target.is_active) return reply.status(404).send({ code: 'NOT_FOUND' })
+
+    const payload: JwtPayload = {
+      sub: target.id,
+      role: target.role,
+      customerId: target.customer_id,
+      impersonatingId: req.user.sub,
+    }
+    const accessToken = app.jwt.sign(payload, { expiresIn: '15m' })
+    return { accessToken }
+  })
+
+  // POST /auth/stop-impersonation  (returns access token for the real admin)
+  app.post('/auth/stop-impersonation', { preHandler: requireAuth }, async (req, reply) => {
+    const realAdminId = req.user.impersonatingId
+    if (!realAdminId) return reply.status(400).send({ code: 'NOT_IMPERSONATING' })
+
+    type Row = { id: number; role: 'admin' | 'operator' | 'customer'; customer_id: number | null; is_active: number }
+    const admin = await queryOne<Row>('SELECT id, role, customer_id, is_active FROM users WHERE id = ?', [realAdminId])
+    if (!admin || !admin.is_active || admin.role !== 'admin') {
+      return reply.status(403).send({ code: 'FORBIDDEN' })
+    }
+
+    const payload: JwtPayload = { sub: admin.id, role: admin.role, customerId: admin.customer_id }
+    const accessToken = app.jwt.sign(payload, { expiresIn: '15m' })
+    return { accessToken }
   })
 }

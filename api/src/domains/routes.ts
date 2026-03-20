@@ -60,9 +60,10 @@ async function fetchLabels(domainIds: number[], isAdmin = false): Promise<Map<nu
 }
 
 
-/** Inject ownership filter for customer role */
+/** Inject ownership filter for non-admin users via user_customers junction table */
 function ownerFilter(req: any): string {
-  return req.user.role === 'customer' ? ` AND d.customer_id = ${Number(req.user.customerId)}` : ''
+  if (req.user.role === 'admin') return ''
+  return ` AND d.customer_id IN (SELECT customer_id FROM user_customers WHERE user_id = ${Number(req.user.sub)})`
 }
 
 export async function domainRoutes(app: FastifyInstance) {
@@ -73,9 +74,9 @@ export async function domainRoutes(app: FastifyInstance) {
 
     const params: unknown[] = []
     let where: string
-    if (req.user.role === 'customer') {
-      where = 'WHERE l.customer_id = ? AND l.admin_only = 0'
-      params.push(req.user.customerId)
+    if (!isAdmin && !customer_id) {
+      where = 'WHERE l.customer_id IN (SELECT customer_id FROM user_customers WHERE user_id = ?) AND l.admin_only = 0'
+      params.push(req.user.sub)
     } else if (customer_id) {
       where = isAdmin
         ? 'WHERE (l.customer_id = ? AND l.admin_only = 0) OR (l.admin_only = 1 AND l.customer_id IS NULL)'
@@ -121,10 +122,11 @@ export async function domainRoutes(app: FastifyInstance) {
       }
     }
 
-    if (req.user.role === 'customer') {
-      where += ` AND d.customer_id = ?`
-      params.push(req.user.customerId)
-    } else if (customer_id) {
+    if (req.user.role !== 'admin') {
+      where += ` AND d.customer_id IN (SELECT customer_id FROM user_customers WHERE user_id = ?)`
+      params.push(req.user.sub)
+    }
+    if (customer_id) {
       where += ` AND d.customer_id = ?`
       params.push(Number(customer_id))
     }

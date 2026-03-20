@@ -12,9 +12,18 @@ const CustomerBody = z.object({
 
 export async function customerRoutes(app: FastifyInstance) {
   // GET /customers
-  app.get('/customers', { preHandler: requireOperatorOrAdmin }, async (req, reply) => {
-    const rows = await query('SELECT id, name, slug, is_active, created_at FROM customers ORDER BY name')
-    return rows
+  app.get('/customers', { preHandler: requireOperatorOrAdmin }, async (req: any, reply) => {
+    if (req.user.role === 'admin') {
+      return query('SELECT id, name, slug, is_active, created_at FROM customers ORDER BY name')
+    }
+    return query(
+      `SELECT c.id, c.name, c.slug, c.is_active, c.created_at
+       FROM customers c
+       JOIN user_customers uc ON uc.customer_id = c.id
+       WHERE uc.user_id = ?
+       ORDER BY c.name`,
+      [req.user.sub]
+    )
   })
 
   // POST /customers  (admin only)
@@ -37,9 +46,12 @@ export async function customerRoutes(app: FastifyInstance) {
   // GET /customers/:id
   app.get<{ Params: { id: string } }>('/customers/:id', { preHandler: requireAuth }, async (req, reply) => {
     const { id } = req.params
-    // customers can only see their own
-    if (req.user.role === 'customer' && req.user.customerId !== Number(id)) {
-      return reply.status(403).send({ code: 'FORBIDDEN' })
+    // non-admin users can only see their assigned customers
+    if (req.user.role !== 'admin') {
+      const assigned = await query('SELECT customer_id FROM user_customers WHERE user_id = ?', [req.user.sub]) as any[]
+      if (!assigned.some(r => r.customer_id === Number(id))) {
+        return reply.status(403).send({ code: 'FORBIDDEN' })
+      }
     }
     const row = await queryOne('SELECT id, name, slug, is_active, created_at FROM customers WHERE id = ?', [id])
     if (!row) return reply.status(404).send({ code: 'NOT_FOUND' })

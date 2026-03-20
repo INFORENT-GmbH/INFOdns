@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
-import { api, login as apiLogin, logout as apiLogout, setAccessToken } from '../api/client'
+import { api, login as apiLogin, logout as apiLogout, setAccessToken, impersonateUser as apiImpersonate, stopImpersonation as apiStopImpersonate } from '../api/client'
 
 interface AuthUser {
   sub: number
   role: 'admin' | 'operator' | 'customer'
   customerId: number | null
+  impersonatingId?: number
 }
 
 interface AuthContextValue {
@@ -13,6 +14,8 @@ interface AuthContextValue {
   ready: boolean   // false until the initial silent refresh attempt completes
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  impersonate: (userId: number) => Promise<void>
+  stopImpersonation: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -59,8 +62,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }, [])
 
+  const impersonate = useCallback(async (userId: number) => {
+    const res = await apiImpersonate(userId)
+    applyToken(res.data.accessToken)
+    setUser(parseJwt(res.data.accessToken))
+  }, [])
+
+  const stopImpersonation = useCallback(async () => {
+    const res = await apiStopImpersonate()
+    applyToken(res.data.accessToken)
+    setUser(parseJwt(res.data.accessToken))
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, accessToken, ready, login, logout }}>
+    <AuthContext.Provider value={{ user, accessToken, ready, login, logout, impersonate, stopImpersonation }}>
       {children}
     </AuthContext.Provider>
   )

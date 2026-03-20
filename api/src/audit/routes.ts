@@ -13,8 +13,8 @@ export async function auditRoutes(app: FastifyInstance) {
     const clauses: string[] = []
 
     if (req.user.role === 'customer') {
-      clauses.push('customer_id = ?')
-      params.push(req.user.customerId)
+      clauses.push('customer_id IN (SELECT customer_id FROM user_customers WHERE user_id = ?)')
+      params.push(req.user.sub)
     }
 
     if (domain_id) { clauses.push('domain_id = ?');    params.push(Number(domain_id)) }

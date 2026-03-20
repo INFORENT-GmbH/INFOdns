@@ -28,6 +28,9 @@ export function useWs(token: string | null): WsStatus {
     if (!token) return  // not logged in; do nothing
 
     let destroyed = false
+    // Reset on token change so a new token (e.g. impersonation) doesn't
+    // trigger the page-reload path meant for missed-event recovery.
+    everConnected.current = false
 
     function connect() {
       if (destroyed) return

@@ -8,7 +8,8 @@ import { broadcast } from '../ws/hub.js'
 // ── Helpers ──────────────────────────────────────────────────
 
 function ownerClause(req: any): string {
-  return req.user.role === 'customer' ? ` AND d.customer_id = ${Number(req.user.customerId)}` : ''
+  if (req.user.role === 'admin') return ''
+  return ` AND d.customer_id IN (SELECT customer_id FROM user_customers WHERE user_id = ${Number(req.user.sub)})`
 }
 
 /** Resolve filter_json to a list of domain IDs the requesting user can access */
@@ -219,7 +220,7 @@ export async function bulkRoutes(app: FastifyInstance) {
     const { type, name, value } = req.query as Record<string, string>
     if (!type) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: 'type is required' })
 
-    const owner = req.user.role === 'customer' ? ` AND d.customer_id = ${Number(req.user.customerId)}` : ''
+    const owner = req.user.role === 'admin' ? '' : ` AND d.customer_id IN (SELECT customer_id FROM user_customers WHERE user_id = ${Number(req.user.sub)})`
     const params: unknown[] = [type]
     let recordWhere = 'r.type = ? AND r.is_deleted = 0'
     if (name)  { recordWhere += ' AND r.name = ?';        params.push(name) }

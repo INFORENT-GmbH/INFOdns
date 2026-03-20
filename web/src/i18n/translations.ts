@@ -176,7 +176,14 @@ export const translations = {
     users_add:         '+ Add User',
     users_newTitle:    'New User',
     users_fullName:    'Full name',
-    users_customerIdOptional: 'Customer ID (optional)',
+    users_customers:   'Customers',
+    users_customerIdOptional: 'Customers (optional)',
+    users_noCustomer:  'No customers',
+    users_impersonate: 'Impersonate',
+
+    // Impersonation
+    impersonation_active: 'You are impersonating another user.',
+    impersonation_stop:   'Stop impersonating',
 
     // Audit log
     audit_title:        'Audit Log',
@@ -386,7 +393,14 @@ export const translations = {
     users_add:         '+ Benutzer hinzufügen',
     users_newTitle:    'Neuer Benutzer',
     users_fullName:    'Vollständiger Name',
-    users_customerIdOptional: 'Kunden-ID (optional)',
+    users_customers:   'Kunden',
+    users_customerIdOptional: 'Kunden (optional)',
+    users_noCustomer:  'Keine Kunden',
+    users_impersonate: 'Identität annehmen',
+
+    // Impersonation
+    impersonation_active: 'Sie agieren als ein anderer Benutzer.',
+    impersonation_stop:   'Identitätswechsel beenden',
 
     // Audit log
     audit_title:        'Protokoll',

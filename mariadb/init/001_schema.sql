@@ -30,6 +30,15 @@ CREATE TABLE users (
   FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ── user_customers (many-to-many) ────────────────────────────
+CREATE TABLE user_customers (
+  user_id     INT UNSIGNED NOT NULL,
+  customer_id INT UNSIGNED NOT NULL,
+  PRIMARY KEY (user_id, customer_id),
+  FOREIGN KEY (user_id)     REFERENCES users(id)     ON DELETE CASCADE,
+  FOREIGN KEY (customer_id) REFERENCES customers(id)  ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- ── refresh_tokens ───────────────────────────────────────────
 CREATE TABLE refresh_tokens (
   id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
