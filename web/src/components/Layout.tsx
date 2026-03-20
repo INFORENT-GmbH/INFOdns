@@ -154,14 +154,14 @@ function dropdownItemStyle({ isActive }: { isActive: boolean }): React.CSSProper
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  shell:     { display: 'flex', flexDirection: 'column', minHeight: '100vh' },
-  nav:       { display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '.75rem 1.5rem', background: '#fff', borderBottom: '1px solid #e5e7eb' },
+  shell:     { display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: 1920 },
+  nav:       { display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '.75rem 1.5rem', background: 'linear-gradient(rgba(255,255,255,0.85), rgba(255,255,255,0.65)), url(/header-skyline.png) no-repeat bottom center', backgroundSize: 'auto, 800px 123px', maxWidth: 1920, borderBottom: '1px solid #e5e7eb' },
   brand:     { height: 42, display: 'block' },
   links:     { display: 'flex', gap: '1.25rem' },
   right:     { display: 'flex', gap: '.5rem', alignItems: 'center' },
   langBtn:   { background: 'none', border: '1px solid #d1d5db', borderRadius: 4, padding: '.25rem .6rem', cursor: 'pointer', fontSize: '.8rem' },
   logoutBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 4, padding: '.25rem .75rem', cursor: 'pointer', fontSize: '.875rem' },
-  main:      { padding: '1.5rem', maxWidth: 1200, margin: '0 auto', width: '100%' },
+  main:      { padding: '1.5rem', maxWidth: 1200, margin: '0 auto', width: '100%', background: 'rgba(255,255,255,0.92)', borderRadius: 8, marginTop: '1rem', marginBottom: '1rem' },
   nsBar:     { display: 'flex', gap: '1.5rem', padding: '.25rem 1.5rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', color: '#6b7280' },
   nsEntry:   { display: 'flex', alignItems: 'center', gap: '.25rem' },
   nsLatency: { color: '#9ca3af', marginLeft: '.25rem' },

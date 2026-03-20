@@ -10,7 +10,17 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
     <style>
       *, *::before, *::after { box-sizing: border-box; }
-      body { margin: 0; font-family: 'Inter', system-ui, sans-serif; }
+      body {
+        margin: 0;
+        font-family: 'Inter', system-ui, sans-serif;
+        background: url('/background.jpg') no-repeat top center;
+        background-size: 1920px 1200px;
+        min-height: 100vh;
+      }
+      #root {
+        max-width: 1920px;
+        margin: 0 auto;
+      }
       @keyframes spin { to { transform: rotate(360deg); } }
     </style>
   </head>
