@@ -1,8 +1,9 @@
 options {
     directory "/var/lib/bind";
 
-    // Hidden primary: answer no queries from outside
-    allow-query { none; };
+    // Hidden primary: only allow queries authenticated via TSIG
+    // (secondaries need this for SOA checks after NOTIFY)
+    allow-query { key tsig-secondary; };
 
     // Only secondaries (via TSIG) may request transfers — enforced per-zone too
     allow-transfer { key tsig-secondary; };
