@@ -53,6 +53,7 @@ jobs:
             --exclude='web/node_modules/' \
             --exclude='api/node_modules/' \
             --exclude='worker/node_modules/' \
+            --exclude='bind/primary/zones/' \
             ./ ${{ vars.SSH_PATH_NS1 }}/
 
       - name: Parse ns2 and ns3 hosts
@@ -159,6 +160,6 @@ jobs:
             mkdir -p bind/primary/zones &&
             chmod 777 bind/primary/zones bind/primary &&
             docker compose pull --quiet 2>/dev/null || true &&
-            docker compose up -d --build --remove-orphans
+            docker compose up -d --build --force-recreate --remove-orphans
           "
 
