@@ -9,7 +9,7 @@ export default function UsersPage() {
   const { user: currentUser, impersonate } = useAuth()
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ email: '', password: '', full_name: '', role: 'customer' })
+  const [form, setForm] = useState({ email: '', password: '', full_name: '', role: 'customer', locale: 'de' })
   const [selectedCustomerIds, setSelectedCustomerIds] = useState<number[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,7 +44,7 @@ export default function UsersPage() {
       } as any)
       qc.invalidateQueries({ queryKey: ['users'] })
       setShowForm(false)
-      setForm({ email: '', password: '', full_name: '', role: 'customer' })
+      setForm({ email: '', password: '', full_name: '', role: 'customer', locale: 'de' })
       setSelectedCustomerIds([])
     } catch (err: any) {
       setError(err.response?.data?.message ?? err.message)
@@ -89,6 +89,13 @@ export default function UsersPage() {
                 <option value="customer">customer</option>
               </select>
             </label>
+            <label style={styles.label}>
+              {t('users_locale')}
+              <select value={form.locale} onChange={e => setField('locale', e.target.value)} style={styles.input}>
+                <option value="de">{t('locale_de')}</option>
+                <option value="en">{t('locale_en')}</option>
+              </select>
+            </label>
           </div>
           <div>
             <div style={{ fontSize: '.875rem', fontWeight: 500, marginBottom: '.25rem' }}>{t('users_customers')}</div>
@@ -122,6 +129,7 @@ export default function UsersPage() {
               <th style={styles.th}>{t('role')}</th>
               <th style={styles.th}>{t('users_customers')}</th>
               <th style={styles.th}>{t('active')}</th>
+              <th style={styles.th}>{t('users_locale')}</th>
               <th style={styles.th}>{t('created')}</th>
               <th style={styles.th}></th>
             </tr>
@@ -134,6 +142,7 @@ export default function UsersPage() {
                 <td style={styles.td}>{roleBadge(u.role)}</td>
                 <td style={styles.td}>{customerNames(u.customer_ids ?? [])}</td>
                 <td style={styles.td}>{u.is_active ? '✓' : '—'}</td>
+                <td style={styles.td}>{u.locale === 'en' ? t('locale_en') : t('locale_de')}</td>
                 <td style={styles.td}>{new Date(u.created_at).toLocaleDateString()}</td>
                 <td style={styles.td}>
                   {currentUser?.role === 'admin' && u.id !== currentUser.sub && (

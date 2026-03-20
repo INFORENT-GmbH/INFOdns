@@ -6,12 +6,13 @@ import { deployZone } from './deployZone.js'
 import { regenerateNamedConf } from './namedConf.js'
 import { pollBulkJobs } from './bulkExecutor.js'
 import { broadcastEvent } from './broadcast.js'
-import { sendJobMail } from './mailer.js'
+import { queueMail, pollMailQueue } from './mailer.js'
 import { existsSync } from 'fs'
 import { join } from 'path'
 
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS ?? 2000)
 const BATCH_SIZE       = Number(process.env.BATCH_SIZE ?? 10)
+const MAIL_ADMIN_TO    = process.env.MAIL_ADMIN_TO ?? ''
 
 const NS_RECORDS: string[] = (process.env.NS_RECORDS ?? '')
   .split(',').map(s => s.trim()).filter(Boolean)
@@ -114,7 +115,9 @@ async function processJob(job: QueueRow): Promise<void> {
 
   const rendered = await queryOne<{ last_rendered_at: string }>('SELECT last_rendered_at FROM domains WHERE id = ?', [domainId])
   broadcastEvent({ type: 'domain_status', domainId, fqdn: domain.fqdn, zone_status: 'clean', last_serial: serial, last_rendered_at: rendered?.last_rendered_at ?? null, zone_error: null })
-  sendJobMail(`[INFOdns] Zone deployed: ${domain.fqdn}`, `Job ${job.id} completed successfully.\n\nDomain: ${domain.fqdn}\nSerial: ${serial}\nRendered at: ${rendered?.last_rendered_at ?? 'unknown'}`)
+  if (MAIL_ADMIN_TO) {
+    queueMail(MAIL_ADMIN_TO, 'zone_deploy_success', { fqdn: domain.fqdn, jobId: job.id, serial, renderedAt: rendered?.last_rendered_at ?? 'unknown' })
+  }
 
   console.log(`[worker] Job ${job.id} done — ${domain.fqdn} serial ${serial}`)
 }
@@ -157,7 +160,9 @@ async function poll(): Promise<void> {
         const failedDomain = await queryOne<{ fqdn: string }>('SELECT fqdn FROM domains WHERE id = ?', [job.domain_id])
         if (failedDomain) {
           broadcastEvent({ type: 'domain_status', domainId: job.domain_id, fqdn: failedDomain.fqdn, zone_status: 'error', zone_error: err.message })
-          sendJobMail(`[INFOdns] Zone deploy FAILED: ${failedDomain.fqdn}`, `Job ${job.id} failed after ${newRetries} retries.\n\nDomain: ${failedDomain.fqdn}\nError: ${err.message}`)
+          if (MAIL_ADMIN_TO) {
+            queueMail(MAIL_ADMIN_TO, 'zone_deploy_failed', { fqdn: failedDomain.fqdn, jobId: job.id, retries: newRetries, error: err.message })
+          }
         }
       } else {
         // Back to pending for retry
@@ -229,6 +234,7 @@ setInterval(syncNamedConf, 60_000)
     try {
       await poll()
       await pollBulkJobs()
+      await pollMailQueue()
     } catch (err: any) {
       console.error('[worker] Poll error:', err.message)
     }

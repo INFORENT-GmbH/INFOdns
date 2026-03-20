@@ -116,6 +116,7 @@ export interface User {
   customer_id: number | null
   customer_ids: number[]
   is_active: number
+  locale: 'en' | 'de'
   created_at: string
 }
 
@@ -245,3 +246,28 @@ export interface AuditLogPage {
 
 export const getAuditLogs = (params?: Record<string, string>) =>
   api.get<AuditLogPage>('/audit-logs', { params })
+
+// Mail queue
+export interface MailQueueItem {
+  id: number
+  to_email: string
+  template: string | null
+  status: 'pending' | 'processing' | 'done' | 'failed'
+  retries: number
+  max_retries: number
+  error: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface MailQueuePage {
+  data: MailQueueItem[]
+  total: number
+  page: number
+  limit: number
+  pages: number
+}
+
+export const getMailQueue = (params?: Record<string, string>) =>
+  api.get<MailQueuePage>('/mail-queue', { params })
+export const retryMail = (id: number) => api.post(`/mail-queue/${id}/retry`)

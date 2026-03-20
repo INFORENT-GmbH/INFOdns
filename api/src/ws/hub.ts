@@ -29,3 +29,4 @@ export type WsEvent =
   | { type: 'bulk_job_progress'; jobId: number; status: string; processed_domains: number; affected_domains: number }
   | { type: 'record_changed'; domainId: number }
   | { type: 'ns_status'; status: Record<string, { ok: boolean; latencyMs: number | null; checkedAt: string }> }
+  | { type: 'mail_queue_update'; mailId: number; status: string; retries?: number; error?: string | null }

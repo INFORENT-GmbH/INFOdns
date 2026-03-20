@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import bcrypt from 'bcrypt'
 import { z } from 'zod'
-import { queryOne } from '../db.js'
+import { queryOne, execute } from '../db.js'
 import {
   generateRefreshToken,
   saveRefreshToken,
@@ -23,6 +23,7 @@ type UserRow = {
   role: 'admin' | 'operator' | 'customer'
   customer_id: number | null
   is_active: number
+  locale: 'en' | 'de'
 }
 
 export async function authRoutes(app: FastifyInstance) {
@@ -32,7 +33,7 @@ export async function authRoutes(app: FastifyInstance) {
     if (!body.success) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: body.error.message })
 
     const user = await queryOne<UserRow>(
-      'SELECT id, email, password_hash, role, customer_id, is_active FROM users WHERE email = ?',
+      'SELECT id, email, password_hash, role, customer_id, is_active, locale FROM users WHERE email = ?',
       [body.data.email]
     )
     if (!user || !user.is_active) return reply.status(401).send({ code: 'INVALID_CREDENTIALS' })
@@ -53,6 +54,18 @@ export async function authRoutes(app: FastifyInstance) {
         maxAge: 7 * 24 * 60 * 60,
       })
       .send({ accessToken })
+
+    // Enqueue login notification email (non-blocking)
+    execute(
+      `INSERT INTO mail_queue (to_email, template, payload) VALUES (?, 'login_notification', ?)`,
+      [user.email, JSON.stringify({
+        _locale: user.locale,
+        email: user.email,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'] ?? 'unknown',
+        timestamp: new Date().toISOString(),
+      })]
+    ).catch(err => console.error('[auth] Failed to enqueue login notification:', err.message))
   })
 
   // POST /auth/refresh  (rate-limited: 30/min per IP — silent refresh on every page load)

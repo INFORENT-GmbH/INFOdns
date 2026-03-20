@@ -6,6 +6,7 @@ type WsEvent =
   | { type: 'bulk_job_progress'; jobId: number; status: string; processed_domains: number; affected_domains: number }
   | { type: 'record_changed'; domainId: number }
   | { type: 'ns_status'; status: Record<string, { ok: boolean; latencyMs: number | null; checkedAt: string }> }
+  | { type: 'mail_queue_update'; mailId: number; status: string; retries?: number; error?: string | null }
 
 export type WsStatus = 'connected' | 'disconnected' | 'reconnecting'
 
@@ -81,6 +82,10 @@ export function useWs(token: string | null): WsStatus {
 
           case 'ns_status':
             qc.setQueryData(['ns-status'], event.status)
+            break
+
+          case 'mail_queue_update':
+            qc.invalidateQueries({ queryKey: ['mail-queue'] })
             break
         }
       }

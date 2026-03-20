@@ -180,6 +180,9 @@ export const translations = {
     users_customerIdOptional: 'Customers (optional)',
     users_noCustomer:  'No customers',
     users_impersonate: 'Impersonate',
+    users_locale:      'Language',
+    locale_en:         'English',
+    locale_de:         'Deutsch',
 
     // Impersonation
     impersonation_active: 'You are impersonating another user.',
@@ -211,6 +214,21 @@ export const translations = {
     zone_clean: 'clean',
     zone_dirty: 'dirty',
     zone_error: 'error',
+
+    // Mail queue
+    nav_mailQueue:         'Mail Queue',
+    mailQueue_title:       'Mail Queue',
+    mailQueue_entries:     'entries',
+    mailQueue_allStatuses: 'All statuses',
+    mailQueue_recipient:   'Recipient',
+    mailQueue_template:    'Template',
+    mailQueue_retries:     'Retries',
+    mailQueue_error:       'Error',
+    mailQueue_noEntries:   'No queued emails',
+    mailQueue_retry:       'Retry',
+    mailQueue_retrying:    'Retrying…',
+    mailQueue_page:        'Page',
+    mailQueue_of:          'of',
 
     // Record modal
     modal_editRecord: 'Edit Record',
@@ -397,6 +415,9 @@ export const translations = {
     users_customerIdOptional: 'Kunden (optional)',
     users_noCustomer:  'Keine Kunden',
     users_impersonate: 'Identität annehmen',
+    users_locale:      'Sprache',
+    locale_en:         'English',
+    locale_de:         'Deutsch',
 
     // Impersonation
     impersonation_active: 'Sie agieren als ein anderer Benutzer.',
@@ -428,6 +449,21 @@ export const translations = {
     zone_clean: 'sauber',
     zone_dirty: 'ausstehend',
     zone_error: 'Fehler',
+
+    // Mail queue
+    nav_mailQueue:         'E-Mail-Warteschlange',
+    mailQueue_title:       'E-Mail-Warteschlange',
+    mailQueue_entries:     'Einträge',
+    mailQueue_allStatuses: 'Alle Status',
+    mailQueue_recipient:   'Empfänger',
+    mailQueue_template:    'Vorlage',
+    mailQueue_retries:     'Versuche',
+    mailQueue_error:       'Fehler',
+    mailQueue_noEntries:   'Keine E-Mails in der Warteschlange',
+    mailQueue_retry:       'Erneut senden',
+    mailQueue_retrying:    'Wird erneut gesendet…',
+    mailQueue_page:        'Seite',
+    mailQueue_of:          'von',
 
     // Record modal
     modal_editRecord: 'Eintrag bearbeiten',

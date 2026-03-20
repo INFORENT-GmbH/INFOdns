@@ -35,6 +35,8 @@ An internal DNS management panel modelled on AutoDNS. Staff and customers manage
 4. Worker updates the catalog zone (RFC 9432) → primary sends NOTIFY → secondaries automatically discover and pull all member zones via AXFR
 5. Worker broadcasts a WebSocket event → UI status badge updates live
 
+**Email notifications** are DB-queued: the API (or worker) inserts a row into `mail_queue` with a template name + JSON payload. The worker poll loop picks it up, renders the HTML template, and sends via SMTP with up to 10 retries. Templates: login notification (per-user, localized en/de), zone deploy success/failure (admin-only).
+
 The Worker is the **only** process that writes zone files or calls rndc.
 
 ---
@@ -97,7 +99,8 @@ INFOdns/
 │       ├── serialNumber.ts     ← YYYYMMDDnn serial inside a DB transaction
 │       ├── bulkExecutor.ts     ← processes approved bulk jobs in batches
 │       ├── broadcast.ts        ← fire-and-forget POST to /internal/broadcast
-│       ├── mailer.ts           ← nodemailer SMTP client, job success/failure emails
+│       ├── mailer.ts           ← mail queue poller (DB-backed, retry up to 10×)
+│       ├── mailTemplates.ts    ← HTML email templates (login notification, zone deploy)
 │       └── db.ts               ← mysql2 pool helpers
 ├── web/                        ← React + Vite SPA
 │   ├── nginx.conf              ← SPA fallback + /api/ proxy + WS upgrade
@@ -486,4 +489,4 @@ docker compose logs -f worker
 | `SMTP_USER` | worker | SMTP username |
 | `SMTP_PASS` | worker | SMTP password |
 | `SMTP_FROM` | worker | From address for outgoing emails |
-| `MAIL_ADMIN_TO` | worker | Recipient for job success/failure notifications |
+| `MAIL_ADMIN_TO` | worker | Recipient for zone deploy success/failure notifications |

@@ -92,6 +92,7 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-}
       MAIL_ADMIN_TO: ${MAIL_ADMIN_TO:-}
     volumes:
       - ./bind/primary/zones:/bind/primary/zones

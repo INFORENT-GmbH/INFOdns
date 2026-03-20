@@ -10,6 +10,7 @@ export type WsEvent =
   | { type: 'domain_status'; domainId: number; fqdn: string; zone_status: string; last_serial?: number; last_rendered_at?: string | null; zone_error?: string | null }
   | { type: 'bulk_job_progress'; jobId: number; status: string; processed_domains: number; affected_domains: number }
   | { type: 'record_changed'; domainId: number }
+  | { type: 'mail_queue_update'; mailId: number; status: string; retries?: number; error?: string | null }
 
 export function broadcastEvent(event: WsEvent): void {
   if (!INTERNAL_SECRET) return

@@ -45,6 +45,7 @@ export default function Layout() {
           {isAdminOrOp && <NavLink to="/customers" style={navStyle}>{t('nav_customers')}</NavLink>}
           {user?.role === 'admin' && <NavLink to="/users" style={navStyle}>{t('nav_users')}</NavLink>}
           <NavLink to="/audit-logs" style={navStyle}>{t('nav_auditLog')}</NavLink>
+          {user?.role === 'admin' && <NavLink to="/mail-queue" style={navStyle}>{t('nav_mailQueue')}</NavLink>}
         </div>
         <div style={styles.right}>
           <button

@@ -10,6 +10,7 @@ import JobsPage from './pages/JobsPage'
 import CustomersPage from './pages/CustomersPage'
 import UsersPage from './pages/UsersPage'
 import AuditLogPage from './pages/AuditLogPage'
+import MailQueuePage from './pages/MailQueuePage'
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000 } } })
 
@@ -47,6 +48,7 @@ export default function App() {
               <Route path="customers" element={<CustomersPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="audit-logs" element={<AuditLogPage />} />
+              <Route path="mail-queue" element={<MailQueuePage />} />
             </Route>
             <Route path="*" element={<Navigate to="/domains" replace />} />
           </Routes>
