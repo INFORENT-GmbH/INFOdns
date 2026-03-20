@@ -66,49 +66,28 @@ async function writePrimaryConf(zones: string[]): Promise<void> {
 
 /**
  * Generate a catalog zone serial that always increments.
- * Reads the current serial from the existing zone file and bumps it.
- * Falls back to YYYYMMDDnn format if no file exists yet.
+ * Uses Unix epoch seconds as the floor so we can never go backwards
+ * even if the container is rebuilt (old YYYYMMDDNN serials are < epoch).
  */
 async function catalogSerial(zonePath: string): Promise<number> {
-  const now = new Date()
-  const date = now.toISOString().slice(0, 10).replace(/-/g, '')
-  const baseSerial = Number(`${date}00`)
+  const epoch = Math.floor(Date.now() / 1000)
 
   try {
     const content = await readFile(zonePath, 'utf8')
-    const match = content.match(/(\d{10})\s*;\s*serial/)
+    const match = content.match(/(\d+)\s*;\s*serial/)
     if (match) {
       const current = Number(match[1])
-      // If same day, increment; if new day, use base
-      return Math.max(current + 1, baseSerial)
+      return Math.max(current + 1, epoch)
     }
   } catch {
     // File doesn't exist yet
   }
-  return baseSerial
+  return epoch
 }
 
 async function deployCatalogZone(zones: string[]): Promise<void> {
   const zonePath = join(ZONE_DIR, `${CATALOG_ZONE}.zone`)
-
-  // Only bump serial when member list actually changed
-  let serial: number
-  try {
-    const existing = await readFile(zonePath, 'utf8')
-    const existingMembers = [...existing.matchAll(/\.zones\s+IN\s+PTR\s+(\S+)/g)]
-      .map(m => m[1]).sort()
-    const newMembers = zones.map(z => `${z}.`).sort()
-    if (existingMembers.join(',') === newMembers.join(',')) {
-      // Same members — keep current serial (no transfer needed)
-      const match = existing.match(/(\d{10})\s*;\s*serial/)
-      serial = match ? Number(match[1]) : await catalogSerial(zonePath)
-    } else {
-      serial = await catalogSerial(zonePath)
-    }
-  } catch {
-    serial = await catalogSerial(zonePath)
-  }
-
+  const serial = await catalogSerial(zonePath)
   const content = renderCatalogZone(CATALOG_ZONE, zones, serial)
   await writeAtomic(zonePath, content)
 }
