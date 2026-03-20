@@ -121,7 +121,7 @@ services:
       - ./bind/primary/named.conf.options:/etc/bind/named.conf.options:ro
       - ./bind/primary/named.conf.local:/etc/bind/named.conf.local
       - ./bind/keys:/etc/bind/keys:ro
-      - ./bind/primary/zones:/var/lib/bind/zones
+      - ./bind/primary/zones:/zones
     ports:
       - "53:53/tcp"       # AXFR zone transfers from secondaries
       - "53:53/udp"       # NOTIFY to secondaries

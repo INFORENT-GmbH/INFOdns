@@ -42,7 +42,7 @@ async function writePrimaryConf(zones: string[]): Promise<void> {
     `// Catalog zone — secondaries discover member zones via this`,
     `zone "${CATALOG_ZONE}" {`,
     `    type primary;`,
-    `    file "/var/lib/bind/zones/${CATALOG_ZONE}.zone";`,
+    `    file "/zones/${CATALOG_ZONE}.zone";`,
     `    allow-transfer { key tsig-secondary; };`,
     `    notify yes;`,
     ...(notifyList ? [`    also-notify { ${notifyList} };`] : []),
@@ -53,7 +53,7 @@ async function writePrimaryConf(zones: string[]): Promise<void> {
   for (const fqdn of zones) {
     lines.push(`zone "${fqdn}" {`)
     lines.push(`    type primary;`)
-    lines.push(`    file "/var/lib/bind/zones/${fqdn}.zone";`)
+    lines.push(`    file "/zones/${fqdn}.zone";`)
     lines.push(`    allow-transfer { key tsig-secondary; };`)
     lines.push(`    notify yes;`)
     if (notifyList) lines.push(`    also-notify { ${notifyList} };`)
