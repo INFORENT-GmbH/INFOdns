@@ -32,7 +32,6 @@ export const translations = {
     active:      'Active',
     created:     'Created',
     name:        'Name',
-    slug:        'Slug',
     status:      'Status',
     domain:      'Domain',
     customer:    'Customer',
@@ -169,7 +168,6 @@ export const translations = {
     customers_add:       '+ Add Customer',
     customers_editTitle: 'Edit Customer',
     customers_newTitle:  'New Customer',
-    customers_slugPh:    'acme-corp',
     customers_deleteConfirm: (name: string) => `Delete customer "${name}"? This cannot be undone.`,
 
     // Users
@@ -285,7 +283,6 @@ export const translations = {
     active:      'Aktiv',
     created:     'Erstellt',
     name:        'Name',
-    slug:        'Kürzel',
     status:      'Status',
     domain:      'Domain',
     customer:    'Kunde',
@@ -422,7 +419,6 @@ export const translations = {
     customers_add:       '+ Kunde hinzufügen',
     customers_editTitle: 'Kunde bearbeiten',
     customers_newTitle:  'Neuer Kunde',
-    customers_slugPh:    'mein-kunde',
     customers_deleteConfirm: (name: string) => `Kunde „${name}" löschen? Dies kann nicht rückgängig gemacht werden.`,
 
     // Users

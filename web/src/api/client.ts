@@ -103,7 +103,6 @@ export interface DnsRecord {
 export interface Customer {
   id: number
   name: string
-  slug: string
   is_active: number
   created_at: string
 }

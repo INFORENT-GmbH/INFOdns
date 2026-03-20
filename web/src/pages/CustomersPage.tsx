@@ -9,7 +9,6 @@ export default function CustomersPage() {
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState<Customer | null>(null)
   const [name, setName] = useState('')
-  const [slug, setSlug] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -19,10 +18,10 @@ export default function CustomersPage() {
   })
 
   function openCreate() {
-    setEditTarget(null); setName(''); setSlug(''); setError(null); setShowForm(true)
+    setEditTarget(null); setName(''); setError(null); setShowForm(true)
   }
   function openEdit(c: Customer) {
-    setEditTarget(c); setName(c.name); setSlug(c.slug); setError(null); setShowForm(true)
+    setEditTarget(c); setName(c.name); setError(null); setShowForm(true)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -30,9 +29,9 @@ export default function CustomersPage() {
     setSaving(true); setError(null)
     try {
       if (editTarget) {
-        await updateCustomer(editTarget.id, { name, slug })
+        await updateCustomer(editTarget.id, { name })
       } else {
-        await createCustomer({ name, slug })
+        await createCustomer({ name })
       }
       qc.invalidateQueries({ queryKey: ['customers'] })
       setShowForm(false)
@@ -64,10 +63,6 @@ export default function CustomersPage() {
             {t('name')}
             <input value={name} onChange={e => setName(e.target.value)} required style={styles.input} />
           </label>
-          <label style={styles.label}>
-            {t('slug')}
-            <input value={slug} onChange={e => setSlug(e.target.value)} required pattern="[a-z0-9-]+" style={styles.input} placeholder={t('customers_slugPh')} />
-          </label>
           <div style={styles.actions}>
             <button type="button" onClick={() => setShowForm(false)} style={styles.btnSecondary}>{t('cancel')}</button>
             <button type="submit" disabled={saving} style={styles.btnPrimary}>{saving ? t('saving') : t('save')}</button>
@@ -80,7 +75,6 @@ export default function CustomersPage() {
           <thead>
             <tr>
               <th style={styles.th}>{t('name')}</th>
-              <th style={styles.th}>{t('slug')}</th>
               <th style={styles.th}>{t('active')}</th>
               <th style={styles.th}>{t('created')}</th>
               <th style={styles.th}></th>
@@ -90,7 +84,6 @@ export default function CustomersPage() {
             {customers.map((c: Customer) => (
               <tr key={c.id} style={styles.tr}>
                 <td style={styles.td}>{c.name}</td>
-                <td style={styles.td}><code>{c.slug}</code></td>
                 <td style={styles.td}>{c.is_active ? '✓' : '—'}</td>
                 <td style={styles.td}>{new Date(c.created_at).toLocaleDateString()}</td>
                 <td style={{ ...styles.td, textAlign: 'right' }}>
