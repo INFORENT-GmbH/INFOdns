@@ -8,6 +8,7 @@ export const translations = {
     nav_customers: 'Customers',
     nav_users:     'Users',
     nav_auditLog:  'Audit Log',
+    nav_logs:      'Logs',
     nav_signOut:   'Sign out',
 
     // Login
@@ -260,6 +261,7 @@ export const translations = {
     nav_customers: 'Kunden',
     nav_users:     'Benutzer',
     nav_auditLog:  'Protokoll',
+    nav_logs:      'Logs',
     nav_signOut:   'Abmelden',
 
     // Login

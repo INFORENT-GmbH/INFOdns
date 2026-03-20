@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useState, useRef } from 'react'
+import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../context/AuthContext'
 import { useWs } from '../hooks/useWs'
@@ -19,6 +19,18 @@ export default function Layout() {
   const navigate = useNavigate()
   const [copiedNs, setCopiedNs] = useState<string | null>(null)
   const [hoveredNs, setHoveredNs] = useState<string | null>(null)
+  const [showLogs, setShowLogs] = useState(false)
+  const logsTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const { pathname } = useLocation()
+  const logsActive = pathname.startsWith('/audit-logs') || pathname.startsWith('/mail-queue')
+
+  function openLogs() {
+    if (logsTimer.current) clearTimeout(logsTimer.current)
+    setShowLogs(true)
+  }
+  function closeLogs() {
+    logsTimer.current = setTimeout(() => setShowLogs(false), 120)
+  }
   const { data: nsStatus } = useQuery({
     queryKey: ['ns-status'],
     queryFn: () => getNsStatus().then(r => r.data),
@@ -37,14 +49,23 @@ export default function Layout() {
   return (
     <div style={styles.shell}>
       <nav style={styles.nav}>
-        <img src="/logo-wide.png" alt="INFOdns" style={styles.brand} />
+        <NavLink to="/domains" style={{ marginRight: 'auto', display: 'flex' }}><img src="/logo-wide.png" alt="INFOdns" style={styles.brand} /></NavLink>
         <div style={styles.links}>
           <NavLink to="/domains" style={navStyle}>{t('nav_domains')}</NavLink>
           <NavLink to="/jobs" style={navStyle}>{t('nav_jobs')}</NavLink>
           {isAdminOrOp && <NavLink to="/customers" style={navStyle}>{t('nav_customers')}</NavLink>}
           {user?.role === 'admin' && <NavLink to="/users" style={navStyle}>{t('nav_users')}</NavLink>}
-          <NavLink to="/audit-logs" style={navStyle}>{t('nav_auditLog')}</NavLink>
-          {user?.role === 'admin' && <NavLink to="/mail-queue" style={navStyle}>{t('nav_mailQueue')}</NavLink>}
+          <div style={{ position: 'relative' }} onMouseEnter={openLogs} onMouseLeave={closeLogs}>
+            <span style={{ ...navStyle({ isActive: logsActive }), cursor: 'pointer', userSelect: 'none' }}>
+              {t('nav_logs')} ▾
+            </span>
+            {showLogs && (
+              <div style={styles.dropdown} onMouseEnter={openLogs} onMouseLeave={closeLogs}>
+                <NavLink to="/audit-logs" style={dropdownItemStyle} onClick={() => setShowLogs(false)}>{t('nav_auditLog')}</NavLink>
+                {user?.role === 'admin' && <NavLink to="/mail-queue" style={dropdownItemStyle} onClick={() => setShowLogs(false)}>{t('nav_mailQueue')}</NavLink>}
+              </div>
+            )}
+          </div>
         </div>
         <div style={styles.right}>
           <button
@@ -119,10 +140,23 @@ function navStyle({ isActive }: { isActive: boolean }): React.CSSProperties {
   }
 }
 
+function dropdownItemStyle({ isActive }: { isActive: boolean }): React.CSSProperties {
+  return {
+    display: 'block',
+    padding: '.5rem .875rem',
+    color: isActive ? '#2563eb' : '#374151',
+    textDecoration: 'none',
+    fontWeight: isActive ? 600 : 400,
+    fontSize: '.875rem',
+    whiteSpace: 'nowrap',
+    background: isActive ? '#eff6ff' : 'transparent',
+  }
+}
+
 const styles: Record<string, React.CSSProperties> = {
   shell:     { display: 'flex', flexDirection: 'column', minHeight: '100vh' },
   nav:       { display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '.75rem 1.5rem', background: '#fff', borderBottom: '1px solid #e5e7eb' },
-  brand:     { height: 32, marginRight: 'auto', display: 'block' },
+  brand:     { height: 42, display: 'block' },
   links:     { display: 'flex', gap: '1.25rem' },
   right:     { display: 'flex', gap: '.5rem', alignItems: 'center' },
   langBtn:   { background: 'none', border: '1px solid #d1d5db', borderRadius: 4, padding: '.25rem .6rem', cursor: 'pointer', fontSize: '.8rem' },
@@ -137,4 +171,5 @@ const styles: Record<string, React.CSSProperties> = {
   wsSpinner: { display: 'inline-block', width: 10, height: 10, border: '2px solid #94a3b8', borderTopColor: '#f8fafc', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 },
   impersonationBar: { display: 'flex', alignItems: 'center', gap: '.75rem', background: '#fbbf24', color: '#78350f', fontSize: '.8125rem', fontWeight: 600, padding: '.5rem 1.5rem', position: 'sticky' as const, top: 0, zIndex: 49 },
   impersonationBtn: { background: '#78350f', color: '#fef3c7', border: 'none', borderRadius: 4, padding: '.25rem .75rem', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' },
+  dropdown:  { position: 'absolute' as const, top: 'calc(100% + 6px)', left: '50%', transform: 'translateX(-50%)', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.08)', zIndex: 100, minWidth: 140 },
 }
