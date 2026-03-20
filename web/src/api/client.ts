@@ -220,6 +220,26 @@ export const getUsers = () => api.get<User[]>('/users')
 export const createUser = (data: Partial<User> & { password: string }) => api.post<User>('/users', data)
 export const updateUser = (id: number, data: Partial<User>) => api.put<User>(`/users/${id}`, data)
 
+// Invites
+export interface PendingInvite {
+  id: number
+  email: string
+  full_name: string
+  role: 'admin' | 'operator' | 'customer'
+  locale: 'en' | 'de'
+  customer_ids: number[]
+  expires_at: string
+  created_at: string
+}
+
+export const getInvites = () => api.get<PendingInvite[]>('/auth/invites')
+export const inviteUser = (data: { email: string; full_name: string; role: string; locale: string; customer_ids: number[] }) =>
+  api.post('/auth/invite', data)
+export const getInvite = (token: string) =>
+  api.get<{ email: string; full_name: string; role: string; locale: string }>(`/auth/invite/${token}`)
+export const acceptInvite = (data: { token: string; password: string }) =>
+  api.post('/auth/accept-invite', data)
+
 // Bulk jobs
 export const getBulkJobs = () => api.get<BulkJob[]>('/bulk-jobs')
 export const createBulkJob = (data: object) => api.post<BulkJob>('/bulk-jobs', data)

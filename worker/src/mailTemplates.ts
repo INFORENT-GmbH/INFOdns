@@ -138,12 +138,60 @@ function zoneDeployFailed(_locale: Locale, p: ZoneDeployFailedPayload): MailCont
   return { subject, html: wrap(subject, bodyHtml), text }
 }
 
+// ── User invite ──────────────────────────────────────────────
+
+interface UserInvitePayload {
+  email: string
+  full_name: string
+  inviteUrl: string
+}
+
+function userInvite(locale: Locale, p: UserInvitePayload): MailContent {
+  const isEn = locale === 'en'
+
+  const subject = isEn
+    ? 'You have been invited to INFOdns'
+    : 'Sie wurden zu INFOdns eingeladen'
+
+  const greeting = p.full_name
+    ? (isEn ? `Hello ${esc(p.full_name)},` : `Hallo ${esc(p.full_name)},`)
+    : (isEn ? 'Hello,' : 'Hallo,')
+
+  const intro = isEn
+    ? 'You have been invited to access <strong>INFOdns</strong>. Click the button below to set your password and activate your account.'
+    : 'Sie wurden eingeladen, auf <strong>INFOdns</strong> zuzugreifen. Klicken Sie auf die Schaltfläche unten, um Ihr Passwort festzulegen und Ihr Konto zu aktivieren.'
+
+  const buttonLabel = isEn ? 'Accept invitation' : 'Einladung annehmen'
+  const expiry = isEn ? 'This link expires in 7 days.' : 'Dieser Link läuft in 7 Tagen ab.'
+  const ignore = isEn
+    ? 'If you did not expect this invitation, you can safely ignore this email.'
+    : 'Wenn Sie diese Einladung nicht erwartet haben, können Sie diese E-Mail ignorieren.'
+
+  const bodyHtml = `<h2>${esc(subject)}</h2>
+<p>${greeting}</p>
+<p>${intro}</p>
+<p style="text-align:center;margin:24px 0">
+  <a href="${esc(p.inviteUrl)}" style="background:#2563eb;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">${esc(buttonLabel)}</a>
+</p>
+<p style="font-size:12px;color:#6b7280">${expiry}<br>${ignore}</p>`
+
+  const text = [
+    subject, '', greeting, '',
+    intro.replace(/<[^>]+>/g, ''), '',
+    `${buttonLabel}: ${p.inviteUrl}`, '',
+    expiry, ignore,
+  ].join('\n')
+
+  return { subject, html: wrap(subject, bodyHtml), text }
+}
+
 // ── Template registry ────────────────────────────────────────
 
 const templates: Record<string, (locale: Locale, payload: any) => MailContent> = {
   login_notification: loginNotification,
   zone_deploy_success: zoneDeploySuccess,
   zone_deploy_failed: zoneDeployFailed,
+  user_invite: userInvite,
 }
 
 export function renderTemplate(template: string, locale: Locale, payload: unknown): MailContent {

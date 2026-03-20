@@ -1,9 +1,11 @@
 import { FastifyInstance } from 'fastify'
 import bcrypt from 'bcrypt'
+import { randomBytes } from 'crypto'
 import { z } from 'zod'
-import { queryOne, execute } from '../db.js'
+import { query, queryOne, execute } from '../db.js'
 import {
   generateRefreshToken,
+  hashToken,
   saveRefreshToken,
   rotateRefreshToken,
   revokeAllForUser,
@@ -14,6 +16,19 @@ import { requireAdmin, requireAuth } from '../middleware/auth.js'
 const LoginBody = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+})
+
+const InviteBody = z.object({
+  email: z.string().email(),
+  full_name: z.string().min(1).max(255),
+  role: z.enum(['admin', 'operator', 'customer']),
+  locale: z.enum(['en', 'de']).optional().default('de'),
+  customer_ids: z.array(z.number().int().positive()).optional().default([]),
+})
+
+const AcceptInviteBody = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8),
 })
 
 type UserRow = {
@@ -142,5 +157,105 @@ export async function authRoutes(app: FastifyInstance) {
     const payload: JwtPayload = { sub: admin.id, role: admin.role, customerId: admin.customer_id }
     const accessToken = app.jwt.sign(payload, { expiresIn: '15m' })
     return { accessToken }
+  })
+
+  // GET /auth/invites  (admin only — list pending invites)
+  app.get('/auth/invites', { preHandler: requireAdmin }, async () => {
+    type Row = { id: number; email: string; full_name: string; role: string; locale: string; customer_ids: string | null; expires_at: string; created_at: string }
+    const rows = await query(
+      'SELECT id, email, full_name, role, locale, customer_ids, expires_at, created_at FROM user_invites WHERE used_at IS NULL AND expires_at > NOW() ORDER BY created_at DESC'
+    ) as Row[]
+    return rows.map(r => ({
+      ...r,
+      customer_ids: r.customer_ids ? JSON.parse(r.customer_ids) as number[] : [],
+    }))
+  })
+
+  // POST /auth/invite  (admin only — send an email invitation)
+  app.post('/auth/invite', { preHandler: requireAdmin }, async (req, reply) => {
+    const body = InviteBody.safeParse(req.body)
+    if (!body.success) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: body.error.message })
+
+    const existing = await queryOne('SELECT id FROM users WHERE email = ?', [body.data.email])
+    if (existing) return reply.status(409).send({ code: 'EMAIL_TAKEN' })
+
+    // Remove any previous unused invite for this address
+    await execute('DELETE FROM user_invites WHERE email = ? AND used_at IS NULL', [body.data.email])
+
+    const token = randomBytes(32).toString('hex')
+    const tokenHash = hashToken(token)
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+    await execute(
+      'INSERT INTO user_invites (email, token_hash, role, full_name, locale, customer_ids, invited_by, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        body.data.email, tokenHash, body.data.role, body.data.full_name,
+        body.data.locale, JSON.stringify(body.data.customer_ids), req.user.sub,
+        expiresAt.toISOString().slice(0, 19).replace('T', ' '),
+      ]
+    )
+
+    const appUrl = process.env.APP_URL ?? 'http://localhost:5173'
+    const inviteUrl = `${appUrl}/accept-invite?token=${token}`
+
+    execute(
+      `INSERT INTO mail_queue (to_email, template, payload) VALUES (?, 'user_invite', ?)`,
+      [body.data.email, JSON.stringify({
+        _locale: body.data.locale,
+        email: body.data.email,
+        full_name: body.data.full_name,
+        inviteUrl,
+      })]
+    ).catch(err => console.error('[auth] Failed to enqueue invite email:', err.message))
+
+    return reply.status(201).send({ ok: true })
+  })
+
+  // GET /auth/invite/:token  (public — validate token and return invite details)
+  app.get<{ Params: { token: string } }>('/auth/invite/:token', async (req, reply) => {
+    const tokenHash = hashToken(req.params.token)
+    type InviteRow = { email: string; full_name: string; role: string; locale: string; expires_at: string; used_at: string | null }
+    const invite = await queryOne<InviteRow>(
+      'SELECT email, full_name, role, locale, expires_at, used_at FROM user_invites WHERE token_hash = ?',
+      [tokenHash]
+    )
+    if (!invite) return reply.status(404).send({ code: 'INVITE_NOT_FOUND' })
+    if (invite.used_at) return reply.status(410).send({ code: 'INVITE_USED' })
+    if (new Date(invite.expires_at) < new Date()) return reply.status(410).send({ code: 'INVITE_EXPIRED' })
+    return { email: invite.email, full_name: invite.full_name, role: invite.role, locale: invite.locale }
+  })
+
+  // POST /auth/accept-invite  (public — set password and activate account)
+  app.post('/auth/accept-invite', async (req, reply) => {
+    const body = AcceptInviteBody.safeParse(req.body)
+    if (!body.success) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: body.error.message })
+
+    const tokenHash = hashToken(body.data.token)
+    type InviteRow = { id: number; email: string; full_name: string; role: 'admin' | 'operator' | 'customer'; locale: 'en' | 'de'; customer_ids: string | null; expires_at: string; used_at: string | null }
+    const invite = await queryOne<InviteRow>(
+      'SELECT id, email, full_name, role, locale, customer_ids, expires_at, used_at FROM user_invites WHERE token_hash = ?',
+      [tokenHash]
+    )
+    if (!invite) return reply.status(404).send({ code: 'INVITE_NOT_FOUND' })
+    if (invite.used_at) return reply.status(410).send({ code: 'INVITE_USED' })
+    if (new Date(invite.expires_at) < new Date()) return reply.status(410).send({ code: 'INVITE_EXPIRED' })
+
+    const existing = await queryOne('SELECT id FROM users WHERE email = ?', [invite.email])
+    if (existing) return reply.status(409).send({ code: 'EMAIL_TAKEN' })
+
+    const hash = await bcrypt.hash(body.data.password, 12)
+    const customerIds: number[] = invite.customer_ids ? JSON.parse(invite.customer_ids) : []
+
+    const result = await execute(
+      'INSERT INTO users (email, password_hash, full_name, role, customer_id, is_active, locale) VALUES (?, ?, ?, ?, ?, 1, ?)',
+      [invite.email, hash, invite.full_name, invite.role, customerIds[0] ?? null, invite.locale]
+    )
+    const userId = result.insertId
+    for (const cid of customerIds) {
+      await execute('INSERT IGNORE INTO user_customers (user_id, customer_id) VALUES (?, ?)', [userId, cid])
+    }
+
+    await execute('UPDATE user_invites SET used_at = NOW() WHERE id = ?', [invite.id])
+    return { ok: true }
   })
 }

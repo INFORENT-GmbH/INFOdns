@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getUsers, createUser, getCustomers, type User } from '../api/client'
+import { getUsers, createUser, inviteUser, getInvites, getCustomers, type User, type PendingInvite } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
 
@@ -14,9 +14,21 @@ export default function UsersPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [showInviteForm, setShowInviteForm] = useState(false)
+  const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', role: 'customer', locale: 'de' })
+  const [inviteCustomerIds, setInviteCustomerIds] = useState<number[]>([])
+  const [inviting, setInviting] = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
+
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: () => getUsers().then(r => r.data),
+  })
+
+  const { data: invites = [] } = useQuery({
+    queryKey: ['invites'],
+    queryFn: () => getInvites().then(r => r.data),
   })
 
   const { data: customers = [] } = useQuery({
@@ -32,6 +44,33 @@ export default function UsersPage() {
     setSelectedCustomerIds(prev =>
       prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
     )
+  }
+
+  function setInviteField(key: string, value: string) {
+    setInviteForm(f => ({ ...f, [key]: value }))
+  }
+
+  function toggleInviteCustomer(id: number) {
+    setInviteCustomerIds(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    )
+  }
+
+  async function handleInvite(e: React.FormEvent) {
+    e.preventDefault()
+    setInviting(true); setInviteError(null); setInviteSuccess(null)
+    try {
+      await inviteUser({ ...inviteForm, customer_ids: inviteCustomerIds })
+      qc.invalidateQueries({ queryKey: ['invites'] })
+      setInviteSuccess(inviteForm.email)
+      setInviteForm({ email: '', full_name: '', role: 'customer', locale: 'de' })
+      setInviteCustomerIds([])
+      setShowInviteForm(false)
+    } catch (err: any) {
+      setInviteError(err.response?.data?.message ?? err.message)
+    } finally {
+      setInviting(false)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -70,8 +109,64 @@ export default function UsersPage() {
     <div>
       <div style={styles.header}>
         <h2 style={styles.h2}>{t('users_title')}</h2>
-        <button onClick={() => setShowForm(v => !v)} style={styles.btnPrimary}>{t('users_add')}</button>
+        <div style={{ display: 'flex', gap: '.5rem' }}>
+          <button
+            onClick={() => { setShowInviteForm(v => !v); setShowForm(false); setInviteSuccess(null) }}
+            style={styles.btnSecondary}
+          >
+            {t('users_invite')}
+          </button>
+          <button onClick={() => { setShowForm(v => !v); setShowInviteForm(false) }} style={styles.btnPrimary}>{t('users_add')}</button>
+        </div>
       </div>
+
+      {inviteSuccess && (
+        <div style={{ background: '#dcfce7', color: '#15803d', padding: '.625rem .875rem', borderRadius: 4, fontSize: '.875rem', marginBottom: '1rem' }}>
+          {t('users_inviteSuccess')} <strong>{inviteSuccess}</strong>
+        </div>
+      )}
+
+      {showInviteForm && (
+        <form onSubmit={handleInvite} style={styles.formCard}>
+          <h4 style={{ margin: 0 }}>{t('users_inviteTitle')}</h4>
+          {inviteError && <div style={styles.error}>{inviteError}</div>}
+          <div style={styles.grid}>
+            <label style={styles.label}>{t('email')} <input type="email" value={inviteForm.email} onChange={e => setInviteField('email', e.target.value)} required style={styles.input} /></label>
+            <label style={styles.label}>{t('users_fullName')} <input value={inviteForm.full_name} onChange={e => setInviteField('full_name', e.target.value)} required style={styles.input} /></label>
+            <label style={styles.label}>
+              {t('role')}
+              <select value={inviteForm.role} onChange={e => setInviteField('role', e.target.value)} style={styles.input}>
+                <option value="admin">admin</option>
+                <option value="operator">operator</option>
+                <option value="customer">customer</option>
+              </select>
+            </label>
+            <label style={styles.label}>
+              {t('users_locale')}
+              <select value={inviteForm.locale} onChange={e => setInviteField('locale', e.target.value)} style={styles.input}>
+                <option value="de">{t('locale_de')}</option>
+                <option value="en">{t('locale_en')}</option>
+              </select>
+            </label>
+          </div>
+          <div>
+            <div style={{ fontSize: '.875rem', fontWeight: 500, marginBottom: '.25rem' }}>{t('users_customers')}</div>
+            <div style={styles.checkboxGrid}>
+              {customers.map(c => (
+                <label key={c.id} style={styles.checkboxLabel}>
+                  <input type="checkbox" checked={inviteCustomerIds.includes(c.id)} onChange={() => toggleInviteCustomer(c.id)} />
+                  {c.name}
+                </label>
+              ))}
+              {customers.length === 0 && <span style={styles.muted}>{t('users_noCustomer')}</span>}
+            </div>
+          </div>
+          <div style={styles.actions}>
+            <button type="button" onClick={() => setShowInviteForm(false)} style={styles.btnSecondary}>{t('cancel')}</button>
+            <button type="submit" disabled={inviting} style={styles.btnPrimary}>{inviting ? t('saving') : t('users_invite')}</button>
+          </div>
+        </form>
+      )}
 
       {showForm && (
         <form onSubmit={handleSubmit} style={styles.formCard}>
@@ -155,6 +250,22 @@ export default function UsersPage() {
                     </button>
                   )}
                 </td>
+              </tr>
+            ))}
+            {invites.map((inv: PendingInvite) => (
+              <tr key={`invite-${inv.id}`} style={{ ...styles.tr, opacity: 0.7 }}>
+                <td style={styles.td}>{inv.email}</td>
+                <td style={{ ...styles.td, color: '#9ca3af' }}>{inv.full_name || <span style={styles.muted}>—</span>}</td>
+                <td style={styles.td}>{roleBadge(inv.role)}</td>
+                <td style={styles.td}>{customerNames(inv.customer_ids ?? [])}</td>
+                <td style={styles.td}>
+                  <span style={{ background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: 12, fontSize: '.75rem', fontWeight: 600 }}>
+                    {t('users_pendingInvite')}
+                  </span>
+                </td>
+                <td style={styles.td}>{inv.locale === 'en' ? t('locale_en') : t('locale_de')}</td>
+                <td style={styles.td}>{new Date(inv.created_at).toLocaleDateString()}</td>
+                <td style={styles.td}></td>
               </tr>
             ))}
           </tbody>

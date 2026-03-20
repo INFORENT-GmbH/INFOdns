@@ -11,6 +11,7 @@ import CustomersPage from './pages/CustomersPage'
 import UsersPage from './pages/UsersPage'
 import AuditLogPage from './pages/AuditLogPage'
 import MailQueuePage from './pages/MailQueuePage'
+import AcceptInvitePage from './pages/AcceptInvitePage'
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000 } } })
 
@@ -33,6 +34,7 @@ export default function App() {
       <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/accept-invite" element={<AcceptInvitePage />} />
             <Route
               path="/"
               element={
