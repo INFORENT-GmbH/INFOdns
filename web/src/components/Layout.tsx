@@ -49,7 +49,7 @@ export default function Layout() {
   return (
     <div style={styles.shell}>
       <nav style={styles.nav}>
-        <NavLink to="/domains" style={{ marginRight: 'auto', display: 'flex' }}><img src="/logo-wide.png" alt="INFOdns" style={styles.brand} /></NavLink>
+        <a href="/domains" style={{ marginRight: 'auto', display: 'flex' }}><img src="/logo-wide.png" alt="INFOdns" style={styles.brand} /></a>
         <div style={styles.links}>
           <NavLink to="/domains" style={navStyle}>{t('nav_domains')}</NavLink>
           <NavLink to="/jobs" style={navStyle}>{t('nav_jobs')}</NavLink>
