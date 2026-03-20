@@ -7,6 +7,8 @@ import { regenerateNamedConf } from './namedConf.js'
 import { pollBulkJobs } from './bulkExecutor.js'
 import { broadcastEvent } from './broadcast.js'
 import { sendJobMail } from './mailer.js'
+import { existsSync } from 'fs'
+import { join } from 'path'
 
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS ?? 2000)
 const BATCH_SIZE       = Number(process.env.BATCH_SIZE ?? 10)
@@ -184,9 +186,38 @@ async function syncNamedConf(): Promise<void> {
   }
 }
 
+// ── Startup: re-queue zones with missing zone files ──────────
+
+const ZONE_DIR = process.env.ZONE_DIR ?? '/bind/primary/zones'
+
+async function requeueMissingZones(): Promise<void> {
+  const rows = await query<{ id: number; fqdn: string }>(
+    "SELECT id, fqdn FROM domains WHERE status = 'active'"
+  )
+  const missing: string[] = []
+  for (const { id, fqdn } of rows) {
+    if (!existsSync(join(ZONE_DIR, `${fqdn}.zone`))) {
+      missing.push(fqdn)
+      await execute("UPDATE domains SET zone_status = 'dirty' WHERE id = ?", [id])
+      await execute(
+        `INSERT INTO zone_render_queue (domain_id, priority)
+         VALUES (?, 5)
+         ON DUPLICATE KEY UPDATE status = 'pending', retries = 0, error = NULL`,
+        [id]
+      )
+    }
+  }
+  if (missing.length > 0) {
+    console.log(`[worker] Re-queued ${missing.length} zones with missing files: ${missing.join(', ')}`)
+  }
+}
+
 // ── Entry point ───────────────────────────────────────────────
 
 console.log('[worker] Starting INFOdns Worker')
+
+// Re-queue any zones missing their zone files (e.g. after redeploy)
+await requeueMissingZones()
 
 // Initial conf sync, then every 60s
 await syncNamedConf()

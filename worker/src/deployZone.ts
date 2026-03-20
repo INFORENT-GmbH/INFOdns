@@ -1,4 +1,4 @@
-import { rename, open } from 'fs/promises'
+import { open } from 'fs/promises'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { join } from 'path'
@@ -10,17 +10,20 @@ const RNDC_HOST     = process.env.BIND_PRIMARY_HOST      ?? 'bind-primary'
 const RNDC_PORT     = process.env.BIND_PRIMARY_RNDC_PORT ?? '953'
 const RNDC_KEY_FILE = process.env.RNDC_KEY_FILE          ?? '/etc/rndc/rndc.key'
 
-/** Write content to a tmp file, fsync, then atomically rename to destPath. */
+/**
+ * Write content to destPath in-place (truncate + write + fsync).
+ * We do NOT use rename because Docker bind-mounted directories are
+ * resolved by inode — rename() creates a new inode that the BIND
+ * container never sees until restarted.
+ */
 export async function writeAtomic(destPath: string, content: string): Promise<void> {
-  const tmpPath = `${destPath}.tmp`
-  const fh = await open(tmpPath, 'w')
+  const fh = await open(destPath, 'w')
   try {
     await fh.writeFile(content, 'utf8')
     await fh.sync()
   } finally {
     await fh.close()
   }
-  await rename(tmpPath, destPath)
 }
 
 /**
