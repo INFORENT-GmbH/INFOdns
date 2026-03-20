@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getUsers, createUser, inviteUser, getInvites, revokeInvite, getCustomers, type User, type PendingInvite } from '../api/client'
+import { getUsers, createUser, updateUser, inviteUser, getInvites, revokeInvite, getCustomers, type User, type PendingInvite } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
 
@@ -20,6 +20,12 @@ export default function UsersPage() {
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
+
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editForm, setEditForm] = useState({ email: '', full_name: '', role: 'customer', locale: 'de', is_active: true })
+  const [editCustomerIds, setEditCustomerIds] = useState<number[]>([])
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
@@ -54,6 +60,37 @@ export default function UsersPage() {
     setInviteCustomerIds(prev =>
       prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
     )
+  }
+
+  function startEdit(u: User) {
+    setEditingId(u.id)
+    setEditForm({ email: u.email, full_name: u.full_name, role: u.role, locale: u.locale, is_active: !!u.is_active })
+    setEditCustomerIds(u.customer_ids ?? [])
+    setEditError(null)
+  }
+
+  function setEditField(key: string, value: string | boolean) {
+    setEditForm(f => ({ ...f, [key]: value }))
+  }
+
+  function toggleEditCustomer(id: number) {
+    setEditCustomerIds(prev =>
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    )
+  }
+
+  async function handleUpdate() {
+    if (!editingId) return
+    setEditSaving(true); setEditError(null)
+    try {
+      await updateUser(editingId, { ...editForm, customer_ids: editCustomerIds } as any)
+      qc.invalidateQueries({ queryKey: ['users'] })
+      setEditingId(null)
+    } catch (err: any) {
+      setEditError(err.response?.data?.message ?? err.message)
+    } finally {
+      setEditSaving(false)
+    }
   }
 
   async function handleInvite(e: React.FormEvent) {
@@ -231,26 +268,84 @@ export default function UsersPage() {
           </thead>
           <tbody>
             {users.map((u: User) => (
-              <tr key={u.id} style={styles.tr}>
-                <td style={styles.td}>{u.email}</td>
-                <td style={styles.td}>{u.full_name}</td>
-                <td style={styles.td}>{roleBadge(u.role)}</td>
-                <td style={styles.td}>{customerNames(u.customer_ids ?? [])}</td>
-                <td style={styles.td}>{u.is_active ? '✓' : '—'}</td>
-                <td style={styles.td}>{u.locale === 'en' ? t('locale_en') : t('locale_de')}</td>
-                <td style={styles.td}>{new Date(u.created_at).toLocaleDateString()}</td>
-                <td style={styles.td}>
-                  {currentUser?.role === 'admin' && u.id !== currentUser.sub && (
-                    <button
-                      onClick={() => impersonate(u.id)}
-                      style={styles.btnImpersonate}
-                      title={t('users_impersonate')}
-                    >
-                      {t('users_impersonate')}
-                    </button>
-                  )}
-                </td>
-              </tr>
+              <React.Fragment key={u.id}>
+                <tr style={styles.tr}>
+                  <td style={styles.td}>{u.email}</td>
+                  <td style={styles.td}>{u.full_name}</td>
+                  <td style={styles.td}>{roleBadge(u.role)}</td>
+                  <td style={styles.td}>{customerNames(u.customer_ids ?? [])}</td>
+                  <td style={styles.td}>{u.is_active ? '✓' : '—'}</td>
+                  <td style={styles.td}>{u.locale === 'en' ? t('locale_en') : t('locale_de')}</td>
+                  <td style={styles.td}>{new Date(u.created_at).toLocaleDateString()}</td>
+                  <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'flex', gap: '.375rem' }}>
+                      <button
+                        onClick={() => editingId === u.id ? setEditingId(null) : startEdit(u)}
+                        style={editingId === u.id ? styles.btnSecondary : styles.btnEdit}
+                      >
+                        {editingId === u.id ? t('cancel') : t('edit')}
+                      </button>
+                      {currentUser?.role === 'admin' && u.id !== currentUser.sub && (
+                        <button
+                          onClick={() => impersonate(u.id)}
+                          style={styles.btnImpersonate}
+                          title={t('users_impersonate')}
+                        >
+                          {t('users_impersonate')}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+                {editingId === u.id && (
+                  <tr key={`${u.id}-edit`}>
+                    <td colSpan={8} style={{ padding: '.75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem', maxWidth: 600 }}>
+                        {editError && <div style={styles.error}>{editError}</div>}
+                        <div style={styles.grid}>
+                          <label style={styles.label}>{t('email')} <input type="email" value={editForm.email} onChange={e => setEditField('email', e.target.value)} style={styles.input} /></label>
+                          <label style={styles.label}>{t('users_fullName')} <input value={editForm.full_name} onChange={e => setEditField('full_name', e.target.value)} style={styles.input} /></label>
+                          <label style={styles.label}>
+                            {t('role')}
+                            <select value={editForm.role} onChange={e => setEditField('role', e.target.value)} style={styles.input}>
+                              <option value="admin">admin</option>
+                              <option value="operator">operator</option>
+                              <option value="customer">customer</option>
+                            </select>
+                          </label>
+                          <label style={styles.label}>
+                            {t('users_locale')}
+                            <select value={editForm.locale} onChange={e => setEditField('locale', e.target.value)} style={styles.input}>
+                              <option value="de">{t('locale_de')}</option>
+                              <option value="en">{t('locale_en')}</option>
+                            </select>
+                          </label>
+                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.875rem', fontWeight: 500, cursor: 'pointer' }}>
+                          <input type="checkbox" checked={editForm.is_active} onChange={e => setEditField('is_active', e.target.checked)} />
+                          {t('active')}
+                        </label>
+                        <div>
+                          <div style={{ fontSize: '.875rem', fontWeight: 500, marginBottom: '.25rem' }}>{t('users_customers')}</div>
+                          <div style={styles.checkboxGrid}>
+                            {customers.map(c => (
+                              <label key={c.id} style={styles.checkboxLabel}>
+                                <input type="checkbox" checked={editCustomerIds.includes(c.id)} onChange={() => toggleEditCustomer(c.id)} />
+                                {c.name}
+                              </label>
+                            ))}
+                            {customers.length === 0 && <span style={styles.muted}>{t('users_noCustomer')}</span>}
+                          </div>
+                        </div>
+                        <div style={styles.actions}>
+                          <button type="button" onClick={() => setEditingId(null)} style={styles.btnSecondary}>{t('cancel')}</button>
+                          <button type="button" onClick={handleUpdate} disabled={editSaving} style={styles.btnPrimary}>{editSaving ? t('saving') : t('save')}</button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
             {invites.map((inv: PendingInvite) => (
               <tr key={`invite-${inv.id}`} style={{ ...styles.tr, opacity: 0.7 }}>
@@ -300,6 +395,7 @@ const styles: Record<string, React.CSSProperties> = {
   tr: { borderBottom: '1px solid #e5e7eb' },
   td: { padding: '.625rem .75rem', fontSize: '.875rem' },
   muted: { color: '#9ca3af' },
+  btnEdit:        { padding: '.25rem .5rem', background: '#fff', border: '1px solid #2563eb', color: '#2563eb', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
   btnImpersonate: { padding: '.25rem .5rem', background: '#fbbf24', color: '#78350f', border: 'none', borderRadius: 4, fontSize: '.75rem', fontWeight: 600, cursor: 'pointer' },
   btnRevoke:      { padding: '.25rem .5rem', background: '#fff', border: '1px solid #d1d5db', color: '#6b7280', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
 }
