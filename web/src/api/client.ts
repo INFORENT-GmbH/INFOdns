@@ -233,6 +233,7 @@ export interface PendingInvite {
 }
 
 export const getInvites = () => api.get<PendingInvite[]>('/auth/invites')
+export const revokeInvite = (id: number) => api.delete(`/auth/invites/${id}`)
 export const inviteUser = (data: { email: string; full_name: string; role: string; locale: string; customer_ids: number[] }) =>
   api.post('/auth/invite', data)
 export const getInvite = (token: string) =>

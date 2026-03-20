@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getUsers, createUser, inviteUser, getInvites, getCustomers, type User, type PendingInvite } from '../api/client'
+import { getUsers, createUser, inviteUser, getInvites, revokeInvite, getCustomers, type User, type PendingInvite } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
 
@@ -265,7 +265,14 @@ export default function UsersPage() {
                 </td>
                 <td style={styles.td}>{inv.locale === 'en' ? t('locale_en') : t('locale_de')}</td>
                 <td style={styles.td}>{new Date(inv.created_at).toLocaleDateString()}</td>
-                <td style={styles.td}></td>
+                <td style={styles.td}>
+                  <button
+                    style={styles.btnRevoke}
+                    onClick={() => revokeInvite(inv.id).then(() => qc.invalidateQueries({ queryKey: ['invites'] }))}
+                  >
+                    {t('users_revokeInvite')}
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -294,4 +301,5 @@ const styles: Record<string, React.CSSProperties> = {
   td: { padding: '.625rem .75rem', fontSize: '.875rem' },
   muted: { color: '#9ca3af' },
   btnImpersonate: { padding: '.25rem .5rem', background: '#fbbf24', color: '#78350f', border: 'none', borderRadius: 4, fontSize: '.75rem', fontWeight: 600, cursor: 'pointer' },
+  btnRevoke:      { padding: '.25rem .5rem', background: '#fff', border: '1px solid #d1d5db', color: '#6b7280', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
 }

@@ -171,6 +171,14 @@ export async function authRoutes(app: FastifyInstance) {
     }))
   })
 
+  // DELETE /auth/invites/:id  (admin only — revoke a pending invite)
+  app.delete<{ Params: { id: string } }>('/auth/invites/:id', { preHandler: requireAdmin }, async (req, reply) => {
+    const id = Number(req.params.id)
+    if (!Number.isInteger(id) || id <= 0) return reply.status(400).send({ code: 'INVALID_ID' })
+    await execute('DELETE FROM user_invites WHERE id = ? AND used_at IS NULL', [id])
+    return { ok: true }
+  })
+
   // POST /auth/invite  (admin only — send an email invitation)
   app.post('/auth/invite', { preHandler: requireAdmin }, async (req, reply) => {
     const body = InviteBody.safeParse(req.body)

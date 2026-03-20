@@ -187,6 +187,7 @@ export const translations = {
     users_inviteTitle:     'Invite User',
     users_inviteSuccess:   'Invitation sent to',
     users_pendingInvite:   'invited',
+    users_revokeInvite:    'Revoke',
     // Invite accept page
     invite_password:        'Set password',
     invite_confirmPassword: 'Confirm password',
@@ -438,6 +439,7 @@ export const translations = {
     users_inviteTitle:     'Benutzer einladen',
     users_inviteSuccess:   'Einladung gesendet an',
     users_pendingInvite:   'eingeladen',
+    users_revokeInvite:    'Widerrufen',
     // Invite accept page
     invite_password:        'Passwort festlegen',
     invite_confirmPassword: 'Passwort bestätigen',
