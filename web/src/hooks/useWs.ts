@@ -7,6 +7,9 @@ type WsEvent =
   | { type: 'record_changed'; domainId: number }
   | { type: 'ns_status'; status: Record<string, { ok: boolean; latencyMs: number | null; checkedAt: string }> }
   | { type: 'mail_queue_update'; mailId: number; status: string; retries?: number; error?: string | null }
+  | { type: 'ticket_created'; ticketId: number }
+  | { type: 'ticket_updated'; ticketId: number }
+  | { type: 'ticket_message_added'; ticketId: number }
 
 export type WsStatus = 'connected' | 'disconnected' | 'reconnecting'
 
@@ -86,6 +89,19 @@ export function useWs(token: string | null): WsStatus {
 
           case 'mail_queue_update':
             qc.invalidateQueries({ queryKey: ['mail-queue'] })
+            break
+
+          case 'ticket_created':
+            qc.invalidateQueries({ queryKey: ['tickets'] })
+            break
+
+          case 'ticket_updated':
+            qc.invalidateQueries({ queryKey: ['tickets'] })
+            qc.invalidateQueries({ queryKey: ['ticket', event.ticketId] })
+            break
+
+          case 'ticket_message_added':
+            qc.invalidateQueries({ queryKey: ['ticket', event.ticketId] })
             break
         }
       }

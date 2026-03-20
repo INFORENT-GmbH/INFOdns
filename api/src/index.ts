@@ -16,6 +16,7 @@ import { wsRoutes } from './ws/routes.js'
 import { internalRoutes } from './ws/internal.js'
 import { nsStatusRoutes, startNsStatusPoller } from './ns-status/index.js'
 import { mailQueueRoutes } from './mail-queue/routes.js'
+import { ticketRoutes } from './tickets/routes.js'
 
 const app = Fastify({ logger: true, trustProxy: true })
 
@@ -65,6 +66,7 @@ await app.register(async (v1) => {
   await v1.register(wsRoutes)
   await v1.register(nsStatusRoutes)
   await v1.register(mailQueueRoutes)
+  await v1.register(ticketRoutes)
 }, { prefix: '/api/v1' })
 
 // ── Start ────────────────────────────────────────────────────

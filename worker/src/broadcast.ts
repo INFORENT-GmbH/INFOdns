@@ -11,6 +11,9 @@ export type WsEvent =
   | { type: 'bulk_job_progress'; jobId: number; status: string; processed_domains: number; affected_domains: number }
   | { type: 'record_changed'; domainId: number }
   | { type: 'mail_queue_update'; mailId: number; status: string; retries?: number; error?: string | null }
+  | { type: 'ticket_created'; ticketId: number }
+  | { type: 'ticket_updated'; ticketId: number }
+  | { type: 'ticket_message_added'; ticketId: number }
 
 export function broadcastEvent(event: WsEvent): void {
   if (!INTERNAL_SECRET) return

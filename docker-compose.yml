@@ -94,6 +94,14 @@ services:
       SMTP_FROM: ${SMTP_FROM:-}
       MAIL_FROM_NAME: ${MAIL_FROM_NAME:-}
       MAIL_ADMIN_TO: ${MAIL_ADMIN_TO:-}
+      POP3_ENABLED: ${POP3_ENABLED:-false}
+      POP3_HOST: ${POP3_HOST:-}
+      POP3_PORT: ${POP3_PORT:-995}
+      POP3_USER: ${POP3_USER:-}
+      POP3_PASS: ${POP3_PASS:-}
+      POP3_TLS: ${POP3_TLS:-true}
+      POP3_POLL_INTERVAL_SECONDS: ${POP3_POLL_INTERVAL_SECONDS:-60}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
     volumes:
       - ./bind/primary/zones:/bind/primary/zones
       - ./bind/primary:/bind/primary/conf

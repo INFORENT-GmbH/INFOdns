@@ -185,6 +185,104 @@ function userInvite(locale: Locale, p: UserInvitePayload): MailContent {
   return { subject, html: wrap(subject, bodyHtml), text }
 }
 
+// ── Ticket created ───────────────────────────────────────────
+
+interface TicketCreatedPayload {
+  ticketId: number
+  subject: string
+  requesterName: string
+  portalUrl: string
+}
+
+function ticketCreated(locale: Locale, p: TicketCreatedPayload): MailContent {
+  const isEn = locale === 'en'
+  const ref = `[#${p.ticketId}]`
+  const subject = isEn
+    ? `Your support request has been received ${ref}`
+    : `Ihre Supportanfrage wurde erhalten ${ref}`
+
+  const greeting = p.requesterName
+    ? (isEn ? `Hello ${esc(p.requesterName)},` : `Hallo ${esc(p.requesterName)},`)
+    : (isEn ? 'Hello,' : 'Hallo,')
+
+  const intro = isEn
+    ? `We have received your support request and will get back to you shortly.`
+    : `Wir haben Ihre Supportanfrage erhalten und werden uns in Kürze bei Ihnen melden.`
+
+  const replyHint = isEn
+    ? `You can reply to this email to add more information, or visit the support portal.`
+    : `Sie können auf diese E-Mail antworten, um weitere Informationen hinzuzufügen, oder das Supportportal besuchen.`
+
+  const bodyHtml = `<h2>${isEn ? 'Support request received' : 'Supportanfrage erhalten'}</h2>
+<p>${greeting}</p>
+<p>${intro}</p>
+${infoTable([
+  [isEn ? 'Ticket number' : 'Ticketnummer', ref],
+  [isEn ? 'Subject' : 'Betreff', p.subject],
+])}
+<p>${replyHint}</p>`
+
+  const text = [subject, '', greeting, '', intro, '', `Ticket: ${ref}`, `Subject: ${p.subject}`, '', replyHint].join('\n')
+  return { subject, html: wrap(subject, bodyHtml), text }
+}
+
+// ── Ticket reply ─────────────────────────────────────────────
+
+interface TicketReplyPayload {
+  ticketId: number
+  subject: string
+  staffName: string
+  messageBody: string
+  portalUrl: string
+}
+
+function ticketReply(locale: Locale, p: TicketReplyPayload): MailContent {
+  const isEn = locale === 'en'
+  const ref = `[#${p.ticketId}]`
+  const subject = `Re: ${ref} ${p.subject}`
+
+  const intro = isEn
+    ? `${esc(p.staffName)} has replied to your support request ${ref}.`
+    : `${esc(p.staffName)} hat auf Ihre Supportanfrage ${ref} geantwortet.`
+
+  const bodyHtml = `<h2>${isEn ? 'New reply to your support request' : 'Neue Antwort auf Ihre Supportanfrage'}</h2>
+<p>${intro}</p>
+<div style="border-left:3px solid #2563eb;padding:8px 16px;margin:16px 0;background:#f0f7ff">
+  <p style="margin:0;white-space:pre-wrap">${esc(p.messageBody)}</p>
+</div>
+<p style="font-size:12px;color:#6b7280">${isEn ? 'Reply to this email to respond.' : 'Antworten Sie auf diese E-Mail, um zu antworten.'}</p>`
+
+  const text = [subject, '', intro, '', p.messageBody].join('\n')
+  return { subject, html: wrap(subject, bodyHtml), text }
+}
+
+// ── Ticket assigned ──────────────────────────────────────────
+
+interface TicketAssignedPayload {
+  ticketId: number
+  subject: string
+  requesterEmail: string
+  priority: string
+  portalUrl: string
+}
+
+function ticketAssigned(_locale: Locale, p: TicketAssignedPayload): MailContent {
+  const ref = `[#${p.ticketId}]`
+  const subject = `[INFOdns Support] Ticket ${ref} assigned to you`
+
+  const bodyHtml = `<h2>Ticket assigned to you</h2>
+<p>A support ticket has been assigned to you.</p>
+${infoTable([
+  ['Ticket', ref],
+  ['Subject', p.subject],
+  ['Requester', p.requesterEmail],
+  ['Priority', p.priority],
+])}`
+
+  const text = [`Ticket ${ref} assigned to you`, '', `Subject: ${p.subject}`, `Requester: ${p.requesterEmail}`, `Priority: ${p.priority}`].join('\n')
+  return { subject, html: wrap(subject, bodyHtml), text }
+}
+
 // ── Template registry ────────────────────────────────────────
 
 const templates: Record<string, (locale: Locale, payload: any) => MailContent> = {
@@ -192,6 +290,9 @@ const templates: Record<string, (locale: Locale, payload: any) => MailContent> =
   zone_deploy_success: zoneDeploySuccess,
   zone_deploy_failed: zoneDeployFailed,
   user_invite: userInvite,
+  ticket_created: ticketCreated,
+  ticket_reply: ticketReply,
+  ticket_assigned: ticketAssigned,
 }
 
 export function renderTemplate(template: string, locale: Locale, payload: unknown): MailContent {

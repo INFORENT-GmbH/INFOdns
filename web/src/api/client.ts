@@ -291,3 +291,59 @@ export interface MailQueuePage {
 export const getMailQueue = (params?: Record<string, string>) =>
   api.get<MailQueuePage>('/mail-queue', { params })
 export const retryMail = (id: number) => api.post(`/mail-queue/${id}/retry`)
+
+// Tickets
+export interface Ticket {
+  id: number
+  subject: string
+  status: 'open' | 'in_progress' | 'waiting' | 'closed'
+  priority: 'low' | 'normal' | 'high' | 'urgent'
+  requester_email: string
+  requester_name: string
+  customer_id: number | null
+  assigned_to: number | null
+  assigned_to_name: string | null
+  source: 'web' | 'email'
+  message_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface TicketMessage {
+  id: number
+  ticket_id: number
+  author_user_id: number | null
+  author_name: string
+  author_email: string
+  body: string
+  is_internal: number
+  source: 'web' | 'email'
+  created_at: string
+}
+
+export interface TicketDetail extends Ticket {
+  messages: TicketMessage[]
+}
+
+export interface TicketListPage {
+  data: Ticket[]
+  total: number
+  page: number
+  limit: number
+  pages: number
+}
+
+export const getTickets = (params?: Record<string, string>) =>
+  api.get<TicketListPage>('/tickets', { params })
+
+export const getTicket = (id: number) =>
+  api.get<TicketDetail>(`/tickets/${id}`)
+
+export const createTicket = (data: { subject: string; body: string; priority?: string }) =>
+  api.post<{ id: number }>('/tickets', data)
+
+export const updateTicket = (id: number, data: { status?: string; priority?: string; assigned_to?: number | null }) =>
+  api.put(`/tickets/${id}`, data)
+
+export const addTicketMessage = (id: number, data: { body: string; is_internal?: boolean }) =>
+  api.post<{ id: number }>(`/tickets/${id}/messages`, data)
