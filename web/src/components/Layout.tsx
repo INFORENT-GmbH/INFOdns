@@ -5,7 +5,6 @@ import { useAuth } from '../context/AuthContext'
 import { useWs } from '../hooks/useWs'
 import { useI18n } from '../i18n/I18nContext'
 import { getNsStatus } from '../api/client'
-import logo from '../assets/logo.png'
 
 const nsLabels: Record<string, { display: string; fqdn?: string }> = {
   ns1: { display: 'primary' },
@@ -38,7 +37,7 @@ export default function Layout() {
   return (
     <div style={styles.shell}>
       <nav style={styles.nav}>
-        <img src={logo} alt="INFOdns" style={styles.brand} />
+        <img src="/logo-wide.png" alt="INFOdns" style={styles.brand} />
         <div style={styles.links}>
           <NavLink to="/domains" style={navStyle}>{t('nav_domains')}</NavLink>
           <NavLink to="/jobs" style={navStyle}>{t('nav_jobs')}</NavLink>

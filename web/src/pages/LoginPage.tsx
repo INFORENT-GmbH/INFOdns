@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
-import logo from '../assets/logo.png'
 
 export default function LoginPage() {
   const { login } = useAuth()
@@ -33,7 +32,7 @@ export default function LoginPage() {
         {locale === 'de' ? 'EN' : 'DE'}
       </button>
       <form onSubmit={handleSubmit} style={styles.card}>
-        <img src={logo} alt="INFOdns" style={styles.logo} />
+        <img src="/logo.png" alt="INFOdns" style={styles.logo} />
         {error && <div style={styles.error}>{error}</div>}
         <label style={styles.label}>
           {t('login_email')}
