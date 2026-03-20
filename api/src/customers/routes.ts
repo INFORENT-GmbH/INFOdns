@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { query, queryOne, execute } from '../db.js'
-import { requireAuth, requireAdmin, requireOperatorOrAdmin } from '../middleware/auth.js'
+import { requireAuth, requireAdmin } from '../middleware/auth.js'
 import { writeAuditLog } from '../audit/middleware.js'
 
 const CustomerBody = z.object({
@@ -12,7 +12,7 @@ const CustomerBody = z.object({
 
 export async function customerRoutes(app: FastifyInstance) {
   // GET /customers
-  app.get('/customers', { preHandler: requireOperatorOrAdmin }, async (req: any, reply) => {
+  app.get('/customers', { preHandler: requireAuth }, async (req: any, reply) => {
     if (req.user.role === 'admin') {
       return query('SELECT id, name, slug, is_active, created_at FROM customers ORDER BY name')
     }

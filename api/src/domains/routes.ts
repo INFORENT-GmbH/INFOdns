@@ -148,10 +148,19 @@ export async function domainRoutes(app: FastifyInstance) {
     return rows.map((r: any) => ({ ...r, labels: labelMap.get(r.id) ?? [] }))
   })
 
-  // POST /domains  (operator/admin; customer creates via operator)
-  app.post('/domains', { preHandler: requireOperatorOrAdmin }, async (req, reply) => {
+  // POST /domains
+  app.post('/domains', { preHandler: requireAuth }, async (req: any, reply) => {
     const body = CreateDomainBody.safeParse(req.body)
     if (!body.success) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: body.error.message })
+
+    // Non-admin/operator users can only create domains for their own customers
+    if (!['admin', 'operator'].includes(req.user.role)) {
+      const owned = await queryOne(
+        'SELECT 1 FROM user_customers WHERE user_id = ? AND customer_id = ?',
+        [req.user.sub, body.data.customer_id]
+      )
+      if (!owned) return reply.status(403).send({ code: 'FORBIDDEN' })
+    }
 
     const existing = await queryOne('SELECT id FROM domains WHERE fqdn = ?', [body.data.fqdn])
     if (existing) return reply.status(409).send({ code: 'FQDN_TAKEN' })

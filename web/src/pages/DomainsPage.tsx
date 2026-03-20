@@ -46,7 +46,6 @@ export default function DomainsPage() {
   const [colDropdownOpen, setColDropdownOpen] = useState(false)
   const colDropdownRef = useRef<HTMLDivElement>(null)
 
-  const isAdminOrOp = user?.role === 'admin' || user?.role === 'operator'
 
   const { data: labelSuggestions = [] } = useQuery({
     queryKey: ['label-suggestions'],
@@ -57,7 +56,7 @@ export default function DomainsPage() {
   const { data: customers = [] } = useQuery({
     queryKey: ['customers'],
     queryFn: () => getCustomers().then(r => r.data),
-    enabled: isAdminOrOp,
+    enabled: !!user,
   })
 
   const { data: domains = [], isLoading, error, refetch } = useQuery({
@@ -203,11 +202,9 @@ export default function DomainsPage() {
               </div>
             )}
           </div>
-          {isAdminOrOp && (
-            <button onClick={() => setShowCreate(v => !v)} style={styles.btnPrimary}>
-              {t('domains_addDomain')}
-            </button>
-          )}
+          <button onClick={() => setShowCreate(v => !v)} style={styles.btnPrimary}>
+            {t('domains_addDomain')}
+          </button>
         </div>
       </div>
 
