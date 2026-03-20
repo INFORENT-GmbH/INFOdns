@@ -265,7 +265,6 @@ export default function JobsPage() {
   const qc = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const [expanded, setExpanded]     = useState<number | null>(null)
-  const [autoRefresh, setAutoRefresh] = useState(true)
   const [showWizard, setShowWizard] = useState(false)
   const [step, setStep]             = useState<Step>('search')
 
@@ -300,7 +299,6 @@ export default function JobsPage() {
   const { data: jobs = [], isLoading } = useQuery<BulkJob[]>({
     queryKey: ['bulk-jobs'],
     queryFn: () => getBulkJobs().then(r => r.data),
-    refetchInterval: autoRefresh ? 5000 : false,
   })
 
   const { data: searchResults = [], isFetching: searching } = useQuery<SearchResult[]>({
@@ -415,15 +413,6 @@ export default function JobsPage() {
           {activeJobs.length > 0 && (
             <span style={styles.activeBadge}>{activeJobs.length} active</span>
           )}
-          <label style={styles.toggleLabel}>
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={e => setAutoRefresh(e.target.checked)}
-              style={{ marginRight: '.35rem' }}
-            />
-            {t('jobs_autoRefresh')}
-          </label>
           <button onClick={() => setShowWizard(true)} style={styles.btnPrimary}>{t('bulk_newJob')}</button>
         </div>
       </div>
@@ -718,7 +707,6 @@ const styles: Record<string, React.CSSProperties> = {
   header:       { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' },
   h2:           { margin: 0, fontSize: '1.25rem', fontWeight: 700 },
   activeBadge:  { background: '#ede9fe', color: '#6d28d9', padding: '2px 10px', borderRadius: 12, fontSize: '.75rem', fontWeight: 600 },
-  toggleLabel:  { display: 'flex', alignItems: 'center', fontSize: '.8125rem', color: '#6b7280', cursor: 'pointer' },
   muted:        { color: '#9ca3af', margin: 0 },
   wizardCard:   { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '1.5rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: 760 },
   wizardTitle:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
