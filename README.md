@@ -265,7 +265,7 @@ The worker polls every 2 seconds and processes pending jobs:
 3. **Serial** — `SELECT last_serial FOR UPDATE`, compute `YYYYMMDDnn`, update atomically
 4. **Render** — pure TypeScript function builds the zone file string: `$ORIGIN`, `$TTL`, SOA, NS records (from env), then all records
 5. **Validate** — `named-checkzone <fqdn> <tmpfile>` — non-zero exit marks the job failed
-6. **Sync conf** — regenerate `named.conf.local` for the primary, render + deploy the catalog zone (RFC 9432), and run `rndc reconfig` + `rndc reload catalog.dns.inforent.de` — ensures newly created domains are known to BIND before reload. Secondaries discover new zones automatically via the catalog zone (no manual config needed).
+6. **Sync conf** — regenerate `named.conf.local` for the primary, render + deploy the catalog zone (RFC 9432), and run `rndc reconfig` + `rndc reload catalog.dns.inforant.de` — ensures newly created domains are known to BIND before reload. Secondaries discover new zones automatically via the catalog zone (no manual config needed).
 7. **Deploy** — write to `<fqdn>.zone.tmp`, then `rename()` to `<fqdn>.zone` (atomic)
 8. **Reload** — `rndc -s bind-primary -p 953 reload <fqdn>`
 9. **Mark clean** — update `domains.zone_status = 'clean'`, queue row `status = 'done'`

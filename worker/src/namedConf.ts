@@ -1,4 +1,4 @@
-import { open } from 'fs/promises'
+import { open, readFile } from 'fs/promises'
 import { join } from 'path'
 import { rndcReconfig, rndcReload } from './deployZone.js'
 import { renderCatalogZone } from './catalogZone.js'
@@ -65,20 +65,47 @@ async function writePrimaryConf(zones: string[]): Promise<void> {
 }
 
 /**
- * Generate a simple incrementing serial from current time (YYYYMMDDnn format).
+ * Generate a catalog zone serial that always increments.
+ * Reads the current serial from the existing zone file and bumps it.
+ * Falls back to YYYYMMDDnn format if no file exists yet.
  */
-function catalogSerial(): number {
+async function catalogSerial(zonePath: string): Promise<number> {
   const now = new Date()
   const date = now.toISOString().slice(0, 10).replace(/-/g, '')
-  // Use hours+minutes as the nn portion to allow multiple updates per day
-  const nn = String(now.getUTCHours() * 2 + (now.getUTCMinutes() >= 30 ? 1 : 0)).padStart(2, '0')
-  return Number(`${date}${nn}`)
+  const baseSerial = Number(`${date}00`)
+
+  try {
+    const content = await readFile(zonePath, 'utf8')
+    const match = content.match(/(\d{10})\s*;\s*serial/)
+    if (match) {
+      const current = Number(match[1])
+      // If same day, increment; if new day, use base
+      return Math.max(current + 1, baseSerial)
+    }
+  } catch {
+    // File doesn't exist yet
+  }
+  return baseSerial
 }
 
 async function deployCatalogZone(zones: string[]): Promise<void> {
-  const serial = catalogSerial()
-  const content = renderCatalogZone(CATALOG_ZONE, zones, serial)
   const zonePath = join(ZONE_DIR, `${CATALOG_ZONE}.zone`)
+
+  // Check if member list actually changed before bumping serial
+  try {
+    const existing = await readFile(zonePath, 'utf8')
+    const existingMembers = [...existing.matchAll(/\.zones\s+IN\s+PTR\s+(\S+)/g)]
+      .map(m => m[1]).sort()
+    const newMembers = zones.map(z => `${z}.`).sort()
+    if (existingMembers.join(',') === newMembers.join(',')) {
+      return // No change — skip rewrite to avoid stale-serial warnings
+    }
+  } catch {
+    // File doesn't exist — write it
+  }
+
+  const serial = await catalogSerial(zonePath)
+  const content = renderCatalogZone(CATALOG_ZONE, zones, serial)
   await writeAtomic(zonePath, content)
 }
 
