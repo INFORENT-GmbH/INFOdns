@@ -126,6 +126,7 @@ export async function processBulkJob(job: BulkJob): Promise<void> {
         "UPDATE bulk_job_domains SET status = 'done' WHERE id = ?",
         [row.id]
       )
+      broadcastEvent({ type: 'record_changed', domainId: row.domain_id })
     } catch (err: any) {
       console.error(`[worker] Bulk job ${job.id} domain ${row.domain_id} failed:`, err.message)
       await execute(

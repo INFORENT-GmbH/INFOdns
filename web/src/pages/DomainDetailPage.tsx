@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext'
 const INLINE_STYLES = `
   .inline-field:hover { border-color: #d1d5db !important; background: #fff !important; }
   .inline-field:focus { border-color: #2563eb !important; background: #fff !important; outline: none !important; box-shadow: 0 0 0 2px #bfdbfe; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 `
 
 const RECORD_TYPES = ['A','AAAA','CNAME','MX','NS','TXT','SRV','CAA','PTR','NAPTR','TLSA','SSHFP','DS']
@@ -79,6 +80,8 @@ export default function DomainDetailPage() {
   const [applying, setApplying] = useState(false)
   const applyingRef = useRef(false)
   const [applyError, setApplyError] = useState<string | null>(null)
+  const [pendingRefresh, setPendingRefresh] = useState(false)
+  const pendingRefreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const [labelKey, setLabelKey] = useState('')
   const [labelValue, setLabelValue] = useState('')
@@ -97,10 +100,19 @@ export default function DomainDetailPage() {
     queryFn: () => getDomain(domainId).then(r => r.data),
   })
 
-  const { data: records = [], isLoading: loadingRecords } = useQuery({
+  const { data: records = [], isLoading: loadingRecords, dataUpdatedAt } = useQuery({
     queryKey: ['records', domainId],
     queryFn: () => getRecords(domainId).then(r => r.data),
   })
+
+  // Clear pendingRefresh when records data actually updates (WS-triggered refetch completed)
+  useEffect(() => {
+    if (pendingRefresh) {
+      setPendingRefresh(false)
+      clearTimeout(pendingRefreshTimer.current)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataUpdatedAt])
 
   const { data: labelSuggestions = [] } = useQuery({
     queryKey: ['label-suggestions', domain?.customer_id],
@@ -229,12 +241,17 @@ export default function DomainDetailPage() {
         await approveBulkJob(job.data.id)
       }
 
+      const hadEdits = dirtyIds.length > 0
       const submittedIds = new Set(rowsToCreate.map(r => r._newId))
       setEdits({})
       setPendingDeletes(new Set())
       setNewRows(prev => prev.filter(r => !submittedIds.has(r._newId)))
       qc.invalidateQueries({ queryKey: ['records', domainId] })
       qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      if (hadEdits) {
+        setPendingRefresh(true)
+        pendingRefreshTimer.current = setTimeout(() => setPendingRefresh(false), 8_000)
+      }
     } catch (e: unknown) {
       const err = e as { response?: { data?: { message?: string; error?: string } }; message?: string }
       const data = err?.response?.data
@@ -466,7 +483,14 @@ export default function DomainDetailPage() {
       {applyError && <div style={{ ...styles.errorBanner, marginBottom: '1rem' }}>{applyError}</div>}
 
       {loadingRecords ? <p>{t('domainDetail_loadingRecords')}</p> : (
-        <table style={styles.table}>
+        <div style={{ position: 'relative' }}>
+        {(applying || pendingRefresh) && (
+          <div style={styles.tableOverlay}>
+            <div style={styles.spinner} />
+            <span style={styles.spinnerText}>{t('domainDetail_updatingRecords')}</span>
+          </div>
+        )}
+        <table style={{ ...styles.table, opacity: (applying || pendingRefresh) ? 0.45 : 1, transition: 'opacity .2s', pointerEvents: (applying || pendingRefresh) ? 'none' : 'auto' }}>
           <thead>
             <tr>
               <th style={styles.th}>{t('name')}</th>
@@ -559,6 +583,7 @@ export default function DomainDetailPage() {
             )}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   )
@@ -596,4 +621,7 @@ const styles: Record<string, React.CSSProperties> = {
   btnSecondary: { padding: '.375rem .875rem', background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem', cursor: 'pointer' },
   btnIcon:  { background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '.8125rem', padding: '2px 6px' },
   bulkBtn:  { background: '#ede9fe', color: '#6d28d9', border: 'none', borderRadius: 10, fontSize: '.7rem', fontWeight: 600, padding: '2px 8px', cursor: 'pointer', marginRight: 4, whiteSpace: 'nowrap' as const },
+  tableOverlay: { position: 'absolute', inset: 0, zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '.5rem' },
+  spinner: { width: 28, height: 28, border: '3px solid #e5e7eb', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.7s linear infinite' },
+  spinnerText: { fontSize: '.8125rem', color: '#6b7280', fontWeight: 500 },
 }
