@@ -91,20 +91,24 @@ async function catalogSerial(zonePath: string): Promise<number> {
 async function deployCatalogZone(zones: string[]): Promise<void> {
   const zonePath = join(ZONE_DIR, `${CATALOG_ZONE}.zone`)
 
-  // Check if member list actually changed before bumping serial
+  // Only bump serial when member list actually changed
+  let serial: number
   try {
     const existing = await readFile(zonePath, 'utf8')
     const existingMembers = [...existing.matchAll(/\.zones\s+IN\s+PTR\s+(\S+)/g)]
       .map(m => m[1]).sort()
     const newMembers = zones.map(z => `${z}.`).sort()
     if (existingMembers.join(',') === newMembers.join(',')) {
-      return // No change — skip rewrite to avoid stale-serial warnings
+      // Same members — keep current serial (no transfer needed)
+      const match = existing.match(/(\d{10})\s*;\s*serial/)
+      serial = match ? Number(match[1]) : await catalogSerial(zonePath)
+    } else {
+      serial = await catalogSerial(zonePath)
     }
   } catch {
-    // File doesn't exist — write it
+    serial = await catalogSerial(zonePath)
   }
 
-  const serial = await catalogSerial(zonePath)
   const content = renderCatalogZone(CATALOG_ZONE, zones, serial)
   await writeAtomic(zonePath, content)
 }
