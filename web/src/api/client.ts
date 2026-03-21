@@ -352,7 +352,7 @@ export const getTicket = (id: number) =>
   api.get<TicketDetail>(`/tickets/${id}`)
 
 export const createTicket = (data: { subject: string; body: string; priority?: string }) =>
-  api.post<{ id: number }>('/tickets', data)
+  api.post<{ id: number; messageId: number }>('/tickets', data)
 
 export const updateTicket = (id: number, data: { status?: string; priority?: string; assigned_to?: number | null }) =>
   api.put(`/tickets/${id}`, data)

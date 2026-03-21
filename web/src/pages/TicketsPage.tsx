@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getTickets, getUsers, createTicket, type Ticket } from '../api/client'
+import { getTickets, getUsers, createTicket, uploadAttachments, type Ticket } from '../api/client'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
 
@@ -45,6 +45,7 @@ export default function TicketsPage() {
   const [creating, setCreating]             = useState(false)
   const [createError, setCreateError]       = useState<string | null>(null)
   const [form, setForm] = useState({ subject: '', body: '', priority: 'normal' })
+  const [createFiles, setCreateFiles] = useState<File[]>([])
 
   const params: Record<string, string> = {
     page: String(page),
@@ -78,9 +79,13 @@ export default function TicketsPage() {
     setCreating(true)
     setCreateError(null)
     try {
-      await createTicket(form)
+      const resp = await createTicket(form)
+      if (createFiles.length > 0) {
+        await uploadAttachments(resp.data.id, resp.data.messageId, createFiles)
+      }
       qc.invalidateQueries({ queryKey: ['tickets'] })
       setForm({ subject: '', body: '', priority: 'normal' })
+      setCreateFiles([])
       setShowCreate(false)
     } catch (err: any) {
       setCreateError(err.response?.data?.message ?? 'Error')
@@ -116,6 +121,23 @@ export default function TicketsPage() {
             onChange={e => setForm(f => ({ ...f, body: e.target.value }))}
             required
           />
+          <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={styles.fileLabel}>
+              📎 {t('ticketDetail_addFiles')}
+              <input
+                type="file"
+                multiple
+                style={{ display: 'none' }}
+                onChange={e => setCreateFiles(Array.from(e.target.files ?? []).slice(0, 20))}
+              />
+            </label>
+            {createFiles.length > 0 && (
+              <span style={styles.fileNames}>
+                {createFiles.map(f => f.name).join(', ')}
+                <button type="button" style={styles.fileClear} onClick={() => setCreateFiles([])}>✕</button>
+              </span>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
             <select style={styles.select} value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
               {['low', 'normal', 'high', 'urgent'].map(p => (
@@ -220,6 +242,9 @@ const styles: Record<string, React.CSSProperties> = {
   filters:    { display: 'flex', gap: '.5rem', marginBottom: '1rem', flexWrap: 'wrap' as const },
   select:     { padding: '.375rem .75rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem' },
   muted:      { color: '#9ca3af', fontSize: '.875rem' },
+  fileLabel:  { padding: '.25rem .6rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.8rem', cursor: 'pointer', color: '#374151' },
+  fileNames:  { fontSize: '.8rem', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '.35rem' },
+  fileClear:  { background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: '.85rem', padding: 0 },
   errorText:  { color: '#b91c1c', fontSize: '.875rem', margin: 0 },
   table:      { width: '100%', borderCollapse: 'collapse' },
   th:         { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' as const },

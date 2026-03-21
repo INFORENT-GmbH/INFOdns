@@ -130,7 +130,7 @@ export async function ticketRoutes(app: FastifyInstance) {
     )
     const ticketId = result.insertId
 
-    await execute(
+    const msgResult = await execute(
       `INSERT INTO ticket_messages (ticket_id, author_user_id, author_name, author_email, body, source)
        VALUES (?, ?, ?, ?, ?, 'web')`,
       [ticketId, req.user.sub, requesterName, requesterEmail, data.body]
@@ -147,7 +147,7 @@ export async function ticketRoutes(app: FastifyInstance) {
       })
     }
 
-    return reply.status(201).send({ id: ticketId, subject: data.subject, status: 'open', priority: data.priority })
+    return reply.status(201).send({ id: ticketId, messageId: msgResult.insertId, subject: data.subject, status: 'open', priority: data.priority })
   })
 
   // GET /tickets/:id
