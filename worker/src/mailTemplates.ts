@@ -283,6 +283,37 @@ ${infoTable([
   return { subject, html: wrap(subject, bodyHtml), text }
 }
 
+// ── Ticket new (admin notification) ──────────────────────────
+
+interface TicketNewAdminPayload {
+  ticketId: number
+  subject: string
+  requesterName: string
+  requesterEmail: string
+  priority: string
+  source: string
+  portalUrl: string
+}
+
+function ticketNewAdmin(_locale: Locale, p: TicketNewAdminPayload): MailContent {
+  const ref = `[#${p.ticketId}]`
+  const subject = `[INFOdns Support] New ticket ${ref}: ${p.subject}`
+
+  const bodyHtml = `<h2>New support ticket</h2>
+<p>A new support ticket has been submitted.</p>
+${infoTable([
+  ['Ticket', ref],
+  ['Subject', p.subject],
+  ['From', `${esc(p.requesterName)} &lt;${esc(p.requesterEmail)}&gt;`],
+  ['Priority', p.priority],
+  ['Source', p.source],
+])}
+${p.portalUrl ? `<p><a href="${esc(p.portalUrl)}/tickets/${p.ticketId}">View ticket in portal</a></p>` : ''}`
+
+  const text = [`New ticket ${ref}`, `Subject: ${p.subject}`, `From: ${p.requesterName} <${p.requesterEmail}>`, `Priority: ${p.priority}`, `Source: ${p.source}`, p.portalUrl ? `\n${p.portalUrl}/tickets/${p.ticketId}` : ''].join('\n')
+  return { subject, html: wrap(subject, bodyHtml), text }
+}
+
 // ── Template registry ────────────────────────────────────────
 
 const templates: Record<string, (locale: Locale, payload: any) => MailContent> = {
@@ -293,6 +324,7 @@ const templates: Record<string, (locale: Locale, payload: any) => MailContent> =
   ticket_created: ticketCreated,
   ticket_reply: ticketReply,
   ticket_assigned: ticketAssigned,
+  ticket_new_admin: ticketNewAdmin,
 }
 
 export function renderTemplate(template: string, locale: Locale, payload: unknown): MailContent {

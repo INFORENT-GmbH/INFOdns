@@ -147,6 +147,20 @@ export async function ticketRoutes(app: FastifyInstance) {
       })
     }
 
+    // Notify all admins
+    const admins = await query<{ email: string }>(`SELECT email FROM users WHERE role = 'admin'`)
+    for (const admin of admins) {
+      await queueMail(admin.email, 'ticket_new_admin', {
+        ticketId,
+        subject: data.subject,
+        requesterName,
+        requesterEmail,
+        priority: data.priority,
+        source: 'web',
+        portalUrl: process.env.APP_PUBLIC_URL ?? '',
+      })
+    }
+
     return reply.status(201).send({ id: ticketId, messageId: msgResult.insertId, subject: data.subject, status: 'open', priority: data.priority })
   })
 

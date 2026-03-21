@@ -125,6 +125,19 @@ async function handleParsedEmail(parsed: Awaited<ReturnType<typeof simpleParser>
       })
     }
 
+    const admins = await query<{ email: string }>(`SELECT email FROM users WHERE role = 'admin'`)
+    for (const admin of admins) {
+      queueMail(admin.email, 'ticket_new_admin', {
+        ticketId: newTicketId,
+        subject,
+        requesterName: fromName,
+        requesterEmail: fromAddr ?? '',
+        priority: 'normal',
+        source: 'email',
+        portalUrl: APP_PUBLIC_URL,
+      })
+    }
+
     console.log(`[imap] Created ticket #${newTicketId} from ${fromAddr}`)
   }
 }
