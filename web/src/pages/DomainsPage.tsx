@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { getDomains, createDomain, getCustomers, getLabelSuggestions, type Domain } from '../api/client'
+import { getDomains, createDomain, getCustomers, getLabelSuggestions, restoreDomain, type Domain } from '../api/client'
 import LabelChip from '../components/LabelChip'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
@@ -45,6 +45,8 @@ export default function DomainsPage() {
   const [visibleCols, setVisibleCols] = useState<ColId[]>(readColsCookie)
   const [colDropdownOpen, setColDropdownOpen] = useState(false)
   const colDropdownRef = useRef<HTMLDivElement>(null)
+  const [showDeleted, setShowDeleted] = useState(false)
+  const [restoringId, setRestoringId] = useState<number | null>(null)
 
 
   const { data: labelSuggestions = [] } = useQuery({
@@ -60,11 +62,12 @@ export default function DomainsPage() {
   })
 
   const { data: domains = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['domains', search, labelFilter],
+    queryKey: ['domains', search, labelFilter, showDeleted],
     queryFn: () => {
       const params: Record<string, string> = {}
       if (search) params.search = search
       if (labelFilter) params.label = labelFilter
+      if (showDeleted) params.show_deleted = 'true'
       return getDomains(Object.keys(params).length ? params : undefined).then(r => r.data)
     },
   })
@@ -82,6 +85,18 @@ export default function DomainsPage() {
       alert(err.response?.data?.message ?? err.message)
     } finally {
       setCreating(false)
+    }
+  }
+
+  async function handleRestore(id: number) {
+    setRestoringId(id)
+    try {
+      await restoreDomain(id)
+      refetch()
+    } catch (err: any) {
+      alert(err.response?.data?.message ?? err.message)
+    } finally {
+      setRestoringId(null)
     }
   }
 
@@ -202,9 +217,20 @@ export default function DomainsPage() {
               </div>
             )}
           </div>
-          <button onClick={() => setShowCreate(v => !v)} style={styles.btnPrimary}>
-            {t('domains_addDomain')}
-          </button>
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => { setShowDeleted(v => !v); setSearch(''); setLabelFilter('') }}
+              style={showDeleted ? styles.btnTrashActive : styles.btnSecondary}
+              title="Show deleted domains"
+            >
+              Trash
+            </button>
+          )}
+          {!showDeleted && (
+            <button onClick={() => setShowCreate(v => !v)} style={styles.btnPrimary}>
+              {t('domains_addDomain')}
+            </button>
+          )}
         </div>
       </div>
 
@@ -242,51 +268,94 @@ export default function DomainsPage() {
 
       <table style={styles.table}>
         <thead>
-          <tr>
-            {show('fqdn') && <th style={styles.th}>FQDN</th>}
-            {show('customer') && <th style={styles.th}>{t('customer')}</th>}
-            {show('status') && <th style={styles.th}>{t('status')}</th>}
-            {show('zone') && <th style={styles.th}>{t('domains_zone')}</th>}
-            {show('labels') && <th style={styles.th}>{t('domains_labels')}</th>}
-            {show('serial') && <th style={styles.th}>{t('serial')}</th>}
-            {show('lastRendered') && <th style={styles.th}>{t('domains_lastRendered')}</th>}
-          </tr>
+          {showDeleted ? (
+            <tr>
+              <th style={styles.th}>FQDN</th>
+              <th style={styles.th}>{t('customer')}</th>
+              <th style={styles.th}>Deleted</th>
+              <th style={styles.th}>Purge in</th>
+              <th style={styles.th}></th>
+            </tr>
+          ) : (
+            <tr>
+              {show('fqdn') && <th style={styles.th}>FQDN</th>}
+              {show('customer') && <th style={styles.th}>{t('customer')}</th>}
+              {show('status') && <th style={styles.th}>{t('status')}</th>}
+              {show('zone') && <th style={styles.th}>{t('domains_zone')}</th>}
+              {show('labels') && <th style={styles.th}>{t('domains_labels')}</th>}
+              {show('serial') && <th style={styles.th}>{t('serial')}</th>}
+              {show('lastRendered') && <th style={styles.th}>{t('domains_lastRendered')}</th>}
+            </tr>
+          )}
         </thead>
         <tbody>
-          {domains.map((d: Domain) => {
-            const zi = zoneIcons[d.zone_status] ?? { icon: '?', color: '#9ca3af', title: d.zone_status }
-            return (
-            <tr key={d.id} style={styles.tr}>
-              {show('fqdn') && <td style={styles.td}>
-                <Link to={`/domains/${d.id}`} style={styles.link}>{d.fqdn}</Link>
-              </td>}
-              {show('customer') && <td style={styles.td}>{d.customer_name}</td>}
-              {show('status') && <td style={styles.td}>{d.status}</td>}
-              {show('zone') && <td style={{ ...styles.td, textAlign: 'center' }}>
-                <span title={zi.title} style={{ color: zi.color, fontSize: '1rem', fontWeight: 700 }}>{zi.icon}</span>
-              </td>}
-              {show('labels') && <td style={styles.td}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                  {(d.labels ?? []).map(l => {
-                    const val = l.value ? `${l.key}=${l.value}` : l.key
-                    return (
-                      <span key={l.id} onClick={() => { setLabelFilter(val) }} style={{ cursor: 'pointer' }}>
-                        <LabelChip label={l} />
-                      </span>
-                    )
-                  })}
-                </div>
-              </td>}
-              {show('serial') && <td style={styles.td}><code>{d.last_serial || '—'}</code></td>}
-              {show('lastRendered') && <td style={styles.td}>
-                {d.last_rendered_at
-                  ? new Date(d.last_rendered_at).toLocaleString()
-                  : <span style={styles.muted}>{t('never')}</span>}
-              </td>}
-            </tr>
-          )})}
+          {showDeleted ? (
+            domains.map((d: Domain) => {
+              const purgeDays = d.deleted_at
+                ? Math.ceil((new Date(d.deleted_at).getTime() + 30 * 86400_000 - Date.now()) / 86400_000)
+                : null
+              const urgent = purgeDays !== null && purgeDays <= 7
+              return (
+                <tr key={d.id} style={styles.tr}>
+                  <td style={{ ...styles.td, color: '#6b7280' }}>{d.fqdn}</td>
+                  <td style={styles.td}>{d.customer_name}</td>
+                  <td style={styles.td}>
+                    {d.deleted_at ? new Date(d.deleted_at).toLocaleDateString() : '—'}
+                  </td>
+                  <td style={{ ...styles.td, color: urgent ? '#dc2626' : '#374151', fontWeight: urgent ? 600 : 400 }}>
+                    {purgeDays !== null ? (purgeDays <= 0 ? 'Purging…' : `${purgeDays}d`) : '—'}
+                  </td>
+                  <td style={styles.td}>
+                    <button
+                      onClick={() => handleRestore(d.id)}
+                      disabled={restoringId === d.id}
+                      style={styles.btnSuccess}
+                    >
+                      {restoringId === d.id ? '…' : 'Restore'}
+                    </button>
+                  </td>
+                </tr>
+              )
+            })
+          ) : (
+            domains.map((d: Domain) => {
+              const zi = zoneIcons[d.zone_status] ?? { icon: '?', color: '#9ca3af', title: d.zone_status }
+              return (
+                <tr key={d.id} style={styles.tr}>
+                  {show('fqdn') && <td style={styles.td}>
+                    <Link to={`/domains/${d.id}`} style={styles.link}>{d.fqdn}</Link>
+                  </td>}
+                  {show('customer') && <td style={styles.td}>{d.customer_name}</td>}
+                  {show('status') && <td style={styles.td}>{d.status}</td>}
+                  {show('zone') && <td style={{ ...styles.td, textAlign: 'center' }}>
+                    <span title={zi.title} style={{ color: zi.color, fontSize: '1rem', fontWeight: 700 }}>{zi.icon}</span>
+                  </td>}
+                  {show('labels') && <td style={styles.td}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {(d.labels ?? []).map(l => {
+                        const val = l.value ? `${l.key}=${l.value}` : l.key
+                        return (
+                          <span key={l.id} onClick={() => { setLabelFilter(val) }} style={{ cursor: 'pointer' }}>
+                            <LabelChip label={l} />
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </td>}
+                  {show('serial') && <td style={styles.td}><code>{d.last_serial || '—'}</code></td>}
+                  {show('lastRendered') && <td style={styles.td}>
+                    {d.last_rendered_at
+                      ? new Date(d.last_rendered_at).toLocaleString()
+                      : <span style={styles.muted}>{t('never')}</span>}
+                  </td>}
+                </tr>
+              )
+            })
+          )}
           {!isLoading && domains.length === 0 && (
-            <tr><td colSpan={visibleCols.length} style={{ ...styles.td, textAlign: 'center', ...styles.muted }}>{t('domains_noneFound')}</td></tr>
+            <tr><td colSpan={showDeleted ? 5 : visibleCols.length} style={{ ...styles.td, textAlign: 'center', ...styles.muted }}>
+              {showDeleted ? 'No deleted domains.' : t('domains_noneFound')}
+            </td></tr>
           )}
         </tbody>
       </table>
@@ -315,4 +384,6 @@ const styles: Record<string, React.CSSProperties> = {
   labelDropdownItem: { display: 'flex', alignItems: 'center', width: '100%', padding: '.375rem .75rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' as const, fontSize: '.875rem' },
   colDropdown: { position: 'absolute' as const, top: '100%', right: 0, marginTop: 2, background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.1)', zIndex: 20, padding: '6px 0', minWidth: 160 },
   colDropdownItem: { display: 'flex', alignItems: 'center', padding: '.3rem .75rem', fontSize: '.8rem', cursor: 'pointer', whiteSpace: 'nowrap' as const },
+  btnTrashActive: { padding: '.375rem .875rem', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: 4, fontSize: '.875rem', cursor: 'pointer', fontWeight: 600 },
+  btnSuccess: { padding: '.375rem .875rem', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
 }

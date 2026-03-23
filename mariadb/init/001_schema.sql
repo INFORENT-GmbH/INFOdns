@@ -74,6 +74,8 @@ CREATE TABLE domains (
   default_ttl      INT UNSIGNED NOT NULL DEFAULT 3600,
   dnssec_enabled   TINYINT(1)   NOT NULL DEFAULT 0,
   notes            TEXT NULL,
+  deleted_at       DATETIME     NULL,
+  reminder_flags   TINYINT UNSIGNED NOT NULL DEFAULT 0,
   created_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_fqdn (fqdn),

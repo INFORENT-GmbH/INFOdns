@@ -82,6 +82,8 @@ export interface Domain {
   customer_id: number
   customer_name: string
   created_at: string
+  deleted_at: string | null
+  reminder_flags: number
   labels: Label[]
   zone_error?: string | null
 }
@@ -179,6 +181,9 @@ export const updateDomain = (id: number, data: Partial<Domain>) =>
 
 export const deleteDomain = (id: number) =>
   api.delete(`/domains/${id}`)
+
+export const restoreDomain = (id: number) =>
+  api.post<Domain>(`/domains/${id}/restore`)
 
 export const updateDomainLabels = (id: number, labels: Label[]) =>
   api.put<Label[]>(`/domains/${id}/labels`, { labels })

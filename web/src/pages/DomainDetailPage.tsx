@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getDomain, getRecords, createRecord, deleteRecord,
   createBulkJob, previewBulkJob, approveBulkJob, searchByRecord,
-  updateDomainLabels, getLabelSuggestions, type DnsRecord, type Label, type Domain, type LabelSuggestion,
+  updateDomainLabels, getLabelSuggestions, updateDomain, deleteDomain,
+  type DnsRecord, type Label, type Domain, type LabelSuggestion,
 } from '../api/client'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import LabelChip, { getLabelColors } from '../components/LabelChip'
@@ -66,6 +67,7 @@ export default function DomainDetailPage() {
   const { id } = useParams<{ id: string }>()
   const domainId = Number(id)
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const { t } = useI18n()
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
@@ -92,6 +94,8 @@ export default function DomainDetailPage() {
   const [editColor, setEditColor] = useState<string | null>(null)
   const [editAdminOnly, setEditAdminOnly] = useState(false)
   const [savingLabels, setSavingLabels] = useState(false)
+  const [togglingStatus, setTogglingStatus] = useState(false)
+  const [deletingDomain, setDeletingDomain] = useState(false)
   const [showAddKeyDrop, setShowAddKeyDrop] = useState(false)
   const [showEditKeyDrop, setShowEditKeyDrop] = useState(false)
 
@@ -367,6 +371,35 @@ export default function DomainDetailPage() {
     )
   }
 
+  // ── Admin domain lifecycle ────────────────────────────────────────────────
+
+  async function handleToggleStatus() {
+    if (!domain || togglingStatus) return
+    const newStatus = domain.status === 'active' ? 'suspended' : 'active'
+    setTogglingStatus(true)
+    try {
+      await updateDomain(domainId, { status: newStatus } as any)
+      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      qc.invalidateQueries({ queryKey: ['domains'] })
+    } catch (err: any) {
+      alert(err.response?.data?.message ?? err.message)
+    } finally {
+      setTogglingStatus(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!domain || !window.confirm(`Delete ${domain.fqdn}? It will be permanently purged after 30 days.`)) return
+    setDeletingDomain(true)
+    try {
+      await deleteDomain(domainId)
+      navigate('/domains')
+    } catch (err: any) {
+      alert(err.response?.data?.message ?? err.message)
+      setDeletingDomain(false)
+    }
+  }
+
   // ── render ───────────────────────────────────────────────────────────────
 
   if (loadingDomain) return <p>{t('loading')}</p>
@@ -381,6 +414,22 @@ export default function DomainDetailPage() {
         <Link to="/domains" style={styles.back}>{t('domainDetail_backLink')}</Link>
         <h2 style={styles.h2}>{domain.fqdn}</h2>
         <ZoneStatusBadge status={domain.zone_status} />
+        {isAdmin && (
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '.5rem' }}>
+            {domain.status !== 'deleted' && (
+              <button
+                onClick={handleToggleStatus}
+                disabled={togglingStatus}
+                style={domain.status === 'suspended' ? styles.btnSuccess : styles.btnWarning}
+              >
+                {togglingStatus ? '…' : domain.status === 'suspended' ? 'Enable' : 'Disable'}
+              </button>
+            )}
+            <button onClick={handleDelete} disabled={deletingDomain} style={styles.btnDanger}>
+              {deletingDomain ? '…' : 'Delete'}
+            </button>
+          </div>
+        )}
       </div>
 
       {domain.zone_status === 'error' && (
@@ -624,4 +673,7 @@ const styles: Record<string, React.CSSProperties> = {
   tableOverlay: { position: 'absolute', inset: 0, zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '.5rem' },
   spinner: { width: 28, height: 28, border: '3px solid #e5e7eb', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.7s linear infinite' },
   spinnerText: { fontSize: '.8125rem', color: '#6b7280', fontWeight: 500 },
+  btnWarning: { padding: '.375rem .875rem', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
+  btnSuccess: { padding: '.375rem .875rem', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
+  btnDanger: { padding: '.375rem .875rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
 }

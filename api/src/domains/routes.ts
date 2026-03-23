@@ -1,8 +1,15 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import { query, queryOne, execute } from '../db.js'
-import { requireAuth, requireOperatorOrAdmin } from '../middleware/auth.js'
+import { requireAuth } from '../middleware/auth.js'
 import { writeAuditLog } from '../audit/middleware.js'
+
+async function queueMail(to: string, template: string, payload: unknown): Promise<void> {
+  await execute(
+    `INSERT INTO mail_queue (to_email, template, payload) VALUES (?, ?, ?)`,
+    [to, template, JSON.stringify(payload)]
+  )
+}
 
 async function enqueueRender(domainId: number) {
   await execute(
@@ -103,11 +110,14 @@ export async function domainRoutes(app: FastifyInstance) {
 
   // GET /domains
   app.get('/domains', { preHandler: requireAuth }, async (req: any, reply) => {
-    const { search, customer_id, label, page = '1', limit = '50' } = req.query as Record<string, string>
+    const { search, customer_id, label, page = '1', limit = '50', show_deleted } = req.query as Record<string, string>
+    const isAdmin = req.user.role === 'admin'
     const offset = (Number(page) - 1) * Number(limit)
     const params: unknown[] = []
     let join = ''
-    let where = "WHERE d.status != 'deleted'"
+    let where = (isAdmin && show_deleted === 'true')
+      ? "WHERE d.status = 'deleted'"
+      : "WHERE d.status != 'deleted'"
 
     if (label) {
       const eqIdx = label.indexOf('=')
@@ -122,7 +132,7 @@ export async function domainRoutes(app: FastifyInstance) {
       }
     }
 
-    if (req.user.role !== 'admin') {
+    if (!isAdmin) {
       where += ` AND d.customer_id IN (SELECT customer_id FROM user_customers WHERE user_id = ?)`
       params.push(req.user.sub)
     }
@@ -137,14 +147,14 @@ export async function domainRoutes(app: FastifyInstance) {
 
     const rows = await query(
       `SELECT d.id, d.fqdn, d.status, d.zone_status, d.last_serial, d.last_rendered_at,
-              d.default_ttl, d.customer_id, c.name AS customer_name, d.created_at
+              d.default_ttl, d.customer_id, c.name AS customer_name, d.created_at, d.deleted_at
        FROM domains d JOIN customers c ON c.id = d.customer_id${join}
        ${where}
        ORDER BY d.fqdn
        LIMIT ? OFFSET ?`,
       [...params, Number(limit), offset]
     ) as any[]
-    const labelMap = await fetchLabels(rows.map((r: any) => r.id), (req as any).user.role === 'admin')
+    const labelMap = await fetchLabels(rows.map((r: any) => r.id), isAdmin)
     return rows.map((r: any) => ({ ...r, labels: labelMap.get(r.id) ?? [] }))
   })
 
@@ -204,6 +214,10 @@ export async function domainRoutes(app: FastifyInstance) {
 
     const body = UpdateDomainBody.safeParse(req.body)
     if (!body.success) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: body.error.message })
+
+    if (body.data.status !== undefined && req.user.role !== 'admin') {
+      return reply.status(403).send({ code: 'FORBIDDEN' })
+    }
 
     await execute(
       `UPDATE domains SET
@@ -337,12 +351,44 @@ export async function domainRoutes(app: FastifyInstance) {
     return labelMap.get(domainId) ?? []
   })
 
-  // DELETE /domains/:id  (soft delete)
-  app.delete<{ Params: { id: string } }>('/domains/:id', { preHandler: requireOperatorOrAdmin }, async (req, reply) => {
-    const old = await queryOne("SELECT * FROM domains WHERE id = ? AND status != 'deleted'", [req.params.id])
+  // DELETE /domains/:id  (soft delete — admin only)
+  app.delete<{ Params: { id: string } }>('/domains/:id', { preHandler: requireAuth }, async (req: any, reply) => {
+    if (req.user.role !== 'admin') return reply.status(403).send({ code: 'FORBIDDEN' })
+    const old = await queryOne("SELECT * FROM domains WHERE id = ? AND status != 'deleted'", [req.params.id]) as any
     if (!old) return reply.status(404).send({ code: 'NOT_FOUND' })
-    await execute("UPDATE domains SET status = 'deleted' WHERE id = ?", [req.params.id])
+
+    const purgeDate = new Date(Date.now() + 30 * 86400_000).toISOString().slice(0, 10)
+    await execute(
+      "UPDATE domains SET status = 'deleted', deleted_at = NOW(), reminder_flags = 0 WHERE id = ?",
+      [req.params.id]
+    )
     await writeAuditLog({ req, entityType: 'domain', entityId: Number(req.params.id), domainId: Number(req.params.id), action: 'delete', oldValue: old })
+    await enqueueRender(Number(req.params.id))
+
+    const admins = await query<{ email: string }>('SELECT email FROM users WHERE role = ? AND is_active = 1', ['admin'])
+    for (const admin of admins) {
+      await queueMail(admin.email, 'domain_deleted', {
+        fqdn: old.fqdn,
+        deletedBy: req.user.email ?? String(req.user.sub),
+        deletedAt: new Date().toISOString().slice(0, 10),
+        purgeDate,
+      })
+    }
     return { ok: true }
+  })
+
+  // POST /domains/:id/restore  (admin only)
+  app.post<{ Params: { id: string } }>('/domains/:id/restore', { preHandler: requireAuth }, async (req: any, reply) => {
+    if (req.user.role !== 'admin') return reply.status(403).send({ code: 'FORBIDDEN' })
+    const old = await queryOne("SELECT * FROM domains WHERE id = ? AND status = 'deleted'", [req.params.id])
+    if (!old) return reply.status(404).send({ code: 'NOT_FOUND' })
+    await execute(
+      "UPDATE domains SET status = 'active', deleted_at = NULL, reminder_flags = 0 WHERE id = ?",
+      [req.params.id]
+    )
+    const restored = await queryOne('SELECT * FROM domains WHERE id = ?', [req.params.id])
+    await writeAuditLog({ req, entityType: 'domain', entityId: Number(req.params.id), domainId: Number(req.params.id), action: 'restore', oldValue: old, newValue: restored })
+    await enqueueRender(Number(req.params.id))
+    return restored
   })
 }

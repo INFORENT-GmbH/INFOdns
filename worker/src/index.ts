@@ -36,6 +36,7 @@ interface DomainRow {
   fqdn: string
   default_ttl: number
   customer_id: number
+  status: string
 }
 
 interface SoaRow {
@@ -64,8 +65,19 @@ async function processJob(job: QueueRow): Promise<void> {
   console.log(`[worker] Processing job ${job.id} for domain ${domainId}`)
 
   // Step 2: Load domain + records + SOA template
-  const domain = await queryOne<DomainRow>('SELECT id, fqdn, default_ttl, customer_id FROM domains WHERE id = ?', [domainId])
+  const domain = await queryOne<DomainRow>('SELECT id, fqdn, default_ttl, customer_id, status FROM domains WHERE id = ?', [domainId])
   if (!domain) throw new Error(`Domain ${domainId} not found`)
+
+  // Non-active domain: just sync named.conf to remove it from BIND, skip render
+  if (domain.status !== 'active') {
+    const allDomains = await query<{ fqdn: string }>(
+      "SELECT fqdn FROM domains WHERE status = 'active' ORDER BY fqdn"
+    )
+    await regenerateNamedConf(allDomains.map(r => r.fqdn))
+    await execute("UPDATE zone_render_queue SET status = 'done', updated_at = NOW() WHERE id = ?", [job.id])
+    console.log(`[worker] Job ${job.id} — ${domain.fqdn} is ${domain.status}, synced named.conf, skipped render`)
+    return
+  }
 
   const records = await query<RecordRow>(
     `SELECT name, type, ttl, priority, weight, port, value
@@ -192,6 +204,62 @@ async function syncNamedConf(): Promise<void> {
   }
 }
 
+// ── Domain lifecycle: reminders + hard purge ─────────────────
+
+const REMINDER_SCHEDULE: { daysRemaining: number; bit: number }[] = [
+  { daysRemaining: 21, bit: 1 },
+  { daysRemaining: 14, bit: 2 },
+  { daysRemaining: 7,  bit: 4 },
+  { daysRemaining: 3,  bit: 8 },
+  { daysRemaining: 2,  bit: 16 },
+  { daysRemaining: 1,  bit: 32 },
+]
+
+async function processDomainLifecycle(): Promise<void> {
+  try {
+    const deleted = await query<{ id: number; fqdn: string; deleted_at: string; reminder_flags: number }>(
+      "SELECT id, fqdn, deleted_at, reminder_flags FROM domains WHERE status = 'deleted' AND deleted_at IS NOT NULL"
+    )
+    if (deleted.length === 0) return
+
+    const admins = await query<{ email: string }>(
+      "SELECT email FROM users WHERE role = 'admin' AND is_active = 1"
+    )
+
+    for (const domain of deleted) {
+      const deletedMs = new Date(domain.deleted_at).getTime()
+      const daysElapsed = (Date.now() - deletedMs) / 86400_000
+
+      if (daysElapsed >= 30) {
+        await execute('DELETE FROM domains WHERE id = ?', [domain.id])
+        console.log(`[worker] Purged domain ${domain.fqdn} (id=${domain.id}) — exceeded 30-day retention`)
+        continue
+      }
+
+      const daysRemaining = Math.ceil(30 - daysElapsed)
+      const purgeDate = new Date(deletedMs + 30 * 86400_000).toISOString().slice(0, 10)
+      const deletedAt = new Date(domain.deleted_at).toISOString().slice(0, 10)
+      let newFlags = domain.reminder_flags
+
+      for (const { daysRemaining: threshold, bit } of REMINDER_SCHEDULE) {
+        const dueAfterDays = 30 - threshold
+        if (daysElapsed >= dueAfterDays && !(newFlags & bit)) {
+          for (const admin of admins) {
+            queueMail(admin.email, 'domain_purge_reminder', { fqdn: domain.fqdn, daysRemaining, deletedAt, purgeDate })
+          }
+          newFlags |= bit
+        }
+      }
+
+      if (newFlags !== domain.reminder_flags) {
+        await execute('UPDATE domains SET reminder_flags = ? WHERE id = ?', [newFlags, domain.id])
+      }
+    }
+  } catch (err: any) {
+    console.error('[worker] processDomainLifecycle failed:', err.message)
+  }
+}
+
 // ── Startup: re-queue zones with missing zone files ──────────
 
 const ZONE_DIR = process.env.ZONE_DIR ?? '/bind/primary/zones'
@@ -228,6 +296,10 @@ await requeueMissingZones()
 // Initial conf sync, then every 60s
 await syncNamedConf()
 setInterval(syncNamedConf, 60_000)
+
+// Domain lifecycle: reminders + hard purge, hourly
+await processDomainLifecycle()
+setInterval(processDomainLifecycle, 60 * 60 * 1000)
 
 // Poll loop
 ;(async function loop() {

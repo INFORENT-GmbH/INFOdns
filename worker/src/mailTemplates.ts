@@ -314,6 +314,69 @@ ${p.portalUrl ? `<p><a href="${esc(p.portalUrl)}/tickets/${p.ticketId}">View tic
   return { subject, html: wrap(subject, bodyHtml), text }
 }
 
+// ── Domain deleted (admin notification) ──────────────────────
+
+interface DomainDeletedPayload {
+  fqdn: string
+  deletedBy: string
+  deletedAt: string
+  purgeDate: string
+}
+
+function domainDeleted(_locale: Locale, p: DomainDeletedPayload): MailContent {
+  const subject = `[INFOdns] Domain deleted: ${p.fqdn}`
+
+  const bodyHtml = `<h2 style="color:#b91c1c;">Domain soft-deleted</h2>
+<p>A domain has been soft-deleted and will be permanently purged if not restored.</p>
+${infoTable([
+  ['Domain', p.fqdn],
+  ['Deleted by', p.deletedBy],
+  ['Deleted on', p.deletedAt],
+  ['Purge date', p.purgeDate],
+])}
+<p>Log in to INFOdns to restore the domain before the purge date.</p>`
+
+  const text = [
+    subject, '',
+    `Domain ${p.fqdn} was soft-deleted by ${p.deletedBy} on ${p.deletedAt}.`,
+    `It will be permanently purged on ${p.purgeDate} unless restored.`,
+  ].join('\n')
+
+  return { subject, html: wrap(subject, bodyHtml), text }
+}
+
+// ── Domain purge reminder (admin notification) ────────────────
+
+interface DomainPurgeReminderPayload {
+  fqdn: string
+  daysRemaining: number
+  deletedAt: string
+  purgeDate: string
+}
+
+function domainPurgeReminder(_locale: Locale, p: DomainPurgeReminderPayload): MailContent {
+  const urgent = p.daysRemaining <= 3
+  const subject = `[INFOdns] ${urgent ? 'URGENT: ' : ''}Domain purge in ${p.daysRemaining} day${p.daysRemaining === 1 ? '' : 's'}: ${p.fqdn}`
+
+  const bodyHtml = `<h2 style="color:${urgent ? '#b91c1c' : '#b45309'};">Permanent deletion reminder</h2>
+<p>The following domain is scheduled for permanent deletion. All DNS records will be lost.</p>
+${infoTable([
+  ['Domain', p.fqdn],
+  ['Deleted on', p.deletedAt],
+  ['Days remaining', String(p.daysRemaining)],
+  ['Purge date', p.purgeDate],
+])}
+<p>${urgent ? '<strong>Action required:</strong> ' : ''}Log in to INFOdns and restore the domain before ${p.purgeDate} to prevent permanent data loss.</p>`
+
+  const text = [
+    subject, '',
+    `Domain ${p.fqdn} (deleted ${p.deletedAt}) will be permanently deleted in ${p.daysRemaining} day${p.daysRemaining === 1 ? '' : 's'} on ${p.purgeDate}.`,
+    'Log in to INFOdns to restore it before then.',
+  ].join('\n')
+
+  return { subject, html: wrap(subject, bodyHtml), text }
+}
+
 // ── Template registry ────────────────────────────────────────
 
 const templates: Record<string, (locale: Locale, payload: any) => MailContent> = {
@@ -325,6 +388,8 @@ const templates: Record<string, (locale: Locale, payload: any) => MailContent> =
   ticket_reply: ticketReply,
   ticket_assigned: ticketAssigned,
   ticket_new_admin: ticketNewAdmin,
+  domain_deleted: domainDeleted,
+  domain_purge_reminder: domainPurgeReminder,
 }
 
 export function renderTemplate(template: string, locale: Locale, payload: unknown): MailContent {
