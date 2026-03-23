@@ -103,10 +103,12 @@ services:
       IMAP_TLS: ${IMAP_TLS:-true}
       IMAP_POLL_INTERVAL_SECONDS: ${IMAP_POLL_INTERVAL_SECONDS:-60}
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
+      BIND_KEYS_DIR: /bind/primary/keys
     volumes:
       - ./bind/primary/zones:/bind/primary/zones
       - ./bind/primary:/bind/primary/conf
       - ./bind/keys:/etc/rndc:ro
+      - ./bind/primary/keys-dnssec:/bind/primary/keys:ro
     networks:
       - internal
       - public

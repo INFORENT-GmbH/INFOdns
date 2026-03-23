@@ -2,14 +2,18 @@ import { query, queryOne, execute, transaction, pool } from './db.js'
 import { claimSerial } from './serialNumber.js'
 import { renderZone } from './renderZone.js'
 import { validateZone } from './validateZone.js'
-import { deployZone, rndcDnssecStatus } from './deployZone.js'
+import { deployZone } from './deployZone.js'
 import { regenerateNamedConf } from './namedConf.js'
 import { pollBulkJobs } from './bulkExecutor.js'
 import { broadcastEvent } from './broadcast.js'
 import { queueMail, pollMailQueue } from './mailer.js'
 import { pollImap } from './ticketMailImporter.js'
 import { existsSync } from 'fs'
+import { readdir, readFile } from 'fs/promises'
+import { createHash } from 'crypto'
 import { join } from 'path'
+
+const BIND_KEYS_DIR = process.env.BIND_KEYS_DIR ?? '/bind/primary/keys'
 
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS ?? 2000)
 const BATCH_SIZE       = Number(process.env.BATCH_SIZE ?? 10)
@@ -60,20 +64,64 @@ interface RecordRow {
 
 // ── DNSSEC DS record extraction ───────────────────────────────
 
+/**
+ * Compute a DS record (SHA-256, digest type 2) from a BIND public key file.
+ * Returns "<keytag> <algorithm> 2 <HEX>" or null if the file is not a KSK/CSK.
+ */
+function computeDsFromKeyFile(fqdn: string, content: string): string | null {
+  // Key file has a line: <zone>. IN DNSKEY <flags> <protocol> <algorithm> <base64key>
+  const m = content.match(/^[^;].*\bDNSKEY\b\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+)/m)
+  if (!m) return null
+  const [, flags, protocol, algorithm, keyBase64] = m
+  // Only KSK / CSK (SEP bit set: flags & 1 == 1)
+  if (!(Number(flags) & 1)) return null
+
+  const keyBuf = Buffer.from(keyBase64, 'base64')
+  const rdata = Buffer.alloc(4 + keyBuf.length)
+  rdata.writeUInt16BE(Number(flags), 0)
+  rdata.writeUInt8(Number(protocol), 2)
+  rdata.writeUInt8(Number(algorithm), 3)
+  keyBuf.copy(rdata, 4)
+
+  // Key tag — RFC 4034 Appendix B
+  let ac = 0
+  for (let i = 0; i < rdata.length; i++) ac += (i & 1) ? rdata[i] : rdata[i] << 8
+  ac += (ac >> 16) & 0xffff
+  const keyTag = ac & 0xffff
+
+  // Owner name in DNS wire format (lowercase labels)
+  const labels = fqdn.replace(/\.$/, '').split('.')
+  const wireParts: Buffer[] = []
+  for (const label of labels) {
+    const lb = Buffer.from(label.toLowerCase())
+    wireParts.push(Buffer.from([lb.length]), lb)
+  }
+  wireParts.push(Buffer.from([0]))
+  const ownerWire = Buffer.concat(wireParts)
+
+  const digest = createHash('sha256').update(ownerWire).update(rdata).digest('hex').toUpperCase()
+  return `${keyTag} ${algorithm} 2 ${digest}`
+}
+
 async function extractDsRecords(fqdn: string): Promise<string | null> {
-  // BIND signs the zone asynchronously after the first reload with dnssec-policy.
-  // Retry a few times to give it time to generate keys.
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    await new Promise(r => setTimeout(r, 3000))
+  // BIND writes key files asynchronously — retry a few times
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    await new Promise(r => setTimeout(r, 2000))
     try {
-      const output = await rndcDnssecStatus(fqdn)
-      // rndc dnssec -status outputs lines like:  DS: 12345 13 2 <hex>
-      const dsLines = output.split('\n')
-        .filter(l => /^\s*DS:\s*\d+\s+\d+\s+\d+\s+[0-9A-Fa-f]+/.test(l))
-        .map(l => l.replace(/^\s*DS:\s*/, '').trim())
+      const files = await readdir(BIND_KEYS_DIR)
+      const prefix = `K${fqdn}.`
+      const keyFiles = files.filter(f => f.startsWith(prefix) && f.endsWith('.key'))
+      if (keyFiles.length === 0) continue
+
+      const dsLines: string[] = []
+      for (const kf of keyFiles) {
+        const content = await readFile(join(BIND_KEYS_DIR, kf), 'utf8')
+        const ds = computeDsFromKeyFile(fqdn, content)
+        if (ds) dsLines.push(ds)
+      }
       if (dsLines.length > 0) return dsLines.join('\n')
     } catch (err: any) {
-      console.warn(`[worker] DS extraction for ${fqdn} (attempt ${attempt}/3):`, err.message)
+      console.warn(`[worker] DS extraction attempt ${attempt}/5:`, err.message)
     }
   }
   return null
