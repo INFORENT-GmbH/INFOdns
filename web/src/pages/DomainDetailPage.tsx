@@ -23,7 +23,7 @@ const INLINE_STYLES = `
     content: attr(data-tip);
     position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
     background: #1f2937; color: #f9fafb; font-size: .75rem; font-weight: 400;
-    padding: 5px 8px; border-radius: 5px; white-space: normal; width: 220px;
+    padding: 5px 8px; border-radius: 5px; white-space: normal; width: max-content; max-width: 220px;
     pointer-events: none; opacity: 0; transition: opacity 0s;
   }
   .alias-hint:hover::after { opacity: 1; }
@@ -583,9 +583,13 @@ export default function DomainDetailPage() {
                     {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
                   </select>
                 </td>
-                <td style={styles.td}>
+                <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
                   <input value={row.ttl} onChange={e => setNewField(row._newId, 'ttl', e.target.value)}
                     placeholder={t('domainDetail_ttlPlaceholder')} className="inline-field" style={{ ...styles.inlineInput, width: 70 }} />
+                  {row.ttl !== '' && (
+                    <button onClick={() => setNewField(row._newId, 'ttl', '')}
+                      className="alias-hint" data-tip="Reset to domain default" style={{ ...styles.btnIcon, color: '#9ca3af', marginLeft: 2 }}>↺</button>
+                  )}
                 </td>
                 <td style={{ ...styles.td, ...styles.valueCell }}>
                   <input value={row.value} onChange={e => setNewField(row._newId, 'value', e.target.value)}
@@ -627,10 +631,14 @@ export default function DomainDetailPage() {
                         style={{ marginLeft: 4, cursor: 'help', color: '#9ca3af', fontWeight: 700, fontSize: '.8rem' }}>?</span>
                     )}
                   </td>
-                  <td style={styles.td}>
+                  <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
                     <input value={row.ttl} onChange={e => setField(rec.id, rec, 'ttl', e.target.value)}
                       disabled={isDeleted} placeholder={t('domainDetail_ttlPlaceholder')} className="inline-field"
                       style={{ ...styles.inlineInput, width: 70 }} />
+                    {row.ttl !== '' && !isDeleted && (
+                      <button onClick={() => setField(rec.id, rec, 'ttl', '')}
+                        className="alias-hint" data-tip="Reset to domain default" style={{ ...styles.btnIcon, color: '#9ca3af', marginLeft: 2 }}>↺</button>
+                    )}
                   </td>
                   <td style={{ ...styles.td, ...styles.valueCell }}>
                     <input value={row.value} onChange={e => setField(rec.id, rec, 'value', e.target.value)}
