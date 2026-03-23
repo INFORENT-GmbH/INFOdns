@@ -248,7 +248,7 @@ export default function DomainDetailPage() {
           payload_json: {
             match: { name: rec.name, type: rec.type, value_contains: rec.value },
             replace_with: {
-              name: row.name.trim(), type: row.type, ttl: ttlNum, value,
+              name: row.name.trim(), type: row.type === 'CNAME' && row.name.trim() === '@' ? 'ALIAS' : row.type, ttl: ttlNum, value,
               ...(priority !== undefined && { priority }),
               ...(weight !== undefined && { weight }),
               ...(port !== undefined && { port }),
@@ -621,12 +621,12 @@ export default function DomainDetailPage() {
                       style={{ ...styles.inlineInput, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }} />
                   </td>
                   <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
-                    <select value={rec.type === 'ALIAS' ? 'CNAME' : row.type}
+                    <select value={row.type === 'ALIAS' ? 'CNAME' : row.type}
                       onChange={e => setField(rec.id, rec, 'type', e.target.value)}
                       disabled={isDeleted} className="inline-field" style={styles.inlineSelect}>
                       {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
                     </select>
-                    {rec.type === 'ALIAS' && (
+                    {(row.type === 'ALIAS' || (row.type === 'CNAME' && row.name.trim() === '@')) && (
                       <span className="alias-hint" data-tip="CNAME flattening — resolved to A/AAAA at zone render time, allowing a CNAME-like record at the apex."
                         style={{ marginLeft: 4, cursor: 'help', color: '#9ca3af', fontWeight: 700, fontSize: '.8rem' }}>?</span>
                     )}
