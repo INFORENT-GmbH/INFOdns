@@ -1,4 +1,4 @@
-import { open } from 'fs/promises'
+import { open, unlink } from 'fs/promises'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { join } from 'path'
@@ -33,6 +33,11 @@ export async function writeAtomic(destPath: string, content: string): Promise<vo
  */
 export async function deployZone(fqdn: string, content: string): Promise<void> {
   const zonePath = join(ZONE_DIR, `${fqdn}.zone`)
+
+  // Delete stale BIND journal files before replacing the zone file.
+  // A full zone file replacement invalidates any existing journal (serial mismatch).
+  await unlink(`${zonePath}.jnl`).catch(() => {})
+  await unlink(`${zonePath}.jbk`).catch(() => {})
 
   await writeAtomic(zonePath, content)
   await rndcReconfig(RNDC_HOST, RNDC_PORT)
