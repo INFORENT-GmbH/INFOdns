@@ -76,3 +76,14 @@ export async function rndcReconfig(host: string, port = RNDC_PORT): Promise<void
     'reconfig',
   ])
 }
+
+export async function rndcDnssecStatus(fqdn: string): Promise<string> {
+  const { stdout } = await execFileAsync('rndc', [
+    '-4',
+    '-s', RNDC_HOST,
+    '-p', RNDC_PORT,
+    '-k', RNDC_KEY_FILE,
+    'dnssec', '-status', fqdn,
+  ])
+  return stdout
+}

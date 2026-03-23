@@ -30,7 +30,12 @@ const ZONE_DIR       = process.env.ZONE_DIR              ?? '/bind/primary/zones
 const SECONDARY_IPS: string[] = (process.env.SECONDARY_IPS ?? '')
   .split(',').map(s => s.trim()).filter(Boolean)
 
-async function writePrimaryConf(zones: string[]): Promise<void> {
+interface ZoneEntry {
+  fqdn: string
+  dnssec_enabled: boolean
+}
+
+async function writePrimaryConf(zones: ZoneEntry[]): Promise<void> {
   const confPath = join(CONF_BASE, 'primary', 'conf', 'named.conf.local')
 
   const notifyList = SECONDARY_IPS.map(ip => `${ip};`).join(' ')
@@ -50,10 +55,15 @@ async function writePrimaryConf(zones: string[]): Promise<void> {
     '',
   ]
 
-  for (const fqdn of zones) {
-    lines.push(`zone "${fqdn}" {`)
+  for (const zone of zones) {
+    lines.push(`zone "${zone.fqdn}" {`)
     lines.push(`    type primary;`)
-    lines.push(`    file "/zones/${fqdn}.zone";`)
+    lines.push(`    file "/zones/${zone.fqdn}.zone";`)
+    if (zone.dnssec_enabled) {
+      lines.push(`    dnssec-policy "default";`)
+      lines.push(`    inline-signing yes;`)
+      lines.push(`    key-directory "/var/cache/bind/keys";`)
+    }
     lines.push(`    allow-transfer { key tsig-secondary; };`)
     lines.push(`    notify yes;`)
     if (notifyList) lines.push(`    also-notify { ${notifyList} };`)
@@ -86,14 +96,14 @@ async function catalogSerial(zonePath: string): Promise<number> {
   return baseSerial
 }
 
-async function deployCatalogZone(zones: string[]): Promise<void> {
+async function deployCatalogZone(zones: ZoneEntry[]): Promise<void> {
   const zonePath = join(ZONE_DIR, `${CATALOG_ZONE}.zone`)
   const serial = await catalogSerial(zonePath)
-  const content = renderCatalogZone(CATALOG_ZONE, zones, serial)
+  const content = renderCatalogZone(CATALOG_ZONE, zones.map(z => z.fqdn), serial)
   await writeAtomic(zonePath, content)
 }
 
-export async function regenerateNamedConf(zones: string[]): Promise<void> {
+export async function regenerateNamedConf(zones: ZoneEntry[]): Promise<void> {
   await writePrimaryConf(zones)
   await deployCatalogZone(zones)
 

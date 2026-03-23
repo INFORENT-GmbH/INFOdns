@@ -33,6 +33,7 @@ const UpdateDomainBody = z.object({
   status: z.enum(['active', 'pending', 'suspended']).optional(),
   default_ttl: z.number().int().positive().optional(),
   notes: z.string().optional(),
+  dnssec_enabled: z.boolean().optional(),
 })
 
 const LabelSchema = z.object({
@@ -147,7 +148,8 @@ export async function domainRoutes(app: FastifyInstance) {
 
     const rows = await query(
       `SELECT d.id, d.fqdn, d.status, d.zone_status, d.last_serial, d.last_rendered_at,
-              d.default_ttl, d.customer_id, c.name AS customer_name, d.created_at, d.deleted_at
+              d.default_ttl, d.customer_id, c.name AS customer_name, d.created_at, d.deleted_at,
+              d.dnssec_enabled
        FROM domains d JOIN customers c ON c.id = d.customer_id${join}
        ${where}
        ORDER BY d.fqdn
@@ -218,14 +220,19 @@ export async function domainRoutes(app: FastifyInstance) {
     if (body.data.status !== undefined && req.user.role !== 'admin') {
       return reply.status(403).send({ code: 'FORBIDDEN' })
     }
+    if (body.data.dnssec_enabled !== undefined && !['admin', 'operator'].includes(req.user.role)) {
+      return reply.status(403).send({ code: 'FORBIDDEN' })
+    }
 
+    const dnssecVal = body.data.dnssec_enabled != null ? (body.data.dnssec_enabled ? 1 : 0) : null
     await execute(
       `UPDATE domains SET
          status = COALESCE(?, status),
          default_ttl = COALESCE(?, default_ttl),
-         notes = COALESCE(?, notes)
+         notes = COALESCE(?, notes),
+         dnssec_enabled = COALESCE(?, dnssec_enabled)
        WHERE id = ?`,
-      [body.data.status ?? null, body.data.default_ttl ?? null, body.data.notes ?? null, req.params.id]
+      [body.data.status ?? null, body.data.default_ttl ?? null, body.data.notes ?? null, dnssecVal, req.params.id]
     )
     const updated = await queryOne('SELECT * FROM domains WHERE id = ?', [req.params.id])
     await writeAuditLog({ req, entityType: 'domain', entityId: Number(req.params.id), domainId: Number(req.params.id), action: 'update', oldValue: old, newValue: updated })

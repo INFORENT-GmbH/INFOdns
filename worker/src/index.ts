@@ -2,7 +2,7 @@ import { query, queryOne, execute, transaction, pool } from './db.js'
 import { claimSerial } from './serialNumber.js'
 import { renderZone } from './renderZone.js'
 import { validateZone } from './validateZone.js'
-import { deployZone } from './deployZone.js'
+import { deployZone, rndcDnssecStatus } from './deployZone.js'
 import { regenerateNamedConf } from './namedConf.js'
 import { pollBulkJobs } from './bulkExecutor.js'
 import { broadcastEvent } from './broadcast.js'
@@ -58,6 +58,27 @@ interface RecordRow {
   value: string
 }
 
+// ── DNSSEC DS record extraction ───────────────────────────────
+
+async function extractDsRecords(fqdn: string): Promise<string | null> {
+  // BIND signs the zone asynchronously after the first reload with dnssec-policy.
+  // Retry a few times to give it time to generate keys.
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    await new Promise(r => setTimeout(r, 3000))
+    try {
+      const output = await rndcDnssecStatus(fqdn)
+      // rndc dnssec -status outputs lines like:  DS: 12345 13 2 <hex>
+      const dsLines = output.split('\n')
+        .filter(l => /^\s*DS:\s*\d+\s+\d+\s+\d+\s+[0-9A-Fa-f]+/.test(l))
+        .map(l => l.replace(/^\s*DS:\s*/, '').trim())
+      if (dsLines.length > 0) return dsLines.join('\n')
+    } catch (err: any) {
+      console.warn(`[worker] DS extraction for ${fqdn} (attempt ${attempt}/3):`, err.message)
+    }
+  }
+  return null
+}
+
 // ── Core render pipeline ─────────────────────────────────────
 
 async function processJob(job: QueueRow): Promise<void> {
@@ -70,10 +91,10 @@ async function processJob(job: QueueRow): Promise<void> {
 
   // Non-active domain: just sync named.conf to remove it from BIND, skip render
   if (domain.status !== 'active') {
-    const allDomains = await query<{ fqdn: string }>(
-      "SELECT fqdn FROM domains WHERE status = 'active' ORDER BY fqdn"
+    const allDomains = await query<{ fqdn: string; dnssec_enabled: number }>(
+      "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' ORDER BY fqdn"
     )
-    await regenerateNamedConf(allDomains.map(r => r.fqdn))
+    await regenerateNamedConf(allDomains.map(r => ({ fqdn: r.fqdn, dnssec_enabled: !!r.dnssec_enabled })))
     await execute("UPDATE zone_render_queue SET status = 'done', updated_at = NOW() WHERE id = ?", [job.id])
     console.log(`[worker] Job ${job.id} — ${domain.fqdn} is ${domain.status}, synced named.conf, skipped render`)
     return
@@ -106,15 +127,28 @@ async function processJob(job: QueueRow): Promise<void> {
   }
 
   // Step 6: Ensure named.conf.local is up-to-date (covers newly added domains)
-  const allDomains = await query<{ fqdn: string }>(
-    "SELECT fqdn FROM domains WHERE status = 'active' ORDER BY fqdn"
+  const allDomains = await query<{ fqdn: string; dnssec_enabled: number }>(
+    "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' ORDER BY fqdn"
   )
   const allZones = allDomains.map(r => r.fqdn)
   console.log(`[worker] Syncing named.conf.local with ${allZones.length} zones (includes ${domain.fqdn}: ${allZones.includes(domain.fqdn)})`)
-  await regenerateNamedConf(allZones)
+  await regenerateNamedConf(allDomains.map(r => ({ fqdn: r.fqdn, dnssec_enabled: !!r.dnssec_enabled })))
 
   // Step 7: Atomic file replace + rndc reload
   await deployZone(domain.fqdn, content)
+
+  // Step 7b: Extract DS records for DNSSEC-enabled domains (best-effort, non-fatal)
+  const dnssecRow = await queryOne<{ dnssec_enabled: number }>(
+    'SELECT dnssec_enabled FROM domains WHERE id = ?', [domainId]
+  )
+  if (dnssecRow?.dnssec_enabled) {
+    const ds = await extractDsRecords(domain.fqdn)
+    if (ds !== null) {
+      await execute('UPDATE domains SET dnssec_ds = ? WHERE id = ?', [ds, domainId])
+    }
+  } else {
+    await execute('UPDATE domains SET dnssec_ds = NULL WHERE id = ?', [domainId])
+  }
 
   // Step 8: Mark domain clean
   await execute(
@@ -193,10 +227,10 @@ async function poll(): Promise<void> {
 
 async function syncNamedConf(): Promise<void> {
   try {
-    const rows = await query<{ fqdn: string }>(
-      "SELECT fqdn FROM domains WHERE status = 'active' ORDER BY fqdn"
+    const rows = await query<{ fqdn: string; dnssec_enabled: number }>(
+      "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' ORDER BY fqdn"
     )
-    const zones = rows.map(r => r.fqdn)
+    const zones = rows.map(r => ({ fqdn: r.fqdn, dnssec_enabled: !!r.dnssec_enabled }))
     await regenerateNamedConf(zones)
     console.log(`[worker] named.conf.local synced — ${zones.length} zones`)
   } catch (err: any) {

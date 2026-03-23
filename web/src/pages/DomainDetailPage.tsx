@@ -81,6 +81,7 @@ export default function DomainDetailPage() {
   const { t } = useI18n()
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
+  const isOperator = user?.role === 'operator'
 
   // edits: changes to existing records keyed by record id
   const [edits, setEdits] = useState<Record<number, EditRow>>({})
@@ -107,6 +108,7 @@ export default function DomainDetailPage() {
   const [editAdminOnly, setEditAdminOnly] = useState(false)
   const [savingLabels, setSavingLabels] = useState(false)
   const [togglingStatus, setTogglingStatus] = useState(false)
+  const [togglingDnssec, setTogglingDnssec] = useState(false)
   const [deletingDomain, setDeletingDomain] = useState(false)
   const [showAddKeyDrop, setShowAddKeyDrop] = useState(false)
   const [showEditKeyDrop, setShowEditKeyDrop] = useState(false)
@@ -407,6 +409,20 @@ export default function DomainDetailPage() {
     }
   }
 
+  async function handleToggleDnssec() {
+    if (!domain || togglingDnssec) return
+    setTogglingDnssec(true)
+    try {
+      await updateDomain(domainId, { dnssec_enabled: !domain.dnssec_enabled } as any)
+      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      qc.invalidateQueries({ queryKey: ['domains'] })
+    } catch (err: any) {
+      alert(err.response?.data?.message ?? err.message)
+    } finally {
+      setTogglingDnssec(false)
+    }
+  }
+
   async function handleDelete() {
     if (!domain || !window.confirm(`Delete ${domain.fqdn}? It will be permanently purged after 30 days.`)) return
     setDeletingDomain(true)
@@ -433,9 +449,9 @@ export default function DomainDetailPage() {
         <Link to="/domains" style={styles.back}>{t('domainDetail_backLink')}</Link>
         <h2 style={styles.h2}>{domain.fqdn}</h2>
         <ZoneStatusBadge status={domain.zone_status} />
-        {isAdmin && (
+        {(isAdmin || isOperator) && (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '.5rem' }}>
-            {domain.status !== 'deleted' && (
+            {isAdmin && domain.status !== 'deleted' && (
               <button
                 onClick={handleToggleStatus}
                 disabled={togglingStatus}
@@ -444,9 +460,20 @@ export default function DomainDetailPage() {
                 {togglingStatus ? '…' : domain.status === 'suspended' ? 'Enable' : 'Disable'}
               </button>
             )}
-            <button onClick={handleDelete} disabled={deletingDomain} style={styles.btnDanger}>
-              {deletingDomain ? '…' : 'Delete'}
-            </button>
+            {domain.status !== 'deleted' && (
+              <button
+                onClick={handleToggleDnssec}
+                disabled={togglingDnssec}
+                style={domain.dnssec_enabled ? styles.btnWarning : styles.btnSecondary}
+              >
+                {togglingDnssec ? '…' : domain.dnssec_enabled ? 'DNSSEC: ON' : 'DNSSEC: OFF'}
+              </button>
+            )}
+            {isAdmin && (
+              <button onClick={handleDelete} disabled={deletingDomain} style={styles.btnDanger}>
+                {deletingDomain ? '…' : 'Delete'}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -468,6 +495,30 @@ export default function DomainDetailPage() {
         <span>{t('serial')}: <code>{domain.last_serial || '—'}</code></span>
         <span>{t('domainDetail_lastRendered')} {domain.last_rendered_at ? new Date(domain.last_rendered_at).toLocaleString() : t('never')}</span>
       </div>
+
+      {!!domain.dnssec_enabled && (
+        <div style={{ margin: '0 0 1rem', padding: '.75rem 1rem', background: '#f0fdf4', borderRadius: 6, border: '1px solid #86efac' }}>
+          <strong style={{ fontSize: '.8125rem', color: '#166534' }}>DNSSEC DS Records</strong>
+          <span style={{ fontSize: '.75rem', color: '#6b7280', marginLeft: '.5rem' }}>paste into your registrar's DS record field</span>
+          {domain.dnssec_ds ? (
+            <>
+              <pre style={{ margin: '.5rem 0 0', fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: '.8125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#111827' }}>
+                {domain.dnssec_ds}
+              </pre>
+              <button
+                onClick={() => navigator.clipboard.writeText(domain.dnssec_ds!)}
+                style={{ ...styles.btnSecondary, marginTop: '.5rem', fontSize: '.75rem' }}
+              >
+                Copy
+              </button>
+            </>
+          ) : (
+            <p style={{ margin: '.5rem 0 0', fontSize: '.8125rem', color: '#6b7280' }}>
+              Signing in progress — DS records will appear here once BIND has generated keys (may take ~10 seconds after enabling).
+            </p>
+          )}
+        </div>
+      )}
 
       <div style={styles.labelsSection}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>

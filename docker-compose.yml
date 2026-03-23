@@ -134,6 +134,7 @@ services:
       - ./bind/primary/named.conf.local:/etc/bind/named.conf.local
       - ./bind/keys:/etc/bind/keys:ro
       - ./bind/primary/zones:/zones
+      - ./bind/primary/keys-dnssec:/var/cache/bind/keys
     ports:
       - "53:53/tcp"       # AXFR zone transfers from secondaries
       - "53:53/udp"       # NOTIFY to secondaries

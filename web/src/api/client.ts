@@ -86,6 +86,8 @@ export interface Domain {
   reminder_flags: number
   labels: Label[]
   zone_error?: string | null
+  dnssec_enabled: number
+  dnssec_ds: string | null
 }
 
 export interface DnsRecord {
