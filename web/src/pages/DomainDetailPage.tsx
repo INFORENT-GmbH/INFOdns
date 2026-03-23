@@ -31,6 +31,11 @@ const INLINE_STYLES = `
 
 const RECORD_TYPES = ['A','AAAA','CNAME','MX','NS','TXT','SRV','CAA','PTR','NAPTR','TLSA','SSHFP','DS']
 
+const DNSSEC_ALGO_NAMES: Record<string, string> = {
+  '5': 'RSASHA1', '8': 'RSASHA256', '10': 'RSASHA512',
+  '13': 'ECDSA256', '14': 'ECDSA384', '15': 'Ed25519', '16': 'Ed448',
+}
+
 interface EditRow {
   name: string
   type: string
@@ -109,6 +114,7 @@ export default function DomainDetailPage() {
   const [savingLabels, setSavingLabels] = useState(false)
   const [togglingStatus, setTogglingStatus] = useState(false)
   const [togglingDnssec, setTogglingDnssec] = useState(false)
+  const [copiedKey, setCopiedKey] = useState(false)
   const [deletingDomain, setDeletingDomain] = useState(false)
   const [showAddKeyDrop, setShowAddKeyDrop] = useState(false)
   const [showEditKeyDrop, setShowEditKeyDrop] = useState(false)
@@ -498,23 +504,33 @@ export default function DomainDetailPage() {
 
       {!!domain.dnssec_enabled && (
         <div style={{ margin: '0 0 1rem', padding: '.75rem 1rem', background: '#f0fdf4', borderRadius: 6, border: '1px solid #86efac' }}>
-          <strong style={{ fontSize: '.8125rem', color: '#166534' }}>DNSSEC DS Records</strong>
-          <span style={{ fontSize: '.75rem', color: '#6b7280', marginLeft: '.5rem' }}>paste into your registrar's DS record field</span>
-          {domain.dnssec_ds ? (
-            <>
-              <pre style={{ margin: '.5rem 0 0', fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: '.8125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#111827' }}>
-                {domain.dnssec_ds}
-              </pre>
-              <button
-                onClick={() => navigator.clipboard.writeText(domain.dnssec_ds!)}
-                style={{ ...styles.btnSecondary, marginTop: '.5rem', fontSize: '.75rem' }}
-              >
-                Copy
-              </button>
-            </>
-          ) : (
+          <strong style={{ fontSize: '.8125rem', color: '#166534' }}>DNSSEC</strong>
+          {domain.dnssec_ds ? (() => {
+            const parts = domain.dnssec_ds!.split(' ')
+            const [dFlags, dProto, dAlgo] = parts
+            const dKey = parts.slice(3).join('')
+            const algoLabel = DNSSEC_ALGO_NAMES[dAlgo] ? `${DNSSEC_ALGO_NAMES[dAlgo]} (${dAlgo})` : dAlgo
+            return (
+              <div style={{ marginTop: '.5rem', display: 'grid', gridTemplateColumns: 'auto auto auto 1fr', gap: '.2rem 1.25rem', alignItems: 'baseline', fontSize: '.8125rem' }}>
+                <span style={{ color: '#6b7280', fontWeight: 500 }}>Flags</span>
+                <span style={{ color: '#6b7280', fontWeight: 500 }}>Proto</span>
+                <span style={{ color: '#6b7280', fontWeight: 500 }}>Algorithm</span>
+                <span style={{ color: '#6b7280', fontWeight: 500 }}>Public Key</span>
+                <span style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", color: '#111827' }}>{dFlags}</span>
+                <span style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", color: '#111827' }}>{dProto}</span>
+                <span style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", color: '#111827' }}>{algoLabel}</span>
+                <span
+                  title={copiedKey ? 'Copied!' : 'Click to copy'}
+                  onClick={() => { navigator.clipboard.writeText(dKey); setCopiedKey(true); setTimeout(() => setCopiedKey(false), 2000) }}
+                  style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", color: '#111827', cursor: 'pointer', wordBreak: 'break-all', background: copiedKey ? '#bbf7d0' : 'transparent', borderRadius: 3, padding: '1px 2px', transition: 'background .2s' }}
+                >
+                  {dKey}
+                </span>
+              </div>
+            )
+          })() : (
             <p style={{ margin: '.5rem 0 0', fontSize: '.8125rem', color: '#6b7280' }}>
-              Signing in progress — DS records will appear here once BIND has generated keys (may take ~10 seconds after enabling).
+              Signing in progress — DNSKEY will appear here once BIND has generated keys (may take ~10 seconds after enabling).
             </p>
           )}
         </div>

@@ -10,7 +10,6 @@ import { queueMail, pollMailQueue } from './mailer.js'
 import { pollImap } from './ticketMailImporter.js'
 import { existsSync } from 'fs'
 import { readdir, readFile } from 'fs/promises'
-import { createHash } from 'crypto'
 import { join } from 'path'
 
 const BIND_KEYS_DIR = process.env.BIND_KEYS_DIR ?? '/bind/primary/keys'
@@ -62,45 +61,21 @@ interface RecordRow {
   value: string
 }
 
-// ── DNSSEC DS record extraction ───────────────────────────────
+// ── DNSSEC DNSKEY extraction ──────────────────────────────────
 
 /**
- * Compute a DS record (SHA-256, digest type 2) from a BIND public key file.
- * Returns "<keytag> <algorithm> 2 <HEX>" or null if the file is not a KSK/CSK.
+ * Extract DNSKEY data from a BIND public key file.
+ * Returns "<flags> <protocol> <algorithm> <base64key>" or null if not a KSK/CSK.
  */
-function computeDsFromKeyFile(fqdn: string, content: string): string | null {
-  // Key file has a line: <zone>. IN DNSKEY <flags> <protocol> <algorithm> <base64key>
-  const m = content.match(/^[^;].*\bDNSKEY\b\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+)/m)
-  if (!m) return null
-  const [, flags, protocol, algorithm, keyBase64] = m
-  // Only KSK / CSK (SEP bit set: flags & 1 == 1)
-  if (!(Number(flags) & 1)) return null
-
-  const keyBuf = Buffer.from(keyBase64, 'base64')
-  const rdata = Buffer.alloc(4 + keyBuf.length)
-  rdata.writeUInt16BE(Number(flags), 0)
-  rdata.writeUInt8(Number(protocol), 2)
-  rdata.writeUInt8(Number(algorithm), 3)
-  keyBuf.copy(rdata, 4)
-
-  // Key tag — RFC 4034 Appendix B
-  let ac = 0
-  for (let i = 0; i < rdata.length; i++) ac += (i & 1) ? rdata[i] : rdata[i] << 8
-  ac += (ac >> 16) & 0xffff
-  const keyTag = ac & 0xffff
-
-  // Owner name in DNS wire format (lowercase labels)
-  const labels = fqdn.replace(/\.$/, '').split('.')
-  const wireParts: Buffer[] = []
-  for (const label of labels) {
-    const lb = Buffer.from(label.toLowerCase())
-    wireParts.push(Buffer.from([lb.length]), lb)
+function extractDnskeyFromKeyFile(content: string): string | null {
+  for (const line of content.split('\n')) {
+    if (line.trimStart().startsWith(';')) continue
+    const m = line.match(/DNSKEY\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+)/)
+    if (!m) continue
+    const [, flags, protocol, algorithm, key] = m
+    if (Number(flags) & 1) return `${flags} ${protocol} ${algorithm} ${key}`
   }
-  wireParts.push(Buffer.from([0]))
-  const ownerWire = Buffer.concat(wireParts)
-
-  const digest = createHash('sha256').update(ownerWire).update(rdata).digest('hex').toUpperCase()
-  return `${keyTag} ${algorithm} 2 ${digest}`
+  return null
 }
 
 async function extractDsRecords(fqdn: string): Promise<string | null> {
@@ -112,16 +87,13 @@ async function extractDsRecords(fqdn: string): Promise<string | null> {
       const prefix = `K${fqdn}.`
       const keyFiles = files.filter(f => f.startsWith(prefix) && f.endsWith('.key'))
       if (keyFiles.length === 0) continue
-
-      const dsLines: string[] = []
       for (const kf of keyFiles) {
         const content = await readFile(join(BIND_KEYS_DIR, kf), 'utf8')
-        const ds = computeDsFromKeyFile(fqdn, content)
-        if (ds) dsLines.push(ds)
+        const dnskey = extractDnskeyFromKeyFile(content)
+        if (dnskey) return dnskey
       }
-      if (dsLines.length > 0) return dsLines.join('\n')
     } catch (err: any) {
-      console.warn(`[worker] DS extraction attempt ${attempt}/5:`, err.message)
+      console.warn(`[worker] DNSKEY extraction attempt ${attempt}/5:`, err.message)
     }
   }
   return null
