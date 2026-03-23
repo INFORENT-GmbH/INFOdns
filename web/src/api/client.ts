@@ -222,6 +222,9 @@ export interface ZoneImportParseResult {
   skipped: string[]
 }
 
+export const getZoneText = (domainId: number) =>
+  api.get<{ text: string }>(`/domains/${domainId}/zone-text`)
+
 export const parseZoneImport = (domainId: number, file: File) => {
   const fd = new FormData()
   fd.append('file', file)

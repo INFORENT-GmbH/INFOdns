@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getDomain, getRecords, createRecord, deleteRecord,
   createBulkJob, previewBulkJob, approveBulkJob, searchByRecord,
-  updateDomainLabels, getLabelSuggestions, updateDomain, deleteDomain,
+  updateDomainLabels, getLabelSuggestions, updateDomain, deleteDomain, getZoneText,
   type DnsRecord, type Label, type Domain, type LabelSuggestion,
 } from '../api/client'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
@@ -80,6 +80,7 @@ export default function DomainDetailPage() {
   // newRows: new records not yet saved
   const [newRows, setNewRows] = useState<NewRow[]>([])
   const [showImportModal, setShowImportModal] = useState(false)
+  const [zoneModal, setZoneModal] = useState<{ text: string; highlightLine: number } | null>(null)
 
   const [applying, setApplying] = useState(false)
   const applyingRef = useRef(false)
@@ -444,7 +445,7 @@ export default function DomainDetailPage() {
           <strong>{t('domainDetail_zoneFailed')}</strong>
           {domain.zone_error && (
             <pre style={{ margin: '.5rem 0 0', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: '.8125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-              {domain.zone_error}
+              {renderZoneError(domain.zone_error, domainId, setZoneModal)}
             </pre>
           )}
         </div>
@@ -651,6 +652,14 @@ export default function DomainDetailPage() {
           onClose={() => setShowImportModal(false)}
         />
       )}
+
+      {zoneModal && (
+        <ZoneFileModal
+          text={zoneModal.text}
+          highlightLine={zoneModal.highlightLine}
+          onClose={() => setZoneModal(null)}
+        />
+      )}
     </div>
   )
 }
@@ -693,4 +702,98 @@ const styles: Record<string, React.CSSProperties> = {
   btnWarning: { padding: '.375rem .875rem', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
   btnSuccess: { padding: '.375rem .875rem', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
   btnDanger: { padding: '.375rem .875rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
+}
+
+// ── Zone error with clickable file paths ──────────────────────
+
+const ZONE_PATH_RE = /(\/tmp\/infodns-[a-f0-9]+\.zone):(\d+)/g
+
+function renderZoneError(
+  errorText: string,
+  domainId: number,
+  setZoneModal: (v: { text: string; highlightLine: number } | null) => void,
+): ReactNode[] {
+  const parts: ReactNode[] = []
+  let last = 0
+  let match: RegExpExecArray | null
+
+  ZONE_PATH_RE.lastIndex = 0
+  while ((match = ZONE_PATH_RE.exec(errorText)) !== null) {
+    if (match.index > last) parts.push(errorText.slice(last, match.index))
+    const lineNum = Number(match[2])
+    const matchText = match[0]
+    parts.push(
+      <button
+        key={match.index}
+        onClick={async () => {
+          try {
+            const res = await getZoneText(domainId)
+            setZoneModal({ text: res.data.text, highlightLine: lineNum })
+          } catch { /* ignore */ }
+        }}
+        style={{ background: 'none', border: 'none', color: '#7f1d1d', textDecoration: 'underline', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', padding: 0 }}
+      >
+        {matchText}
+      </button>
+    )
+    last = match.index + matchText.length
+  }
+  if (last < errorText.length) parts.push(errorText.slice(last))
+  return parts
+}
+
+// ── Zone file viewer modal ────────────────────────────────────
+
+function ZoneFileModal({ text, highlightLine, onClose }: { text: string; highlightLine: number; onClose: () => void }) {
+  const lines = text.split('\n')
+  const lineRefs = useRef<(HTMLTableRowElement | null)[]>([])
+
+  useEffect(() => {
+    lineRefs.current[highlightLine - 1]?.scrollIntoView({ block: 'center' })
+  }, [highlightLine])
+
+  return (
+    <div style={zm.overlay} onClick={onClose}>
+      <div style={zm.modal} onClick={e => e.stopPropagation()}>
+        <div style={zm.header}>
+          <span style={zm.title}>Zone file — line {highlightLine} highlighted</span>
+          <button onClick={onClose} style={zm.closeBtn}>✕</button>
+        </div>
+        <div style={zm.body}>
+          <table style={zm.table}>
+            <tbody>
+              {lines.map((line, i) => {
+                const lineNo = i + 1
+                const isHighlight = lineNo === highlightLine
+                return (
+                  <tr
+                    key={i}
+                    ref={el => { lineRefs.current[i] = el }}
+                    style={isHighlight ? zm.rowHighlight : zm.row}
+                  >
+                    <td style={zm.lineNo}>{lineNo}</td>
+                    <td style={zm.lineContent}>{line || ' '}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const zm: Record<string, React.CSSProperties> = {
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200 },
+  modal: { background: '#1e1e1e', borderRadius: 8, width: '80vw', maxWidth: 900, height: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 8px 32px rgba(0,0,0,.4)', overflow: 'hidden' },
+  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.75rem 1rem', background: '#2d2d2d', borderBottom: '1px solid #444', flexShrink: 0 },
+  title: { color: '#e5e7eb', fontSize: '.875rem', fontWeight: 600 },
+  closeBtn: { background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '1rem', padding: '0 4px' },
+  body: { overflowY: 'auto', flex: 1, padding: '.5rem 0' },
+  table: { width: '100%', borderCollapse: 'collapse', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: '.8rem' },
+  row: { background: 'transparent' },
+  rowHighlight: { background: '#7f1d1d' },
+  lineNo: { padding: '1px 1rem 1px .75rem', color: '#6b7280', textAlign: 'right', userSelect: 'none', whiteSpace: 'nowrap', minWidth: 48, verticalAlign: 'top' },
+  lineContent: { padding: '1px .75rem 1px 0', color: '#e5e7eb', whiteSpace: 'pre', wordBreak: 'keep-all' },
 }
