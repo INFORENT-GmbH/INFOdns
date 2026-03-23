@@ -18,6 +18,15 @@ const INLINE_STYLES = `
   .inline-field:hover { border-color: #d1d5db !important; background: #fff !important; }
   .inline-field:focus { border-color: #2563eb !important; background: #fff !important; outline: none !important; box-shadow: 0 0 0 2px #bfdbfe; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .alias-hint { position: relative; display: inline-block; }
+  .alias-hint::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+    background: #1f2937; color: #f9fafb; font-size: .75rem; font-weight: 400;
+    padding: 5px 8px; border-radius: 5px; white-space: normal; width: 220px;
+    pointer-events: none; opacity: 0; transition: opacity 0s;
+  }
+  .alias-hint:hover::after { opacity: 1; }
 `
 
 const RECORD_TYPES = ['A','AAAA','CNAME','MX','NS','TXT','SRV','CAA','PTR','NAPTR','TLSA','SSHFP','DS']
@@ -614,7 +623,7 @@ export default function DomainDetailPage() {
                       {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
                     </select>
                     {rec.type === 'ALIAS' && (
-                      <span title="CNAME flattening — this record is stored as an alias and resolved to A/AAAA addresses at zone render time, allowing a CNAME-like record at the zone apex."
+                      <span className="alias-hint" data-tip="CNAME flattening — resolved to A/AAAA at zone render time, allowing a CNAME-like record at the apex."
                         style={{ marginLeft: 4, cursor: 'help', color: '#9ca3af', fontWeight: 700, fontSize: '.8rem' }}>?</span>
                     )}
                   </td>
