@@ -54,6 +54,7 @@ jobs:
             --exclude='api/node_modules/' \
             --exclude='worker/node_modules/' \
             --exclude='bind/primary/zones/' \
+            --exclude='bind/primary/keys-dnssec/' \
             ./ ${{ vars.SSH_PATH_NS1 }}/
 
       - name: Parse ns2 and ns3 hosts
@@ -157,7 +158,7 @@ jobs:
         run: |
           ssh ${{ steps.parse.outputs.host }} "
             cd ${{ steps.parse.outputs.path }} &&
-            mkdir -p bind/primary/zones &&
+            mkdir -p bind/primary/zones bind/primary/keys-dnssec &&
             chmod 777 bind/primary/zones bind/primary &&
             docker compose pull --quiet 2>/dev/null || true &&
             docker compose up -d --build --force-recreate --remove-orphans
