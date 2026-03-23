@@ -10,6 +10,9 @@ options {
     // Do not recurse
     recursion no;
 
+    forwarders { 1.1.1.1; 1.0.0.1; };
+    forward only;
+
     listen-on    { any; };
     listen-on-v6 { any; };
 

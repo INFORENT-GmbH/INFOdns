@@ -30,6 +30,7 @@ const INLINE_STYLES = `
 `
 
 const RECORD_TYPES = ['A','AAAA','CNAME','MX','NS','TXT','SRV','CAA','PTR','NAPTR','TLSA','SSHFP','DS']
+const MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
 
 const DNSSEC_ALGO_NAMES: Record<string, string> = {
   '5': 'RSASHA1', '8': 'RSASHA256', '10': 'RSASHA512',
@@ -41,6 +42,9 @@ interface EditRow {
   type: string
   ttl: string
   value: string
+  priority: string
+  weight: string
+  port: string
 }
 
 interface NewRow extends EditRow {
@@ -152,7 +156,10 @@ export default function DomainDetailPage() {
       name: rec.name,
       type: rec.type,
       ttl: rec.ttl != null ? String(rec.ttl) : '',
-      value: formatValue(rec),
+      value: rec.value,
+      priority: rec.priority != null ? String(rec.priority) : '',
+      weight: rec.weight != null ? String(rec.weight) : '',
+      port: rec.port != null ? String(rec.port) : '',
     }
   }
 
@@ -163,10 +170,14 @@ export default function DomainDetailPage() {
       name: rec.name,
       type: rec.type,
       ttl: rec.ttl != null ? String(rec.ttl) : '',
-      value: formatValue(rec),
+      value: rec.value,
+      priority: rec.priority != null ? String(rec.priority) : '',
+      weight: rec.weight != null ? String(rec.weight) : '',
+      port: rec.port != null ? String(rec.port) : '',
     }
     const isDirty = next.name !== original.name || next.type !== original.type ||
-      next.ttl !== original.ttl || next.value !== original.value
+      next.ttl !== original.ttl || next.value !== original.value ||
+      next.priority !== original.priority || next.weight !== original.weight || next.port !== original.port
     if (isDirty) {
       setEdits(prev => ({ ...prev, [recId]: next }))
     } else {
@@ -186,7 +197,7 @@ export default function DomainDetailPage() {
   // ── new row helpers ──────────────────────────────────────────────────────
 
   function addNewRow() {
-    setNewRows(prev => [{ _newId: crypto.randomUUID(), name: '@', type: 'A', ttl: '', value: '' }, ...prev])
+    setNewRows(prev => [{ _newId: crypto.randomUUID(), name: '@', type: 'A', ttl: '', value: '', priority: '', weight: '', port: '' }, ...prev])
   }
 
   function setNewField(newId: string, field: keyof EditRow, value: string) {
@@ -218,12 +229,11 @@ export default function DomainDetailPage() {
         if (body.type === 'CNAME' && body.name === '@') body.type = 'ALIAS'
         if (ttlNum !== undefined) body.ttl = ttlNum
         if (row.type === 'MX') {
-          const parts = row.value.trim().split(/\s+/)
-          body.priority = Number(parts[0]); body.value = parts.slice(1).join(' ')
+          body.priority = Number(row.priority)
         } else if (row.type === 'SRV') {
-          const parts = row.value.trim().split(/\s+/)
-          body.priority = Number(parts[0]); body.weight = Number(parts[1])
-          body.port = Number(parts[2]); body.value = parts.slice(3).join(' ')
+          body.priority = Number(row.priority)
+          body.weight = Number(row.weight)
+          body.port = Number(row.port)
         }
         await createRecord(domainId, body)
       }
@@ -241,12 +251,13 @@ export default function DomainDetailPage() {
         const ttlNum = row.ttl === '' ? null : Number(row.ttl)
         let priority: number | undefined, weight: number | undefined, port: number | undefined, value: string
         if (row.type === 'MX') {
-          const parts = row.value.trim().split(/\s+/)
-          priority = Number(parts[0]); value = parts.slice(1).join(' ')
+          priority = Number(row.priority)
+          value = row.value.trim()
         } else if (row.type === 'SRV') {
-          const parts = row.value.trim().split(/\s+/)
-          priority = Number(parts[0]); weight = Number(parts[1]); port = Number(parts[2])
-          value = parts.slice(3).join(' ')
+          priority = Number(row.priority)
+          weight = Number(row.weight)
+          port = Number(row.port)
+          value = row.value.trim()
         } else {
           value = row.value.trim()
         }
@@ -632,6 +643,9 @@ export default function DomainDetailPage() {
               <th style={styles.th}>{t('name')}</th>
               <th style={styles.th}>{t('type')}</th>
               <th style={styles.th}>{t('ttl')}</th>
+              <th style={{ ...styles.th, width: 52 }}>Pri</th>
+              <th style={{ ...styles.th, width: 48 }}>Wt</th>
+              <th style={{ ...styles.th, width: 58 }}>Port</th>
               <th style={styles.th}>{t('value')}</th>
               <th style={styles.th}></th>
             </tr>
@@ -662,9 +676,28 @@ export default function DomainDetailPage() {
                       className="alias-hint" data-tip="Reset to domain default" style={{ ...styles.btnIcon, color: '#9ca3af', marginLeft: 2 }}>↺</button>
                   )}
                 </td>
+                <td style={styles.td}>
+                  {(row.type === 'MX' || row.type === 'SRV') && (
+                    <input value={row.priority} onChange={e => setNewField(row._newId, 'priority', e.target.value)}
+                      className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
+                  )}
+                </td>
+                <td style={styles.td}>
+                  {row.type === 'SRV' && (
+                    <input value={row.weight} onChange={e => setNewField(row._newId, 'weight', e.target.value)}
+                      className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
+                  )}
+                </td>
+                <td style={styles.td}>
+                  {row.type === 'SRV' && (
+                    <input value={row.port} onChange={e => setNewField(row._newId, 'port', e.target.value)}
+                      className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
+                  )}
+                </td>
                 <td style={{ ...styles.td, ...styles.valueCell }}>
                   <input value={row.value} onChange={e => setNewField(row._newId, 'value', e.target.value)}
-                    placeholder={t('domainDetail_valuePlaceholder')} className="inline-field" style={{ ...styles.inlineInput, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", width: '100%' }} />
+                    placeholder={t('domainDetail_valuePlaceholder')} className="inline-field"
+                    style={{ ...styles.inlineInput, fontFamily: MONO, width: '100%' }} />
                 </td>
                 <td style={{ ...styles.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                   <span style={styles.newBadge}>{t('domainDetail_newBadge')}</span>
@@ -711,10 +744,28 @@ export default function DomainDetailPage() {
                         className="alias-hint" data-tip="Reset to domain default" style={{ ...styles.btnIcon, color: '#9ca3af', marginLeft: 2 }}>↺</button>
                     )}
                   </td>
+                  <td style={styles.td}>
+                    {(row.type === 'MX' || row.type === 'SRV') && (
+                      <input value={row.priority} onChange={e => setField(rec.id, rec, 'priority', e.target.value)}
+                        disabled={isDeleted} className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
+                    )}
+                  </td>
+                  <td style={styles.td}>
+                    {row.type === 'SRV' && (
+                      <input value={row.weight} onChange={e => setField(rec.id, rec, 'weight', e.target.value)}
+                        disabled={isDeleted} className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
+                    )}
+                  </td>
+                  <td style={styles.td}>
+                    {row.type === 'SRV' && (
+                      <input value={row.port} onChange={e => setField(rec.id, rec, 'port', e.target.value)}
+                        disabled={isDeleted} className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
+                    )}
+                  </td>
                   <td style={{ ...styles.td, ...styles.valueCell }}>
                     <input value={row.value} onChange={e => setField(rec.id, rec, 'value', e.target.value)}
                       disabled={isDeleted} className="inline-field"
-                      style={{ ...styles.inlineInput, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", width: '100%' }} />
+                      style={{ ...styles.inlineInput, fontFamily: MONO, width: '100%' }} />
                   </td>
                   <td style={{ ...styles.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                     {!isDeleted && <BulkEditButton rec={rec} />}
@@ -732,7 +783,7 @@ export default function DomainDetailPage() {
             })}
 
             {records.length === 0 && newRows.length === 0 && (
-              <tr><td colSpan={5} style={{ ...styles.td, textAlign: 'center', color: '#9ca3af' }}>{t('domainDetail_noRecords')}</td></tr>
+              <tr><td colSpan={8} style={{ ...styles.td, textAlign: 'center', color: '#9ca3af' }}>{t('domainDetail_noRecords')}</td></tr>
             )}
           </tbody>
         </table>
@@ -760,11 +811,6 @@ export default function DomainDetailPage() {
 }
 
 
-function formatValue(rec: DnsRecord): string {
-  if (rec.type === 'MX') return `${rec.priority} ${rec.value}`
-  if (rec.type === 'SRV') return `${rec.priority} ${rec.weight} ${rec.port} ${rec.value}`
-  return rec.value
-}
 
 const styles: Record<string, React.CSSProperties> = {
   header: { display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '.5rem' },

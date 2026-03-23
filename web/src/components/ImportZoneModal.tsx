@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { parseZoneImport, type DnsRecord, type ParsedImportRecord, type ImportConflict, type ZoneImportParseResult } from '../api/client'
 
-interface EditRow { name: string; type: string; ttl: string; value: string }
+interface EditRow { name: string; type: string; ttl: string; value: string; priority: string; weight: string; port: string }
 interface NewRow extends EditRow { _newId: string }
 
 interface Props {
@@ -76,19 +76,27 @@ export default function ImportZoneModal({ domainId, onStage, onClose }: Props) {
 
     for (const entry of entries) {
       if (entry.kind === 'new' && entry.checked) {
+        const r = entry.record
         newRows.push({
           _newId: crypto.randomUUID(),
-          name: entry.record.name,
-          type: entry.record.type,
-          ttl: entry.record.ttl != null ? String(entry.record.ttl) : '',
-          value: formatImportValue(entry.record),
+          name: r.name,
+          type: r.type,
+          ttl: r.ttl != null ? String(r.ttl) : '',
+          value: r.value,
+          priority: r.priority != null ? String(r.priority) : '',
+          weight: r.weight != null ? String(r.weight) : '',
+          port: r.port != null ? String(r.port) : '',
         })
       } else if (entry.kind === 'conflict' && entry.choice === 'overwrite') {
+        const r = entry.conflict.incoming
         edits[entry.conflict.existing.id] = {
-          name: entry.conflict.incoming.name,
-          type: entry.conflict.incoming.type,
-          ttl: entry.conflict.incoming.ttl != null ? String(entry.conflict.incoming.ttl) : '',
-          value: formatImportValue(entry.conflict.incoming),
+          name: r.name,
+          type: r.type,
+          ttl: r.ttl != null ? String(r.ttl) : '',
+          value: r.value,
+          priority: r.priority != null ? String(r.priority) : '',
+          weight: r.weight != null ? String(r.weight) : '',
+          port: r.port != null ? String(r.port) : '',
         }
       }
     }
