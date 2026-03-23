@@ -200,6 +200,34 @@ export const getLabelSuggestions = (customerId?: number) =>
     params: customerId != null ? { customer_id: customerId } : undefined,
   })
 
+// Zone import
+export interface ParsedImportRecord {
+  name: string
+  type: string
+  ttl: number | null
+  priority: number | null
+  weight: number | null
+  port: number | null
+  value: string
+}
+
+export interface ImportConflict {
+  existing: DnsRecord
+  incoming: ParsedImportRecord
+}
+
+export interface ZoneImportParseResult {
+  new: ParsedImportRecord[]
+  conflicts: ImportConflict[]
+  skipped: string[]
+}
+
+export const parseZoneImport = (domainId: number, file: File) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  return api.post<ZoneImportParseResult>(`/domains/${domainId}/zone-import/parse`, fd)
+}
+
 // Records
 export const getRecords = (domainId: number) =>
   api.get<DnsRecord[]>(`/domains/${domainId}/records`)

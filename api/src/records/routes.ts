@@ -1,9 +1,10 @@
 import { FastifyInstance } from 'fastify'
-import { queryOne, execute } from '../db.js'
+import { query, queryOne, execute } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { writeAuditLog } from '../audit/middleware.js'
 import { validateRecord } from './validators.js'
 import { broadcast } from '../ws/hub.js'
+import { parseZoneFile } from './parseZone.js'
 
 /** Enqueue a zone render job for a domain (upsert — one pending job per domain) */
 async function enqueueRender(domainId: number) {
@@ -120,6 +121,70 @@ export async function recordRoutes(app: FastifyInstance) {
       broadcast({ type: 'record_changed', domainId: domain.id })
       await writeAuditLog({ req, entityType: 'dns_record', entityId: Number(req.params.id), domainId: domain.id, action: 'delete', oldValue: old })
       return { ok: true }
+    }
+  )
+
+  // POST /domains/:domainId/zone-import/parse
+  app.post<{ Params: { domainId: string } }>(
+    '/domains/:domainId/zone-import/parse',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const domain = await resolveDomain(req.params.domainId, req, reply)
+      if (!domain) return
+
+      const domainData = await queryOne<{ fqdn: string; default_ttl: number }>(
+        'SELECT fqdn, default_ttl FROM domains WHERE id = ?',
+        [domain.id]
+      )
+      if (!domainData) return reply.status(404).send({ code: 'NOT_FOUND' })
+
+      // Read uploaded file
+      let fileText = ''
+      try {
+        for await (const part of (req as any).files()) {
+          const chunks: Buffer[] = []
+          for await (const chunk of part.file) chunks.push(chunk as Buffer)
+          fileText = Buffer.concat(chunks).toString('utf8')
+          break // only process first file
+        }
+      } catch (err: any) {
+        if (err.code === 'FST_REQ_FILE_TOO_LARGE') {
+          return reply.status(400).send({ code: 'PARSE_ERROR', message: 'File too large (max 20 MB)' })
+        }
+        throw err
+      }
+
+      if (!fileText.trim()) {
+        return reply.status(400).send({ code: 'PARSE_ERROR', message: 'Empty or unreadable file' })
+      }
+
+      const { records: parsed, skipped } = parseZoneFile(fileText, domainData.fqdn, domainData.default_ttl)
+
+      if (parsed.length === 0 && skipped.length === 0) {
+        return reply.status(400).send({ code: 'PARSE_ERROR', message: 'No DNS records found in file' })
+      }
+
+      // Fetch existing records for conflict detection
+      const existing = await query<any>(
+        'SELECT id, name, type, ttl, priority, weight, port, value FROM dns_records WHERE domain_id = ? AND is_deleted = 0',
+        [domain.id]
+      )
+
+      // Partition parsed records into new vs conflicts
+      const newRecords = []
+      const conflicts = []
+
+      for (const rec of parsed) {
+        const matches = existing.filter((e: any) => e.name === rec.name && e.type === rec.type)
+        if (matches.length === 0) {
+          newRecords.push(rec)
+        } else {
+          // Pair incoming with first matching existing record
+          conflicts.push({ existing: matches[0], incoming: rec })
+        }
+      }
+
+      return { new: newRecords, conflicts, skipped }
     }
   )
 }

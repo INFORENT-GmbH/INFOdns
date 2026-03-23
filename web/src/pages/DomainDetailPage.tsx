@@ -10,6 +10,7 @@ import {
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import LabelChip, { getLabelColors } from '../components/LabelChip'
 import ColorPicker from '../components/ColorPicker'
+import ImportZoneModal from '../components/ImportZoneModal'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
 
@@ -78,6 +79,7 @@ export default function DomainDetailPage() {
   const [pendingDeletes, setPendingDeletes] = useState<Set<number>>(new Set())
   // newRows: new records not yet saved
   const [newRows, setNewRows] = useState<NewRow[]>([])
+  const [showImportModal, setShowImportModal] = useState(false)
 
   const [applying, setApplying] = useState(false)
   const applyingRef = useRef(false)
@@ -279,6 +281,11 @@ export default function DomainDetailPage() {
     setPendingDeletes(new Set())
     setNewRows([])
     setApplyError(null)
+  }
+
+  function handleImportStage(importedNewRows: NewRow[], importedEdits: Record<number, EditRow>) {
+    setNewRows(prev => [...importedNewRows, ...prev])
+    setEdits(prev => ({ ...prev, ...importedEdits }))
   }
 
   // ── label helpers ─────────────────────────────────────────────────────────
@@ -525,6 +532,7 @@ export default function DomainDetailPage() {
               {applying ? t('domainDetail_applying') : t('domainDetail_applyChanges')}
             </button>
           )}
+          <button onClick={() => setShowImportModal(true)} style={styles.btnSecondary}>Import Zone</button>
           <button onClick={addNewRow} style={hasDirty ? styles.btnSecondary : styles.btnPrimary}>{t('domainDetail_addRecord')}</button>
         </div>
       </div>
@@ -633,6 +641,15 @@ export default function DomainDetailPage() {
           </tbody>
         </table>
         </div>
+      )}
+
+      {showImportModal && (
+        <ImportZoneModal
+          domainId={domainId}
+          existingRecords={records as DnsRecord[]}
+          onStage={handleImportStage}
+          onClose={() => setShowImportModal(false)}
+        />
       )}
     </div>
   )
