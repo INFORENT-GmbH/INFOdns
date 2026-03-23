@@ -1,3 +1,5 @@
+import { promises as dns } from 'dns'
+
 export interface SoaTemplate {
   mname: string
   rname: string
@@ -46,6 +48,28 @@ function formatTxt(raw: string): string {
 }
 
 /**
+ * Resolves an ALIAS record's target to synthesized A/AAAA zone lines.
+ * resolve4 failure throws (fails the zone render job).
+ * resolve6 failure is silently ignored (IPv4-only targets are valid).
+ */
+async function resolveAlias(rec: DnsRecord, defaultTtl: number): Promise<string[]> {
+  const host = rec.value.endsWith('.') ? rec.value.slice(0, -1) : rec.value
+  const ttl = rec.ttl ?? defaultTtl
+  const name = rec.name === '@' ? '@' : rec.name
+  const lines: string[] = []
+
+  const v4 = await dns.resolve4(host)
+  for (const ip of v4) lines.push(`${name} ${ttl} IN A ${ip}`)
+
+  try {
+    const v6 = await dns.resolve6(host)
+    for (const ip of v6) lines.push(`${name} ${ttl} IN AAAA ${ip}`)
+  } catch { /* IPv4-only target */ }
+
+  return lines
+}
+
+/**
  * Renders a single dns_record row into one or more zone file lines.
  */
 function renderRecord(rec: DnsRecord, defaultTtl: number): string {
@@ -87,16 +111,17 @@ function renderRecord(rec: DnsRecord, defaultTtl: number): string {
 }
 
 /**
- * Pure function: renders a complete BIND zone file from domain metadata + records.
+ * Renders a complete BIND zone file from domain metadata + records.
  * NS records for the zone apex are injected from nsRecords (system config), not from the DB.
+ * ALIAS records are resolved to A/AAAA at render time (CNAME flattening).
  */
-export function renderZone(
+export async function renderZone(
   domain: Domain,
   records: DnsRecord[],
   soa: SoaTemplate,
   serial: number,
   nsRecords: string[]   // e.g. ["ns1.example.com.", "ns2.example.com."]
-): string {
+): Promise<string> {
   const lines: string[] = []
 
   lines.push(`; Zone: ${domain.fqdn}`)
@@ -122,9 +147,19 @@ export function renderZone(
   }
   lines.push('')
 
+  // Resolve ALIAS records before grouping — they emit as synthesized A/AAAA, not as ALIAS
+  const aliasRecords = records.filter(r => r.type === 'ALIAS')
+  const nonAliasRecords = records.filter(r => r.type !== 'ALIAS')
+
+  const aliasLines: string[] = []
+  for (const rec of aliasRecords) {
+    const resolved = await resolveAlias(rec, domain.default_ttl)
+    aliasLines.push(...resolved)
+  }
+
   // User records grouped by type for readability
   const byType = new Map<string, DnsRecord[]>()
-  for (const rec of records) {
+  for (const rec of nonAliasRecords) {
     const list = byType.get(rec.type) ?? []
     list.push(rec)
     byType.set(rec.type, list)
@@ -135,6 +170,12 @@ export function renderZone(
     for (const rec of recs) {
       lines.push(renderRecord(rec, domain.default_ttl))
     }
+    lines.push('')
+  }
+
+  if (aliasLines.length > 0) {
+    lines.push('; ALIAS (synthesized)')
+    lines.push(...aliasLines)
     lines.push('')
   }
 

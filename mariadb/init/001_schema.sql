@@ -112,7 +112,7 @@ CREATE TABLE dns_records (
   name       VARCHAR(253) NOT NULL,                        -- relative label or "@"
   type       ENUM(
                'A','AAAA','CNAME','MX','NS','TXT','SRV',
-               'CAA','PTR','NAPTR','TLSA','SSHFP','DNSKEY','DS'
+               'CAA','PTR','NAPTR','TLSA','SSHFP','DNSKEY','DS','ALIAS'
              ) NOT NULL,
   ttl        INT UNSIGNED NULL,                            -- NULL = domain default_ttl
   priority   SMALLINT UNSIGNED NULL,                       -- MX, SRV

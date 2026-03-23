@@ -96,8 +96,8 @@ async function processJob(job: QueueRow): Promise<void> {
   // Step 3: Claim serial inside a transaction with FOR UPDATE
   const serial = await transaction(async (conn) => claimSerial(conn, domainId))
 
-  // Step 4: Render zone in memory
-  const content = renderZone(domain, records, soa, serial, NS_RECORDS)
+  // Step 4: Render zone in memory (async — ALIAS records are resolved via DNS)
+  const content = await renderZone(domain, records, soa, serial, NS_RECORDS)
 
   // Step 5: Validate with named-checkzone
   const validation = await validateZone(domain.fqdn, content)

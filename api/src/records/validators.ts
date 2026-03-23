@@ -91,6 +91,12 @@ const typeValidators: Record<string, z.ZodTypeAny> = {
     ttl: z.number().int().positive().optional(),
     value: z.string().min(1),
   }),
+
+  ALIAS: z.object({
+    name: label, type: z.literal('ALIAS'),
+    ttl: z.number().int().positive().optional(),
+    value: fqdn,
+  }),
 }
 
 export type RecordType = keyof typeof typeValidators

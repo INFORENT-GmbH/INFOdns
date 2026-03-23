@@ -197,6 +197,8 @@ export default function DomainDetailPage() {
       for (const row of rowsToCreate) {
         const ttlNum = row.ttl === '' ? undefined : Number(row.ttl)
         const body: Partial<DnsRecord> = { name: row.name.trim(), type: row.type, value: row.value.trim() }
+        // CNAME at apex → submit as ALIAS (CNAME flattening)
+        if (body.type === 'CNAME' && body.name === '@') body.type = 'ALIAS'
         if (ttlNum !== undefined) body.ttl = ttlNum
         if (row.type === 'MX') {
           const parts = row.value.trim().split(/\s+/)
@@ -605,11 +607,16 @@ export default function DomainDetailPage() {
                       disabled={isDeleted} className="inline-field"
                       style={{ ...styles.inlineInput, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }} />
                   </td>
-                  <td style={styles.td}>
-                    <select value={row.type} onChange={e => setField(rec.id, rec, 'type', e.target.value)}
+                  <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
+                    <select value={rec.type === 'ALIAS' ? 'CNAME' : row.type}
+                      onChange={e => setField(rec.id, rec, 'type', e.target.value)}
                       disabled={isDeleted} className="inline-field" style={styles.inlineSelect}>
                       {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
                     </select>
+                    {rec.type === 'ALIAS' && (
+                      <span title="CNAME flattening — this record is stored as an alias and resolved to A/AAAA addresses at zone render time, allowing a CNAME-like record at the zone apex."
+                        style={{ marginLeft: 4, cursor: 'help', color: '#9ca3af', fontWeight: 700, fontSize: '.8rem' }}>?</span>
+                    )}
                   </td>
                   <td style={styles.td}>
                     <input value={row.ttl} onChange={e => setField(rec.id, rec, 'ttl', e.target.value)}
@@ -663,6 +670,7 @@ export default function DomainDetailPage() {
     </div>
   )
 }
+
 
 function formatValue(rec: DnsRecord): string {
   if (rec.type === 'MX') return `${rec.priority} ${rec.value}`
