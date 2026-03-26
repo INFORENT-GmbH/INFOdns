@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
+import { registerNavGuard } from '../hooks/navGuard'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getDomain, getRecords, createRecord, deleteRecord,
@@ -130,6 +131,14 @@ export default function DomainDetailPage() {
     queryFn: () => getRecords(domainId).then(r => r.data),
   })
 
+  // Reset all edit state when switching to a different domain
+  useEffect(() => {
+    setEdits({})
+    setPendingDeletes(new Set())
+    setNewRows([])
+    setApplyError(null)
+  }, [domainId])
+
   // Clear pendingRefresh when records data actually updates (WS-triggered refetch completed)
   useEffect(() => {
     if (pendingRefresh) {
@@ -210,6 +219,12 @@ export default function DomainDetailPage() {
 
   const dirtyIds = Object.keys(edits).map(Number)
   const hasDirty = dirtyIds.length > 0 || pendingDeletes.size > 0 || newRows.length > 0
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    registerNavGuard(hasDirty ? () => window.confirm('You have unsaved changes. Discard them?') : null)
+    return () => registerNavGuard(null)
+  }, [hasDirty])
 
   const showPriority = (records as DnsRecord[]).some(rec => {
     const rt = getRow(rec).type; return rt === 'MX' || rt === 'SRV'
@@ -470,10 +485,10 @@ export default function DomainDetailPage() {
   const changeCount = dirtyIds.length + pendingDeletes.size + newRows.length
 
   return (
-    <div style={{ paddingBottom: hasDirty ? '4.5rem' : 0 }}>
+    <div>
       <style>{INLINE_STYLES}</style>
       <div style={styles.header}>
-        <Link to="/domains" style={styles.back}>{t('domainDetail_backLink')}</Link>
+        <button onClick={() => { if (!hasDirty || window.confirm('You have unsaved changes. Discard them?')) navigate('/domains') }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#9ca3af', padding: '0 4px', lineHeight: 1, flexShrink: 0 }} title="Close">×</button>
         <h2 style={styles.h2}>{domain.fqdn}</h2>
         <ZoneStatusBadge status={domain.zone_status} />
         {(isAdmin || isOperator) && (
@@ -804,7 +819,7 @@ export default function DomainDetailPage() {
       )}
 
       {hasDirty && (
-        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', borderTop: '2px solid #2563eb', padding: '.625rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', zIndex: 50, boxShadow: '0 -2px 12px rgba(0,0,0,.08)' }}>
+        <div style={{ position: 'sticky', bottom: 0, marginLeft: '-1.5rem', marginRight: '-1.5rem', background: '#fff', borderTop: '2px solid #2563eb', padding: '.625rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', zIndex: 50, boxShadow: '0 -2px 12px rgba(0,0,0,.08)' }}>
           <span style={styles.dirtyHint}>{changeCount} {changeCount === 1 ? t('domainDetail_unsavedChange') : t('domainDetail_unsavedChanges')}</span>
           {applyError && <span style={{ fontSize: '.8125rem', color: '#b91c1c', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{applyError}</span>}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '.5rem' }}>
@@ -823,6 +838,7 @@ export default function DomainDetailPage() {
           onClose={() => setZoneModal(null)}
         />
       )}
+
     </div>
   )
 }

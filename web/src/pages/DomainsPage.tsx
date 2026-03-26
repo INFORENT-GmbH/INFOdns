@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useMatch } from 'react-router-dom'
+import { checkNavGuard } from '../hooks/navGuard'
 import { useQuery } from '@tanstack/react-query'
 import { getDomains, createDomain, getCustomers, getLabelSuggestions, restoreDomain, type Domain } from '../api/client'
 import LabelChip from '../components/LabelChip'
@@ -32,10 +33,12 @@ function writeColsCookie(cols: ColId[]) {
   document.cookie = `${COOKIE_KEY}=${encodeURIComponent(JSON.stringify(cols))}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`
 }
 
-export default function DomainsPage() {
+export default function DomainsPage({ condensed = false }: { condensed?: boolean }) {
   const { user } = useAuth()
   const { t } = useI18n()
   const navigate = useNavigate()
+  const detailMatch = useMatch('/domains/:id')
+  const selectedId = detailMatch?.params.id ? Number(detailMatch.params.id) : null
   const [search, setSearch] = useState('')
   const [labelFilter, setLabelFilter] = useState('')
   const [labelDropdownOpen, setLabelDropdownOpen] = useState(false)
@@ -122,6 +125,106 @@ export default function DomainsPage() {
   }
 
   const show = (col: ColId) => visibleCols.includes(col)
+
+  if (condensed) {
+    return (
+      <div style={{ padding: '.75rem' }}>
+        <style>{INLINE_STYLES}</style>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.375rem', marginBottom: '.5rem' }}>
+          <input
+            placeholder={t('domains_searchPlaceholder')}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ ...styles.searchInput, width: '100%', boxSizing: 'border-box' as const }}
+          />
+          <div ref={labelDropdownRef} style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setLabelDropdownOpen(v => !v)}
+              onBlur={e => { if (!labelDropdownRef.current?.contains(e.relatedTarget as Node)) setLabelDropdownOpen(false) }}
+              style={{
+                ...styles.searchInput, width: '100%', boxSizing: 'border-box' as const,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                cursor: 'pointer', background: '#fff', textAlign: 'left' as const,
+                outline: labelFilter ? '2px solid #2563eb' : undefined,
+              }}
+            >
+              {labelFilter
+                ? <LabelChip label={{ id: 0, key: labelFilter.includes('=') ? labelFilter.split('=')[0] : labelFilter, value: labelFilter.includes('=') ? labelFilter.split('=').slice(1).join('=') : '', color: labelSuggestions.find(s => s.key === (labelFilter.includes('=') ? labelFilter.split('=')[0] : labelFilter))?.color ?? null }} />
+                : <span style={{ color: '#9ca3af' }}>{t('domains_labelFilterPlaceholder')}</span>}
+              <span style={{ fontSize: '.65rem', color: '#9ca3af', marginLeft: 4 }}>{labelFilter ? '' : '▼'}</span>
+            </button>
+            {labelFilter && (
+              <button
+                onClick={() => { setLabelFilter(''); setLabelDropdownOpen(false) }}
+                style={{ ...styles.btnClear, position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)' }}
+                title="Clear label filter"
+              >✕</button>
+            )}
+            {labelDropdownOpen && (
+              <div style={styles.labelDropdown}>
+                {labelSuggestions.flatMap(s => {
+                  const items: { key: string; value: string; filter: string; color: string | null }[] = []
+                  items.push({ key: s.key, value: '', filter: s.key, color: s.color })
+                  for (const v of s.values) items.push({ key: s.key, value: v, filter: `${s.key}=${v}`, color: s.color })
+                  return items
+                }).map(item => (
+                  <button
+                    key={item.filter}
+                    type="button"
+                    onMouseDown={e => { e.preventDefault(); setLabelFilter(item.filter); setLabelDropdownOpen(false) }}
+                    style={styles.labelDropdownItem}
+                  >
+                    <LabelChip label={{ id: 0, key: item.key, value: item.value, color: item.color }} />
+                  </button>
+                ))}
+                {labelSuggestions.length === 0 && (
+                  <div style={{ padding: '.5rem .75rem', color: '#9ca3af', fontSize: '.8rem' }}>No labels</div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+        {isLoading && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
+            <div style={{ width: 18, height: 18, border: '2px solid #e5e7eb', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+          </div>
+        )}
+        <table style={styles.table}>
+          <tbody>
+            {domains.map((d: Domain) => {
+              const isSelected = selectedId === d.id
+              const suspended = d.status === 'suspended'
+              return (
+                <tr
+                  key={d.id}
+                  className="domain-row"
+                  style={{ ...styles.tr, background: isSelected ? '#eff6ff' : suspended ? '#fffbeb' : undefined }}
+                  onClick={() => { if (checkNavGuard()) navigate(`/domains/${d.id}`) }}
+                >
+                  <td style={{ ...styles.td, padding: '.5rem .75rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '.375rem', flexWrap: 'wrap' as const }}>
+                      <span style={{ fontWeight: 500, color: isSelected ? '#1d4ed8' : '#2563eb', fontSize: '.875rem', wordBreak: 'break-all' as const }}>{d.fqdn}</span>
+                      <ZoneStatusBadge status={d.zone_status} />
+                      {!!d.dnssec_enabled && (
+                        <span style={{ fontSize: '.65rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '1px 4px', borderRadius: 6 }}>DNSSEC</span>
+                      )}
+                    </div>
+                    {suspended && (
+                      <div style={{ fontSize: '.7rem', color: '#92400e', marginTop: 2 }}>suspended</div>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+            {!isLoading && domains.length === 0 && (
+              <tr><td style={{ ...styles.td, color: '#9ca3af', textAlign: 'center', padding: '1rem' }}>{t('domains_noneFound')}</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
 
   return (
     <div>
