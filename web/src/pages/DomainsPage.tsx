@@ -1,10 +1,17 @@
 import { useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getDomains, createDomain, getCustomers, getLabelSuggestions, restoreDomain, type Domain } from '../api/client'
 import LabelChip from '../components/LabelChip'
+import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
+
+const INLINE_STYLES = `
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .domain-row { cursor: pointer; }
+  .domain-row:hover td { background: #f8faff !important; }
+`
 
 const COOKIE_KEY = 'infodns_domain_cols'
 const ALL_COLUMNS = ['fqdn', 'customer', 'status', 'zone', 'labels', 'serial', 'lastRendered'] as const
@@ -25,15 +32,10 @@ function writeColsCookie(cols: ColId[]) {
   document.cookie = `${COOKIE_KEY}=${encodeURIComponent(JSON.stringify(cols))}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`
 }
 
-const zoneIcons: Record<string, { icon: string; color: string; title: string }> = {
-  clean: { icon: '✓', color: '#16a34a', title: 'clean' },
-  dirty: { icon: '⏳', color: '#ca8a04', title: 'pending' },
-  error: { icon: '✕', color: '#dc2626', title: 'error' },
-}
-
 export default function DomainsPage() {
   const { user } = useAuth()
   const { t } = useI18n()
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [labelFilter, setLabelFilter] = useState('')
   const [labelDropdownOpen, setLabelDropdownOpen] = useState(false)
@@ -123,8 +125,14 @@ export default function DomainsPage() {
 
   return (
     <div>
+      <style>{INLINE_STYLES}</style>
       <div style={styles.header}>
-        <h2 style={styles.h2}>{t('domains_title')}</h2>
+        <div>
+          <h2 style={styles.h2}>{t('domains_title')}</h2>
+          {!isLoading && !error && (
+            <span style={{ fontSize: '.75rem', color: '#9ca3af', fontWeight: 400 }}>{domains.length} domain{domains.length !== 1 ? 's' : ''}</span>
+          )}
+        </div>
         <div style={styles.headerRight}>
           <input
             placeholder={t('domains_searchPlaceholder')}
@@ -223,7 +231,7 @@ export default function DomainsPage() {
               style={showDeleted ? styles.btnTrashActive : styles.btnSecondary}
               title="Show deleted domains"
             >
-              Trash
+              Deleted
             </button>
           )}
           {!showDeleted && (
@@ -263,7 +271,12 @@ export default function DomainsPage() {
         </form>
       )}
 
-      {isLoading && <p style={styles.muted}>{t('loading')}</p>}
+      {isLoading && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '2rem 0', color: '#6b7280', fontSize: '.875rem' }}>
+          <div style={{ width: 18, height: 18, border: '2px solid #e5e7eb', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
+          {t('loading')}
+        </div>
+      )}
       {error && <p style={styles.errorText}>{t('domains_loadError')}</p>}
 
       <table style={styles.table}>
@@ -319,23 +332,40 @@ export default function DomainsPage() {
             })
           ) : (
             domains.map((d: Domain) => {
-              const zi = zoneIcons[d.zone_status] ?? { icon: '?', color: '#9ca3af', title: d.zone_status }
+              const suspended = d.status === 'suspended'
+              const rowBase: React.CSSProperties = suspended
+                ? { ...styles.tr, opacity: 0.65, background: '#fffbeb' }
+                : styles.tr
               return (
-                <tr key={d.id} style={styles.tr}>
+                <tr
+                  key={d.id}
+                  className="domain-row"
+                  style={rowBase}
+                  onClick={e => { if ((e.target as HTMLElement).closest('button,a,input')) return; navigate(`/domains/${d.id}`) }}
+                >
                   {show('fqdn') && <td style={styles.td}>
-                    <Link to={`/domains/${d.id}`} style={styles.link}>{d.fqdn}</Link>
+                    <Link to={`/domains/${d.id}`} style={styles.link} onClick={e => e.stopPropagation()}>{d.fqdn}</Link>
+                    {!!d.dnssec_enabled && (
+                      <span style={{ marginLeft: 6, fontSize: '.7rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '1px 5px', borderRadius: 8, verticalAlign: 'middle' }}>DNSSEC</span>
+                    )}
                   </td>}
                   {show('customer') && <td style={styles.td}>{d.customer_name}</td>}
-                  {show('status') && <td style={styles.td}>{d.status}</td>}
-                  {show('zone') && <td style={{ ...styles.td, textAlign: 'center' }}>
-                    <span title={zi.title} style={{ color: zi.color, fontSize: '1rem', fontWeight: 700 }}>{zi.icon}</span>
+                  {show('status') && <td style={styles.td}>
+                    <span style={{
+                      display: 'inline-block', padding: '1px 8px', borderRadius: 10, fontSize: '.75rem', fontWeight: 600,
+                      background: d.status === 'active' ? '#dcfce7' : d.status === 'suspended' ? '#fef3c7' : '#f3f4f6',
+                      color:      d.status === 'active' ? '#166534' : d.status === 'suspended' ? '#92400e' : '#6b7280',
+                    }}>{d.status}</span>
                   </td>}
-                  {show('labels') && <td style={styles.td}>
+                  {show('zone') && <td style={styles.td}>
+                    <ZoneStatusBadge status={d.zone_status} />
+                  </td>}
+                  {show('labels') && <td style={styles.td} onClick={e => e.stopPropagation()}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                       {(d.labels ?? []).map(l => {
                         const val = l.value ? `${l.key}=${l.value}` : l.key
                         return (
-                          <span key={l.id} onClick={() => { setLabelFilter(val) }} style={{ cursor: 'pointer' }}>
+                          <span key={l.id} onClick={() => setLabelFilter(val)} style={{ cursor: 'pointer' }}>
                             <LabelChip label={l} />
                           </span>
                         )
@@ -343,10 +373,10 @@ export default function DomainsPage() {
                     </div>
                   </td>}
                   {show('serial') && <td style={styles.td}><code>{d.last_serial || '—'}</code></td>}
-                  {show('lastRendered') && <td style={styles.td}>
+                  {show('lastRendered') && <td style={{ ...styles.td, ...styles.muted }}>
                     {d.last_rendered_at
                       ? new Date(d.last_rendered_at).toLocaleString()
-                      : <span style={styles.muted}>{t('never')}</span>}
+                      : t('never')}
                   </td>}
                 </tr>
               )
