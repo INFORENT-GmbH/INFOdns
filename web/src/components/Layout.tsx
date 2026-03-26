@@ -167,7 +167,7 @@ const styles: Record<string, React.CSSProperties> = {
   nsEntry:   { display: 'flex', alignItems: 'center', gap: '.25rem' },
   nsLatency: { color: '#9ca3af', marginLeft: '.25rem' },
   nsCopied:  { color: '#16a34a', marginLeft: '.25rem', fontSize: '.7rem' },
-  nsTooltip: { position: 'absolute' as const, top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 10, pointerEvents: 'none' as const },
+  nsTooltip: { position: 'absolute' as const, top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const },
   wsToast:   { display: 'flex', alignItems: 'center', gap: '.5rem', background: '#1e293b', color: '#f8fafc', fontSize: '.8125rem', padding: '.5rem 1.5rem', position: 'sticky' as const, top: 0, zIndex: 50 },
   wsSpinner: { display: 'inline-block', width: 10, height: 10, border: '2px solid #94a3b8', borderTopColor: '#f8fafc', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 },
   impersonationBar: { display: 'flex', alignItems: 'center', gap: '.75rem', background: '#fbbf24', color: '#78350f', fontSize: '.8125rem', fontWeight: 600, padding: '.5rem 1.5rem', position: 'sticky' as const, top: 0, zIndex: 49 },
