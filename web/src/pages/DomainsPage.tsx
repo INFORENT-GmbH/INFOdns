@@ -11,6 +11,7 @@ const INLINE_STYLES = `
   @keyframes spin { to { transform: rotate(360deg); } }
   .domain-row { cursor: pointer; }
   .domain-row:hover td { background: #f8faff !important; }
+  .condensed-row:hover { background: #f0f4ff !important; }
 `
 
 const COOKIE_KEY = 'infodns_domain_cols'
@@ -127,14 +128,14 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
 
   if (condensed) {
     return (
-      <div style={{ padding: '.75rem' }}>
+      <div>
         <style>{INLINE_STYLES}</style>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '.375rem', marginBottom: '.5rem' }}>
+        <div style={{ padding: '.625rem .75rem', borderBottom: '1px solid #e5e7eb' }}>
           <input
             placeholder={t('domains_searchPlaceholder')}
             value={search}
             onChange={e => setSearch(e.target.value)}
-            style={{ ...styles.searchInput, width: '100%', boxSizing: 'border-box' as const }}
+            style={{ ...styles.searchInput, width: '100%', boxSizing: 'border-box' as const, marginBottom: '.375rem' }}
           />
           <div ref={labelDropdownRef} style={{ position: 'relative' }}>
             <button
@@ -183,44 +184,54 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
               </div>
             )}
           </div>
+          {!isLoading && (
+            <div style={{ fontSize: '.7rem', color: '#9ca3af', marginTop: '.375rem' }}>
+              {domains.length} domain{domains.length !== 1 ? 's' : ''}
+            </div>
+          )}
         </div>
         {isLoading && (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '1.5rem' }}>
             <div style={{ width: 18, height: 18, border: '2px solid #e5e7eb', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
           </div>
         )}
-        <table style={styles.table}>
-          <tbody>
-            {domains.map((d: Domain) => {
-              const isSelected = selectedId === d.id
-              const suspended = d.status === 'suspended'
-              return (
-                <tr
-                  key={d.id}
-                  className="domain-row"
-                  style={{ ...styles.tr, background: isSelected ? '#eff6ff' : suspended ? '#fffbeb' : undefined }}
-                  onClick={() => navigate(`/domains/${d.id}`)}
-                >
-                  <td style={{ ...styles.td, padding: '.5rem .75rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '.375rem', flexWrap: 'wrap' as const }}>
-                      <span style={{ fontWeight: 500, color: isSelected ? '#1d4ed8' : '#2563eb', fontSize: '.875rem', wordBreak: 'break-all' as const }}>{d.fqdn}</span>
-                      <ZoneStatusBadge status={d.zone_status} />
-                      {!!d.dnssec_enabled && (
-                        <span style={{ fontSize: '.65rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '1px 4px', borderRadius: 6 }}>DNSSEC</span>
-                      )}
-                    </div>
-                    {suspended && (
-                      <div style={{ fontSize: '.7rem', color: '#92400e', marginTop: 2 }}>suspended</div>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-            {!isLoading && domains.length === 0 && (
-              <tr><td style={{ ...styles.td, color: '#9ca3af', textAlign: 'center', padding: '1rem' }}>{t('domains_noneFound')}</td></tr>
-            )}
-          </tbody>
-        </table>
+        <div>
+          {domains.map((d: Domain) => {
+            const isSelected = selectedId === d.id
+            const suspended = d.status === 'suspended'
+            return (
+              <div
+                key={d.id}
+                className={isSelected ? undefined : 'condensed-row'}
+                onClick={() => navigate(`/domains/${d.id}`)}
+                style={{
+                  padding: '.45rem .75rem',
+                  paddingLeft: isSelected ? 'calc(.75rem - 3px)' : '.75rem',
+                  borderLeft: isSelected ? '3px solid #2563eb' : '3px solid transparent',
+                  borderBottom: '1px solid #f3f4f6',
+                  cursor: 'pointer',
+                  background: isSelected ? '#eff6ff' : suspended ? '#fffbeb' : undefined,
+                }}
+              >
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500, fontSize: '.8125rem', color: isSelected ? '#1d4ed8' : '#111827' }}>
+                  {d.fqdn}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 3, flexWrap: 'wrap' as const }}>
+                  <ZoneStatusBadge status={d.zone_status} />
+                  {!!d.dnssec_enabled && (
+                    <span style={{ fontSize: '.6rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '1px 4px', borderRadius: 6 }}>DNSSEC</span>
+                  )}
+                  {suspended && (
+                    <span style={{ fontSize: '.65rem', color: '#92400e' }}>suspended</span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+          {!isLoading && domains.length === 0 && (
+            <div style={{ padding: '1.5rem', color: '#9ca3af', textAlign: 'center' as const, fontSize: '.8rem' }}>{t('domains_noneFound')}</div>
+          )}
+        </div>
       </div>
     )
   }
