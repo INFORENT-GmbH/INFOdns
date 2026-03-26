@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react'
 import { Link, useNavigate, useMatch } from 'react-router-dom'
-import { checkNavGuard } from '../hooks/navGuard'
 import { useQuery } from '@tanstack/react-query'
 import { getDomains, createDomain, getCustomers, getLabelSuggestions, restoreDomain, type Domain } from '../api/client'
 import LabelChip from '../components/LabelChip'
@@ -200,7 +199,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                   key={d.id}
                   className="domain-row"
                   style={{ ...styles.tr, background: isSelected ? '#eff6ff' : suspended ? '#fffbeb' : undefined }}
-                  onClick={() => { if (checkNavGuard()) navigate(`/domains/${d.id}`) }}
+                  onClick={() => navigate(`/domains/${d.id}`)}
                 >
                   <td style={{ ...styles.td, padding: '.5rem .75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '.375rem', flexWrap: 'wrap' as const }}>

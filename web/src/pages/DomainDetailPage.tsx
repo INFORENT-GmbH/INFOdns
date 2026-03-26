@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { registerNavGuard } from '../hooks/navGuard'
+import { saveDomainEdits, loadDomainEdits, clearDomainEdits } from '../hooks/domainEditCache'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getDomain, getRecords, createRecord, deleteRecord,
@@ -102,6 +102,7 @@ export default function DomainDetailPage() {
   const [applying, setApplying] = useState(false)
   const applyingRef = useRef(false)
   const [applyError, setApplyError] = useState<string | null>(null)
+  const [loadedFromCacheSerial, setLoadedFromCacheSerial] = useState<number | null>(null)
   const [pendingRefresh, setPendingRefresh] = useState(false)
   const pendingRefreshTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
@@ -131,12 +132,39 @@ export default function DomainDetailPage() {
     queryFn: () => getRecords(domainId).then(r => r.data),
   })
 
-  // Reset all edit state when switching to a different domain
+  // Refs always holding the latest state values — used in the effect cleanup below.
+  // Assigned in the render body (not in an effect) so they capture current state.
+  // Exception: serial is tracked via useEffect so the cleanup sees the OLD domain's
+  // serial even after React Query has already switched to the new domain's data.
+  const latestEdits = useRef(edits)
+  const latestPendingDeletes = useRef(pendingDeletes)
+  const latestNewRows = useRef(newRows)
+  const lastKnownSerialRef = useRef<number>(0)
+  latestEdits.current = edits
+  latestPendingDeletes.current = pendingDeletes
+  latestNewRows.current = newRows
+
   useEffect(() => {
-    setEdits({})
-    setPendingDeletes(new Set())
-    setNewRows([])
+    if (domain?.last_serial) lastKnownSerialRef.current = domain.last_serial
+  }, [domain?.last_serial])
+
+  // Save/restore per-domain edit state when switching between domains
+  useEffect(() => {
+    const saved = loadDomainEdits(domainId)
+    setEdits(saved?.edits ?? {})
+    setPendingDeletes(new Set(saved?.pendingDeletes ?? []))
+    setNewRows(saved?.newRows ?? [])
     setApplyError(null)
+    setLoadedFromCacheSerial(saved?.serial ?? null)
+    return () => {
+      saveDomainEdits(domainId, {
+        serial: lastKnownSerialRef.current,
+        edits: latestEdits.current,
+        pendingDeletes: [...latestPendingDeletes.current],
+        newRows: latestNewRows.current,
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [domainId])
 
   // Clear pendingRefresh when records data actually updates (WS-triggered refetch completed)
@@ -219,12 +247,17 @@ export default function DomainDetailPage() {
 
   const dirtyIds = Object.keys(edits).map(Number)
   const hasDirty = dirtyIds.length > 0 || pendingDeletes.size > 0 || newRows.length > 0
+  const conflictWarning = hasDirty
+    && loadedFromCacheSerial !== null
+    && loadedFromCacheSerial > 0
+    && !!domain?.last_serial
+    && loadedFromCacheSerial !== domain.last_serial
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    registerNavGuard(hasDirty ? () => window.confirm('You have unsaved changes. Discard them?') : null)
-    return () => registerNavGuard(null)
-  }, [hasDirty])
+  function handleForceReload() {
+    handleDiscard()
+    qc.invalidateQueries({ queryKey: ['records', domainId] })
+    qc.invalidateQueries({ queryKey: ['domain', domainId] })
+  }
 
   const showPriority = (records as DnsRecord[]).some(rec => {
     const rt = getRow(rec).type; return rt === 'MX' || rt === 'SRV'
@@ -302,6 +335,7 @@ export default function DomainDetailPage() {
       setEdits({})
       setPendingDeletes(new Set())
       setNewRows(prev => prev.filter(r => !submittedIds.has(r._newId)))
+      clearDomainEdits(domainId)
       qc.invalidateQueries({ queryKey: ['records', domainId] })
       qc.invalidateQueries({ queryKey: ['domain', domainId] })
       if (hadEdits) {
@@ -331,6 +365,7 @@ export default function DomainDetailPage() {
     setPendingDeletes(new Set())
     setNewRows([])
     setApplyError(null)
+    clearDomainEdits(domainId)
   }
 
   function handleImportStage(importedNewRows: NewRow[], importedEdits: Record<number, EditRow>) {
@@ -488,7 +523,7 @@ export default function DomainDetailPage() {
     <div>
       <style>{INLINE_STYLES}</style>
       <div style={styles.header}>
-        <button onClick={() => { if (!hasDirty || window.confirm('You have unsaved changes. Discard them?')) navigate('/domains') }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#9ca3af', padding: '0 4px', lineHeight: 1, flexShrink: 0 }} title="Close">×</button>
+        <button onClick={() => navigate('/domains')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#9ca3af', padding: '0 4px', lineHeight: 1, flexShrink: 0 }} title="Close">×</button>
         <h2 style={styles.h2}>{domain.fqdn}</h2>
         <ZoneStatusBadge status={domain.zone_status} />
         {(isAdmin || isOperator) && (
@@ -519,6 +554,15 @@ export default function DomainDetailPage() {
           </div>
         )}
       </div>
+
+      {conflictWarning && (
+        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.6rem 1rem', borderRadius: 6, marginBottom: '.75rem', fontSize: '.875rem', display: 'flex', alignItems: 'center', gap: '.75rem', border: '1px solid #fde68a' }}>
+          <span>⚠ This zone was updated by someone else while you were away. Your unsaved edits may conflict.</span>
+          <button onClick={handleForceReload} style={{ flexShrink: 0, padding: '3px 10px', borderRadius: 4, border: '1px solid #f59e0b', background: '#fff', color: '#92400e', fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' }}>
+            Discard &amp; reload
+          </button>
+        </div>
+      )}
 
       {domain.status === 'suspended' && (
         <div style={{ background: '#fef3c7', color: '#92400e', padding: '.6rem 1rem', borderRadius: 6, marginBottom: '.75rem', fontSize: '.875rem', display: 'flex', alignItems: 'center', gap: '.5rem', border: '1px solid #fde68a' }}>
