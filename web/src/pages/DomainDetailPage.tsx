@@ -572,9 +572,9 @@ export default function DomainDetailPage() {
               navigator.clipboard.writeText(text)
               setCopied(id); setTimeout(() => setCopied(null), 2000)
             }
-            const copyRowStyle = (id: string): React.CSSProperties => ({
+            const copyRowStyle: React.CSSProperties = {
               display: 'flex', alignItems: 'baseline', gap: '.75rem', marginTop: '.5rem',
-            })
+            }
             const copyValueStyle = (id: string): React.CSSProperties => ({
               fontFamily: MONO, fontSize: '.75rem', color: '#111827', wordBreak: 'break-all', flex: 1,
               background: copied === id ? '#bbf7d0' : '#e9fef0', borderRadius: 4, padding: '3px 6px', lineHeight: 1.5,
@@ -598,14 +598,14 @@ export default function DomainDetailPage() {
                   <span style={{ fontFamily: MONO, wordBreak: 'break-all' }}>{dKey}</span>
                 </div>
                 <div style={{ marginTop: '.75rem', borderTop: '1px solid #86efac', paddingTop: '.6rem', display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
-                  <div style={copyRowStyle('dnskey')}>
+                  <div style={copyRowStyle}>
                     <span style={{ color: '#6b7280', fontWeight: 500, flexShrink: 0, minWidth: 80 }}>DNSKEY RR</span>
                     <span style={copyValueStyle('dnskey')}>{dnskeyRr}</span>
                     <button style={copyBtnStyle} onClick={() => copyText('dnskey', dnskeyRr)}>
                       {copied === 'dnskey' ? 'Copied!' : 'Copy'}
                     </button>
                   </div>
-                  <div style={copyRowStyle('ds')}>
+                  <div style={copyRowStyle}>
                     <span style={{ color: '#6b7280', fontWeight: 500, flexShrink: 0, minWidth: 80 }}>DS Record</span>
                     <span style={copyValueStyle('ds')}>{dsLine ?? 'computing…'}</span>
                     <button style={copyBtnStyle} disabled={!dsLine} onClick={() => dsLine && copyText('ds', dsLine)}>
