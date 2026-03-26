@@ -458,13 +458,19 @@ export default function DomainDetailPage() {
 
   // ── render ───────────────────────────────────────────────────────────────
 
-  if (loadingDomain) return <p>{t('loading')}</p>
+  if (loadingDomain) return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '3rem 0', color: '#6b7280', fontSize: '.875rem' }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div style={{ width: 18, height: 18, border: '2px solid #e5e7eb', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
+      {t('loading')}
+    </div>
+  )
   if (!domain) return <p>Domain not found</p>
 
   const changeCount = dirtyIds.length + pendingDeletes.size + newRows.length
 
   return (
-    <div>
+    <div style={{ paddingBottom: hasDirty ? '4.5rem' : 0 }}>
       <style>{INLINE_STYLES}</style>
       <div style={styles.header}>
         <Link to="/domains" style={styles.back}>{t('domainDetail_backLink')}</Link>
@@ -478,7 +484,7 @@ export default function DomainDetailPage() {
                 disabled={togglingStatus}
                 style={domain.status === 'suspended' ? styles.btnSuccess : styles.btnWarning}
               >
-                {togglingStatus ? '…' : domain.status === 'suspended' ? 'Enable' : 'Disable'}
+                {togglingStatus ? '…' : domain.status === 'suspended' ? 'Activate' : 'Suspend'}
               </button>
             )}
             {domain.status !== 'deleted' && (
@@ -499,11 +505,17 @@ export default function DomainDetailPage() {
         )}
       </div>
 
+      {domain.status === 'suspended' && (
+        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.6rem 1rem', borderRadius: 6, marginBottom: '.75rem', fontSize: '.875rem', display: 'flex', alignItems: 'center', gap: '.5rem', border: '1px solid #fde68a' }}>
+          <strong>Suspended</strong> — zone is not served to secondaries. Click Activate to resume.
+        </div>
+      )}
+
       {domain.zone_status === 'error' && (
         <div style={styles.errorBanner}>
           <strong>{t('domainDetail_zoneFailed')}</strong>
           {domain.zone_error && (
-            <pre style={{ margin: '.5rem 0 0', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: '.8125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            <pre style={{ margin: '.5rem 0 0', fontFamily: MONO, fontSize: '.8125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
               {renderZoneError(domain.zone_error, domainId, setZoneModal)}
             </pre>
           )}
@@ -511,9 +523,17 @@ export default function DomainDetailPage() {
       )}
 
       <div style={styles.meta}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem' }}>
+          <span style={{
+            display: 'inline-block', padding: '1px 8px', borderRadius: 10, fontSize: '.75rem', fontWeight: 600,
+            background: domain.status === 'active' ? '#dcfce7' : domain.status === 'suspended' ? '#fef3c7' : '#f3f4f6',
+            color:      domain.status === 'active' ? '#166534' : domain.status === 'suspended' ? '#92400e' : '#6b7280',
+          }}>{domain.status}</span>
+        </span>
         <span>{t('customer')}: <strong>{domain.customer_name}</strong></span>
         <span>{t('domainDetail_defaultTtl')} <strong>{domain.default_ttl}s</strong></span>
         <span>{t('serial')}: <code>{domain.last_serial || '—'}</code></span>
+        <span>Added: {new Date(domain.created_at).toLocaleDateString()}</span>
         <span>{t('domainDetail_lastRendered')} {domain.last_rendered_at ? new Date(domain.last_rendered_at).toLocaleString() : t('never')}</span>
       </div>
 
@@ -596,19 +616,10 @@ export default function DomainDetailPage() {
       <div style={styles.tableHeader}>
         <h3 style={styles.h3}>{t('domainDetail_dnsRecords')}</h3>
         <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
-          {hasDirty && <span style={styles.dirtyHint}>{changeCount} {changeCount > 1 ? t('domainDetail_unsavedChanges') : t('domainDetail_unsavedChange')}</span>}
-          {hasDirty && <button onClick={handleDiscard} style={styles.btnSecondary} disabled={applying}>{t('domainDetail_discard')}</button>}
-          {hasDirty && (
-            <button onClick={handleApply} style={styles.btnPrimary} disabled={applying}>
-              {applying ? t('domainDetail_applying') : t('domainDetail_applyChanges')}
-            </button>
-          )}
           <button onClick={() => setShowImportModal(true)} style={styles.btnSecondary}>Import Zone</button>
           <button onClick={addNewRow} style={hasDirty ? styles.btnSecondary : styles.btnPrimary}>{t('domainDetail_addRecord')}</button>
         </div>
       </div>
-
-      {applyError && <div style={{ ...styles.errorBanner, marginBottom: '1rem' }}>{applyError}</div>}
 
       {loadingRecords ? <p>{t('domainDetail_loadingRecords')}</p> : (
         <div style={{ position: 'relative' }}>
@@ -790,6 +801,19 @@ export default function DomainDetailPage() {
           onStage={handleImportStage}
           onClose={() => setShowImportModal(false)}
         />
+      )}
+
+      {hasDirty && (
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#fff', borderTop: '2px solid #2563eb', padding: '.625rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', zIndex: 50, boxShadow: '0 -2px 12px rgba(0,0,0,.08)' }}>
+          <span style={styles.dirtyHint}>{changeCount} {changeCount === 1 ? t('domainDetail_unsavedChange') : t('domainDetail_unsavedChanges')}</span>
+          {applyError && <span style={{ fontSize: '.8125rem', color: '#b91c1c', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{applyError}</span>}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '.5rem' }}>
+            <button onClick={handleDiscard} style={styles.btnSecondary} disabled={applying}>{t('domainDetail_discard')}</button>
+            <button onClick={handleApply} style={styles.btnPrimary} disabled={applying}>
+              {applying ? t('domainDetail_applying') : t('domainDetail_applyChanges')}
+            </button>
+          </div>
+        </div>
       )}
 
       {zoneModal && (
