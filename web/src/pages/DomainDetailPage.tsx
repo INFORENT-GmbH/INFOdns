@@ -213,6 +213,12 @@ export default function DomainDetailPage() {
   const dirtyIds = Object.keys(edits).map(Number)
   const hasDirty = dirtyIds.length > 0 || pendingDeletes.size > 0 || newRows.length > 0
 
+  const showPriority = (records as DnsRecord[]).some(rec => {
+    const rt = getRow(rec).type; return rt === 'MX' || rt === 'SRV'
+  }) || newRows.some(r => r.type === 'MX' || r.type === 'SRV')
+  const showWeightPort = (records as DnsRecord[]).some(rec => getRow(rec).type === 'SRV')
+    || newRows.some(r => r.type === 'SRV')
+
   async function handleApply() {
     if (!hasDirty || applyingRef.current) return
     applyingRef.current = true
@@ -643,9 +649,9 @@ export default function DomainDetailPage() {
               <th style={styles.th}>{t('name')}</th>
               <th style={styles.th}>{t('type')}</th>
               <th style={styles.th}>{t('ttl')}</th>
-              <th style={{ ...styles.th, width: 52 }}>Pri</th>
-              <th style={{ ...styles.th, width: 48 }}>Wt</th>
-              <th style={{ ...styles.th, width: 58 }}>Port</th>
+              {showPriority   && <th style={{ ...styles.th, width: 70 }}>{t('priority')}</th>}
+              {showWeightPort && <th style={{ ...styles.th, width: 58 }}>{t('weight')}</th>}
+              {showWeightPort && <th style={{ ...styles.th, width: 58 }}>{t('port')}</th>}
               <th style={styles.th}>{t('value')}</th>
               <th style={styles.th}></th>
             </tr>
@@ -676,24 +682,30 @@ export default function DomainDetailPage() {
                       className="alias-hint" data-tip="Reset to domain default" style={{ ...styles.btnIcon, color: '#9ca3af', marginLeft: 2 }}>↺</button>
                   )}
                 </td>
-                <td style={styles.td}>
-                  {(row.type === 'MX' || row.type === 'SRV') && (
-                    <input value={row.priority} onChange={e => setNewField(row._newId, 'priority', e.target.value)}
-                      className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
-                  )}
-                </td>
-                <td style={styles.td}>
-                  {row.type === 'SRV' && (
-                    <input value={row.weight} onChange={e => setNewField(row._newId, 'weight', e.target.value)}
-                      className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
-                  )}
-                </td>
-                <td style={styles.td}>
-                  {row.type === 'SRV' && (
-                    <input value={row.port} onChange={e => setNewField(row._newId, 'port', e.target.value)}
-                      className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
-                  )}
-                </td>
+                {showPriority && (
+                  <td style={styles.td}>
+                    {(row.type === 'MX' || row.type === 'SRV') && (
+                      <input value={row.priority} onChange={e => setNewField(row._newId, 'priority', e.target.value)}
+                        className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
+                    )}
+                  </td>
+                )}
+                {showWeightPort && (
+                  <td style={styles.td}>
+                    {row.type === 'SRV' && (
+                      <input value={row.weight} onChange={e => setNewField(row._newId, 'weight', e.target.value)}
+                        className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
+                    )}
+                  </td>
+                )}
+                {showWeightPort && (
+                  <td style={styles.td}>
+                    {row.type === 'SRV' && (
+                      <input value={row.port} onChange={e => setNewField(row._newId, 'port', e.target.value)}
+                        className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
+                    )}
+                  </td>
+                )}
                 <td style={{ ...styles.td, ...styles.valueCell }}>
                   <input value={row.value} onChange={e => setNewField(row._newId, 'value', e.target.value)}
                     placeholder={t('domainDetail_valuePlaceholder')} className="inline-field"
@@ -744,24 +756,30 @@ export default function DomainDetailPage() {
                         className="alias-hint" data-tip="Reset to domain default" style={{ ...styles.btnIcon, color: '#9ca3af', marginLeft: 2 }}>↺</button>
                     )}
                   </td>
-                  <td style={styles.td}>
-                    {(row.type === 'MX' || row.type === 'SRV') && (
-                      <input value={row.priority} onChange={e => setField(rec.id, rec, 'priority', e.target.value)}
-                        disabled={isDeleted} className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
-                    )}
-                  </td>
-                  <td style={styles.td}>
-                    {row.type === 'SRV' && (
-                      <input value={row.weight} onChange={e => setField(rec.id, rec, 'weight', e.target.value)}
-                        disabled={isDeleted} className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
-                    )}
-                  </td>
-                  <td style={styles.td}>
-                    {row.type === 'SRV' && (
-                      <input value={row.port} onChange={e => setField(rec.id, rec, 'port', e.target.value)}
-                        disabled={isDeleted} className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
-                    )}
-                  </td>
+                  {showPriority && (
+                    <td style={styles.td}>
+                      {(row.type === 'MX' || row.type === 'SRV') && (
+                        <input value={row.priority} onChange={e => setField(rec.id, rec, 'priority', e.target.value)}
+                          disabled={isDeleted} className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
+                      )}
+                    </td>
+                  )}
+                  {showWeightPort && (
+                    <td style={styles.td}>
+                      {row.type === 'SRV' && (
+                        <input value={row.weight} onChange={e => setField(rec.id, rec, 'weight', e.target.value)}
+                          disabled={isDeleted} className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
+                      )}
+                    </td>
+                  )}
+                  {showWeightPort && (
+                    <td style={styles.td}>
+                      {row.type === 'SRV' && (
+                        <input value={row.port} onChange={e => setField(rec.id, rec, 'port', e.target.value)}
+                          disabled={isDeleted} className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
+                      )}
+                    </td>
+                  )}
                   <td style={{ ...styles.td, ...styles.valueCell }}>
                     <input value={row.value} onChange={e => setField(rec.id, rec, 'value', e.target.value)}
                       disabled={isDeleted} className="inline-field"
@@ -783,7 +801,7 @@ export default function DomainDetailPage() {
             })}
 
             {records.length === 0 && newRows.length === 0 && (
-              <tr><td colSpan={8} style={{ ...styles.td, textAlign: 'center', color: '#9ca3af' }}>{t('domainDetail_noRecords')}</td></tr>
+              <tr><td colSpan={5 + (showPriority ? 1 : 0) + (showWeightPort ? 2 : 0)} style={{ ...styles.td, textAlign: 'center', color: '#9ca3af' }}>{t('domainDetail_noRecords')}</td></tr>
             )}
           </tbody>
         </table>
