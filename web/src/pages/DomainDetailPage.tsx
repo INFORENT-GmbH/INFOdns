@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { saveDomainEdits, loadDomainEdits, clearDomainEdits } from '../hooks/domainEditCache'
+import { saveDomainEdits, loadDomainEdits, clearDomainEdits, setLiveDirty } from '../hooks/domainEditCache'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getDomain, getRecords, createRecord, deleteRecord,
@@ -157,6 +157,7 @@ export default function DomainDetailPage() {
     setApplyError(null)
     setLoadedFromCacheSerial(saved?.serial ?? null)
     return () => {
+      setLiveDirty(domainId, false)
       saveDomainEdits(domainId, {
         serial: lastKnownSerialRef.current,
         edits: latestEdits.current,
@@ -247,6 +248,7 @@ export default function DomainDetailPage() {
 
   const dirtyIds = Object.keys(edits).map(Number)
   const hasDirty = dirtyIds.length > 0 || pendingDeletes.size > 0 || newRows.length > 0
+  setLiveDirty(domainId, hasDirty)
   const conflictWarning = hasDirty
     && loadedFromCacheSerial !== null
     && loadedFromCacheSerial > 0

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useMatch } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getDomains, createDomain, getCustomers, getLabelSuggestions, restoreDomain, type Domain } from '../api/client'
@@ -6,6 +6,7 @@ import LabelChip from '../components/LabelChip'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
+import { getDirtyDomainIds, subscribe } from '../hooks/domainEditCache'
 
 const INLINE_STYLES = `
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -50,6 +51,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
   const [visibleCols, setVisibleCols] = useState<ColId[]>(readColsCookie)
   const [colDropdownOpen, setColDropdownOpen] = useState(false)
   const colDropdownRef = useRef<HTMLDivElement>(null)
+  const [customerFilter, setCustomerFilter] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
   const [restoringId, setRestoringId] = useState<number | null>(null)
 
@@ -67,11 +69,12 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
   })
 
   const { data: domains = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['domains', search, labelFilter, showDeleted],
+    queryKey: ['domains', search, labelFilter, customerFilter, showDeleted],
     queryFn: () => {
       const params: Record<string, string> = {}
       if (search) params.search = search
       if (labelFilter) params.label = labelFilter
+      if (customerFilter) params.customer_id = customerFilter
       if (showDeleted) params.show_deleted = 'true'
       return getDomains(Object.keys(params).length ? params : undefined).then(r => r.data)
     },
@@ -125,6 +128,9 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
   }
 
   const show = (col: ColId) => visibleCols.includes(col)
+
+  const [dirtyDomainIds, setDirtyDomainIds] = useState(() => getDirtyDomainIds())
+  useEffect(() => subscribe(() => setDirtyDomainIds(getDirtyDomainIds())), [])
 
   if (condensed) {
     return (
@@ -184,6 +190,18 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
               </div>
             )}
           </div>
+          {customers.length > 1 && (
+            <select
+              value={customerFilter}
+              onChange={e => setCustomerFilter(e.target.value)}
+              style={{ ...styles.searchInput, width: '100%', boxSizing: 'border-box' as const, marginTop: '.375rem', cursor: 'pointer' }}
+            >
+              <option value="">All customers</option>
+              {customers.map(c => (
+                <option key={c.id} value={String(c.id)}>{c.name}</option>
+              ))}
+            </select>
+          )}
           {!isLoading && (
             <div style={{ fontSize: '.7rem', color: '#9ca3af', marginTop: '.375rem' }}>
               {domains.length} domain{domains.length !== 1 ? 's' : ''}
@@ -213,8 +231,13 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                   background: isSelected ? '#eff6ff' : suspended ? '#fffbeb' : undefined,
                 }}
               >
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500, fontSize: '.8125rem', color: isSelected ? '#1d4ed8' : '#111827' }}>
-                  {d.fqdn}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', overflow: 'hidden' }}>
+                  {dirtyDomainIds.has(d.id) && (
+                    <span style={{ color: '#f59e0b', fontSize: '.45rem', flexShrink: 0, lineHeight: 1 }} title="Unsaved changes">●</span>
+                  )}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500, fontSize: '.8125rem', color: isSelected ? '#1d4ed8' : '#111827' }}>
+                    {d.fqdn}
+                  </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 3, flexWrap: 'wrap' as const }}>
                   <ZoneStatusBadge status={d.zone_status} />
@@ -225,6 +248,16 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                     <span style={{ fontSize: '.65rem', color: '#92400e' }}>suspended</span>
                   )}
                 </div>
+                {d.customer_name && (
+                  <div style={{ fontSize: '.7rem', color: '#9ca3af', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
+                    {d.customer_name}
+                  </div>
+                )}
+                {d.labels && d.labels.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 2, marginTop: 3 }}>
+                    {d.labels.map(l => <LabelChip key={l.id} label={l} />)}
+                  </div>
+                )}
               </div>
             )
           })}
@@ -309,6 +342,18 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
               </div>
             )}
           </div>
+          {customers.length > 1 && (
+            <select
+              value={customerFilter}
+              onChange={e => setCustomerFilter(e.target.value)}
+              style={{ ...styles.searchInput, width: 160, cursor: 'pointer' }}
+            >
+              <option value="">All customers</option>
+              {customers.map(c => (
+                <option key={c.id} value={String(c.id)}>{c.name}</option>
+              ))}
+            </select>
+          )}
           <div ref={colDropdownRef} style={{ position: 'relative' }}>
             <button
               type="button"
@@ -340,7 +385,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
           </div>
           {user?.role === 'admin' && (
             <button
-              onClick={() => { setShowDeleted(v => !v); setSearch(''); setLabelFilter('') }}
+              onClick={() => { setShowDeleted(v => !v); setSearch(''); setLabelFilter(''); setCustomerFilter('') }}
               style={showDeleted ? styles.btnTrashActive : styles.btnSecondary}
               title="Show deleted domains"
             >
