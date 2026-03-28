@@ -358,10 +358,10 @@ setInterval(processDomainLifecycle, 60 * 60 * 1000)
 
 // NS delegation check: all on startup, then split by status
 await checkNsDelegation(NS_RECORDS, 'all')
-// Pending/mismatch domains: every 10s (fast feedback when delegation is set)
+// Pending/mismatch domains: every 15s (fast feedback when delegation is set)
 setInterval(() => checkNsDelegation(NS_RECORDS, 'pending').catch(err =>
   console.error('[worker] checkNsDelegation (pending) failed:', err.message)
-), 10_000)
+), 15_000)
 // Ok domains: every 5 minutes (steady-state confirmation)
 setInterval(() => checkNsDelegation(NS_RECORDS, 'ok').catch(err =>
   console.error('[worker] checkNsDelegation (ok) failed:', err.message)

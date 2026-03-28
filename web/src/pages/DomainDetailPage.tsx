@@ -123,6 +123,8 @@ export default function DomainDetailPage() {
   const [ttlDraft, setTtlDraft] = useState('')
   const [savingTtl, setSavingTtl] = useState(false)
   const [showDnssecModal, setShowDnssecModal] = useState(false)
+  const [copiedNs, setCopiedNs] = useState<string | null>(null)
+  const [hoveredNsItem, setHoveredNsItem] = useState<string | null>(null)
   const [deletingDomain, setDeletingDomain] = useState(false)
   const [showAddKeyDrop, setShowAddKeyDrop] = useState(false)
   const [showEditKeyDrop, setShowEditKeyDrop] = useState(false)
@@ -621,11 +623,33 @@ export default function DomainDetailPage() {
           {domain.expected_ns?.length > 0 && (
             <div style={{ marginTop: '.375rem' }}>
               Set your domain's NS records at your registrar to:
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: 2 }}>
               {domain.expected_ns.map(ns => (
-                <code key={ns} style={{ display: 'block', fontFamily: MONO, fontSize: '.8rem', background: '#fef9c3', padding: '2px 6px', borderRadius: 3, marginTop: 2 }}>{ns}.</code>
+                <span
+                  key={ns}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', position: 'relative', cursor: 'pointer', marginTop: 2 }}
+                  onMouseEnter={() => setHoveredNsItem(ns)}
+                  onMouseLeave={() => setHoveredNsItem(null)}
+                  onClick={() => {
+                    navigator.clipboard.writeText(ns)
+                    setCopiedNs(ns)
+                    setTimeout(() => setCopiedNs(prev => prev === ns ? null : prev), 1500)
+                  }}
+                >
+                  <span style={{ fontFamily: MONO, fontSize: '.8rem' }}>{ns}</span>
+                  {copiedNs === ns && <span style={{ color: '#16a34a', marginLeft: '.25rem', fontSize: '.7rem' }}>✓</span>}
+                  {hoveredNsItem === ns && copiedNs !== ns && (
+                    <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>click to copy</span>
+                  )}
+                  {copiedNs === ns && hoveredNsItem === ns && (
+                    <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>Copied!</span>
+                  )}
+                </span>
               ))}
+              </div>
             </div>
           )}
+          <div style={{ marginTop: '.5rem', fontSize: '.775rem', color: '#a16207' }}>This status is checked every 15 seconds.</div>
         </div>
       )}
 
