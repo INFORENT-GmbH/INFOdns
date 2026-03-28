@@ -22,6 +22,9 @@ async function enqueueRender(domainId: number) {
 
 const FQDN_RE = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i
 
+const EXPECTED_NS: string[] = (process.env.NS_RECORDS ?? '')
+  .split(',').map(s => s.trim().replace(/\.$/, '').toLowerCase()).filter(Boolean)
+
 const CreateDomainBody = z.object({
   fqdn: z.string().min(1).max(253).refine(v => FQDN_RE.test(v), 'Invalid FQDN'),
   customer_id: z.number().int().positive(),
@@ -150,7 +153,7 @@ export async function domainRoutes(app: FastifyInstance) {
     const rows = await query(
       `SELECT d.id, d.fqdn, d.status, d.zone_status, d.last_serial, d.last_rendered_at,
               d.default_ttl, d.customer_id, c.name AS customer_name, d.created_at, d.deleted_at,
-              d.dnssec_enabled
+              d.dnssec_enabled, d.ns_ok, d.ns_checked_at
        FROM domains d JOIN customers c ON c.id = d.customer_id${join}
        ${where}
        ORDER BY d.fqdn
@@ -158,7 +161,7 @@ export async function domainRoutes(app: FastifyInstance) {
       [...params, Number(limit), offset]
     ) as any[]
     const labelMap = await fetchLabels(rows.map((r: any) => r.id), isAdmin)
-    return rows.map((r: any) => ({ ...r, labels: labelMap.get(r.id) ?? [] }))
+    return rows.map((r: any) => ({ ...r, labels: labelMap.get(r.id) ?? [], expected_ns: EXPECTED_NS }))
   })
 
   // POST /domains
@@ -204,7 +207,7 @@ export async function domainRoutes(app: FastifyInstance) {
     if (!row) return reply.status(404).send({ code: 'NOT_FOUND' })
     const isAdmin = (req as any).user.role === 'admin'
     const labelMap = await fetchLabels([row.id], isAdmin)
-    return { ...row, labels: labelMap.get(row.id) ?? [] }
+    return { ...row, labels: labelMap.get(row.id) ?? [], expected_ns: EXPECTED_NS }
   })
 
   // PUT /domains/:id

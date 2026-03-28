@@ -615,6 +615,20 @@ export default function DomainDetailPage() {
         </div>
       )}
 
+      {domain.ns_ok === 0 && domain.status === 'active' && (
+        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.6rem 1rem', borderRadius: 6, marginBottom: '.75rem', fontSize: '.875rem', border: '1px solid #fde68a' }}>
+          <strong>NS delegation mismatch</strong> — public DNS returns different nameservers for this domain.
+          {domain.expected_ns?.length > 0 && (
+            <div style={{ marginTop: '.375rem' }}>
+              Set your domain's NS records at your registrar to:
+              {domain.expected_ns.map(ns => (
+                <code key={ns} style={{ display: 'block', fontFamily: MONO, fontSize: '.8rem', background: '#fef9c3', padding: '2px 6px', borderRadius: 3, marginTop: 2 }}>{ns}.</code>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {domain.zone_status === 'error' && (
         <div style={styles.errorBanner}>
           <strong>{t('domainDetail_zoneFailed')}</strong>

@@ -5,6 +5,7 @@ import { validateZone } from './validateZone.js'
 import { deployZone } from './deployZone.js'
 import { regenerateNamedConf } from './namedConf.js'
 import { pollBulkJobs } from './bulkExecutor.js'
+import { checkNsDelegation } from './nsDelegation.js'
 import { broadcastEvent } from './broadcast.js'
 import { queueMail, pollMailQueue } from './mailer.js'
 import { pollImap } from './ticketMailImporter.js'
@@ -354,6 +355,17 @@ setInterval(syncNamedConf, 60_000)
 // Domain lifecycle: reminders + hard purge, hourly
 await processDomainLifecycle()
 setInterval(processDomainLifecycle, 60 * 60 * 1000)
+
+// NS delegation check: all on startup, then split by status
+await checkNsDelegation(NS_RECORDS, 'all')
+// Pending/mismatch domains: every 10s (fast feedback when delegation is set)
+setInterval(() => checkNsDelegation(NS_RECORDS, 'pending').catch(err =>
+  console.error('[worker] checkNsDelegation (pending) failed:', err.message)
+), 10_000)
+// Ok domains: every 5 minutes (steady-state confirmation)
+setInterval(() => checkNsDelegation(NS_RECORDS, 'ok').catch(err =>
+  console.error('[worker] checkNsDelegation (ok) failed:', err.message)
+), 5 * 60 * 1000)
 
 // Poll loop
 ;(async function loop() {

@@ -88,6 +88,9 @@ export interface Domain {
   zone_error?: string | null
   dnssec_enabled: number
   dnssec_ds: string | null
+  ns_ok: number | null
+  ns_checked_at: string | null
+  expected_ns: string[]
 }
 
 export interface DnsRecord {
