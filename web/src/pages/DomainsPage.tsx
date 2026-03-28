@@ -515,7 +515,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                       display: 'inline-block', padding: '1px 8px', borderRadius: 10, fontSize: '.75rem', fontWeight: 600,
                       background: d.status === 'active' ? '#dcfce7' : d.status === 'suspended' ? '#fef3c7' : '#f3f4f6',
                       color:      d.status === 'active' ? '#166534' : d.status === 'suspended' ? '#92400e' : '#6b7280',
-                    }}>{d.status}</span>
+                    }}>{t(`domain_status_${d.status}` as any) ?? d.status}</span>
                   </td>}
                   {show('zone') && <td style={styles.td}>
                     <ZoneStatusBadge status={d.zone_status} suspended={d.status === 'suspended'} />

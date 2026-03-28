@@ -252,6 +252,11 @@ export const translations = {
     audit_page:         'Page',
     audit_of:           'of',
 
+    // Domain status
+    domain_status_active:    'active',
+    domain_status_suspended: 'suspended',
+    domain_status_deleted:   'deleted',
+
     // Zone status
     zone_clean: 'clean',
     zone_dirty: 'dirty',
@@ -601,6 +606,11 @@ export const translations = {
     audit_noEntries:    'Keine Protokolleinträge gefunden',
     audit_page:         'Seite',
     audit_of:           'von',
+
+    // Domain status
+    domain_status_active:    'aktiv',
+    domain_status_suspended: 'gesperrt',
+    domain_status_deleted:   'gelöscht',
 
     // Zone status
     zone_clean: 'sauber',

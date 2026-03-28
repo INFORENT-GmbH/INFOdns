@@ -675,7 +675,7 @@ export default function DomainDetailPage() {
             display: 'inline-block', padding: '1px 8px', borderRadius: 10, fontSize: '.75rem', fontWeight: 600,
             background: domain.status === 'active' ? '#dcfce7' : domain.status === 'suspended' ? '#fef3c7' : '#f3f4f6',
             color:      domain.status === 'active' ? '#166534' : domain.status === 'suspended' ? '#92400e' : '#6b7280',
-          }}>{domain.status}</span>
+          }}>{t(`domain_status_${domain.status}` as any) ?? domain.status}</span>
         </span>
         {isAdmin ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
