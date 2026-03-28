@@ -89,6 +89,10 @@ export const translations = {
     domainDetail_labelNew:         '+ New',
     domainDetail_labelAdd:         'Add',
     domainDetail_labelAdminOnly:   'Admin only',
+    domainDetail_nsMismatch:       'NS delegation mismatch',
+    domainDetail_nsMismatchDesc:   'Public DNS returns different nameservers for this domain.',
+    domainDetail_nsSetRecords:     'Set your domain\'s NS records at your registrar to:',
+    domainDetail_nsCheckedEvery:   'This status is checked every 15 seconds.',
 
     // Bulk jobs
     bulk_title:             'Bulk Jobs',
@@ -379,6 +383,10 @@ export const translations = {
     domainDetail_labelNew:         '+ Neu',
     domainDetail_labelAdd:         'Hinzufügen',
     domainDetail_labelAdminOnly:   'Nur Admins',
+    domainDetail_nsMismatch:       'NS-Delegierung falsch',
+    domainDetail_nsMismatchDesc:   'Das öffentliche DNS meldet andere Nameserver für diese Domain.',
+    domainDetail_nsSetRecords:     'Setzen Sie die NS-Einträge Ihrer Domain beim Registrar auf:',
+    domainDetail_nsCheckedEvery:   'Dieser Status wird alle 15 Sekunden geprüft.',
 
     // Bulk jobs
     bulk_title:             'Massenaufgaben',

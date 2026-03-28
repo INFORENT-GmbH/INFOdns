@@ -619,10 +619,10 @@ export default function DomainDetailPage() {
 
       {domain.ns_ok === 0 && domain.status === 'active' && (
         <div style={{ background: '#fef3c7', color: '#92400e', padding: '.6rem 1rem', borderRadius: 6, marginBottom: '.75rem', fontSize: '.875rem', border: '1px solid #fde68a' }}>
-          <strong>NS delegation mismatch</strong> — public DNS returns different nameservers for this domain.
+          <strong>{t('domainDetail_nsMismatch')}</strong> — {t('domainDetail_nsMismatchDesc')}
           {domain.expected_ns?.length > 0 && (
             <div style={{ marginTop: '.375rem' }}>
-              Set your domain's NS records at your registrar to:
+              {t('domainDetail_nsSetRecords')}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: 2 }}>
               {domain.expected_ns.map(ns => (
                 <span
