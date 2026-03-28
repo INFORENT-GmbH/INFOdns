@@ -34,6 +34,7 @@ const UpdateDomainBody = z.object({
   default_ttl: z.number().int().positive().optional(),
   notes: z.string().optional(),
   dnssec_enabled: z.boolean().optional(),
+  customer_id: z.number().int().positive().optional(),
 })
 
 const LabelSchema = z.object({
@@ -223,20 +224,33 @@ export async function domainRoutes(app: FastifyInstance) {
     if (body.data.dnssec_enabled !== undefined && !['admin', 'operator'].includes(req.user.role)) {
       return reply.status(403).send({ code: 'FORBIDDEN' })
     }
+    if (body.data.customer_id !== undefined && req.user.role !== 'admin') {
+      return reply.status(403).send({ code: 'FORBIDDEN' })
+    }
+
+    if (body.data.customer_id !== undefined) {
+      const targetCustomer = await queryOne(
+        'SELECT id FROM customers WHERE id = ? AND is_active = 1',
+        [body.data.customer_id]
+      )
+      if (!targetCustomer) return reply.status(422).send({ code: 'CUSTOMER_NOT_FOUND' })
+    }
 
     const dnssecVal = body.data.dnssec_enabled != null ? (body.data.dnssec_enabled ? 1 : 0) : null
     await execute(
       `UPDATE domains SET
-         status = COALESCE(?, status),
-         default_ttl = COALESCE(?, default_ttl),
-         notes = COALESCE(?, notes),
-         dnssec_enabled = COALESCE(?, dnssec_enabled)
+         status         = COALESCE(?, status),
+         default_ttl    = COALESCE(?, default_ttl),
+         notes          = COALESCE(?, notes),
+         dnssec_enabled = COALESCE(?, dnssec_enabled),
+         customer_id    = COALESCE(?, customer_id)
        WHERE id = ?`,
-      [body.data.status ?? null, body.data.default_ttl ?? null, body.data.notes ?? null, dnssecVal, req.params.id]
+      [body.data.status ?? null, body.data.default_ttl ?? null, body.data.notes ?? null, dnssecVal, body.data.customer_id ?? null, req.params.id]
     )
     const updated = await queryOne('SELECT * FROM domains WHERE id = ?', [req.params.id])
     await writeAuditLog({ req, entityType: 'domain', entityId: Number(req.params.id), domainId: Number(req.params.id), action: 'update', oldValue: old, newValue: updated })
-    await enqueueRender(Number(req.params.id))
+    const zoneRelevant = body.data.status !== undefined || body.data.default_ttl !== undefined || body.data.dnssec_enabled !== undefined
+    if (zoneRelevant) await enqueueRender(Number(req.params.id))
     return updated
   })
 

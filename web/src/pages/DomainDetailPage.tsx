@@ -6,7 +6,8 @@ import {
   getDomain, getRecords, createRecord, deleteRecord,
   createBulkJob, previewBulkJob, approveBulkJob, searchByRecord,
   updateDomainLabels, getLabelSuggestions, updateDomain, deleteDomain, getZoneText,
-  type DnsRecord, type Label, type Domain, type LabelSuggestion,
+  getCustomers,
+  type DnsRecord, type Label, type Domain, type LabelSuggestion, type Customer,
 } from '../api/client'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import LabelChip, { getLabelColors } from '../components/LabelChip'
@@ -117,6 +118,10 @@ export default function DomainDetailPage() {
   const [savingLabels, setSavingLabels] = useState(false)
   const [togglingStatus, setTogglingStatus] = useState(false)
   const [togglingDnssec, setTogglingDnssec] = useState(false)
+  const [movingCustomer, setMovingCustomer] = useState(false)
+  const [editingTtl, setEditingTtl] = useState(false)
+  const [ttlDraft, setTtlDraft] = useState('')
+  const [savingTtl, setSavingTtl] = useState(false)
   const [showDnssecModal, setShowDnssecModal] = useState(false)
   const [deletingDomain, setDeletingDomain] = useState(false)
   const [showAddKeyDrop, setShowAddKeyDrop] = useState(false)
@@ -183,6 +188,13 @@ export default function DomainDetailPage() {
     queryFn: () => getLabelSuggestions(domain?.customer_id).then(r => r.data),
     staleTime: 30_000,
     enabled: !!domain,
+  })
+
+  const { data: customers = [] } = useQuery<Customer[]>({
+    queryKey: ['customers'],
+    queryFn: () => getCustomers().then(r => r.data),
+    enabled: isAdmin,
+    staleTime: 60_000,
   })
 
   // ── existing record helpers ──────────────────────────────────────────────
@@ -482,6 +494,37 @@ export default function DomainDetailPage() {
     }
   }
 
+  async function handleMoveCustomer(newCustomerId: number) {
+    if (!domain || movingCustomer || newCustomerId === domain.customer_id) return
+    setMovingCustomer(true)
+    try {
+      await updateDomain(domainId, { customer_id: newCustomerId } as any)
+      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      qc.invalidateQueries({ queryKey: ['domains'] })
+    } catch (err: any) {
+      alert(err.response?.data?.message ?? err.message)
+    } finally {
+      setMovingCustomer(false)
+    }
+  }
+
+  async function handleSaveTtl() {
+    if (!domain || savingTtl) return
+    const val = parseInt(ttlDraft, 10)
+    if (!Number.isInteger(val) || val < 1) { setEditingTtl(false); return }
+    if (val === domain.default_ttl) { setEditingTtl(false); return }
+    setSavingTtl(true)
+    try {
+      await updateDomain(domainId, { default_ttl: val } as any)
+      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+    } catch (err: any) {
+      alert(err.response?.data?.message ?? err.message)
+    } finally {
+      setSavingTtl(false)
+      setEditingTtl(false)
+    }
+  }
+
   async function handleToggleDnssec() {
     if (!domain || togglingDnssec) return
     setTogglingDnssec(true)
@@ -591,8 +634,45 @@ export default function DomainDetailPage() {
             color:      domain.status === 'active' ? '#166534' : domain.status === 'suspended' ? '#92400e' : '#6b7280',
           }}>{domain.status}</span>
         </span>
-        <span>{t('customer')}: <strong>{domain.customer_name}</strong></span>
-        <span>{t('domainDetail_defaultTtl')} <strong>{domain.default_ttl}s</strong></span>
+        {isAdmin ? (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
+            {t('customer')}:
+            <select
+              value={domain.customer_id}
+              disabled={movingCustomer}
+              onChange={e => handleMoveCustomer(Number(e.target.value))}
+              style={{
+                fontSize: 'inherit', fontWeight: 600,
+                border: '1px solid transparent', borderRadius: 4,
+                background: 'none', cursor: 'pointer', padding: '0 2px',
+              }}
+            >
+              {customers.filter(c => c.is_active || c.id === domain.customer_id).map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            {movingCustomer && <span style={{ color: '#9ca3af' }}>…</span>}
+          </span>
+        ) : (
+          <span>{t('customer')}: <strong>{domain.customer_name}</strong></span>
+        )}
+        <span>{t('domainDetail_defaultTtl')}{' '}
+          {editingTtl ? (
+            <input
+              type="number" min={1} value={ttlDraft} autoFocus disabled={savingTtl}
+              onChange={e => setTtlDraft(e.target.value)}
+              onBlur={handleSaveTtl}
+              onKeyDown={e => { if (e.key === 'Enter') handleSaveTtl(); if (e.key === 'Escape') setEditingTtl(false) }}
+              style={{ width: '5rem', fontWeight: 600, fontSize: 'inherit', padding: '0 2px' }}
+            />
+          ) : (
+            <strong
+              style={{ cursor: 'pointer', borderBottom: '1px dashed #9ca3af' }}
+              title="Click to edit"
+              onClick={() => { setTtlDraft(String(domain.default_ttl)); setEditingTtl(true) }}
+            >{domain.default_ttl}s</strong>
+          )}
+        </span>
         <span>{t('serial')}: <code>{domain.last_serial || '—'}</code></span>
         <span>Added: {new Date(domain.created_at).toLocaleDateString()}</span>
         <span>{t('domainDetail_lastRendered')} {domain.last_rendered_at ? new Date(domain.last_rendered_at).toLocaleString() : t('never')}</span>
