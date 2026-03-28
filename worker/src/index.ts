@@ -9,6 +9,7 @@ import { checkNsDelegation } from './nsDelegation.js'
 import { broadcastEvent } from './broadcast.js'
 import { queueMail, pollMailQueue } from './mailer.js'
 import { pollImap } from './ticketMailImporter.js'
+import { promises as dns } from 'dns'
 import { existsSync } from 'fs'
 import { readdir, readFile } from 'fs/promises'
 import { join } from 'path'
@@ -343,26 +344,60 @@ async function requeueMissingZones(): Promise<void> {
 }
 
 // ── ALIAS refresh: re-queue zones with ALIAS records ─────────
-// Ensures CNAME-flattened A/AAAA values stay fresh when upstream IPs change.
+// Resolves each ALIAS target and only re-queues if the IPs actually changed.
+
+interface AliasRecordRow {
+  record_id: number
+  domain_id: number
+  fqdn: string
+  alias_target: string
+  alias_resolved: string | null
+}
 
 async function requeueAliasZones(): Promise<void> {
   try {
-    const rows = await query<{ id: number; fqdn: string }>(
-      `SELECT DISTINCT d.id, d.fqdn
+    const rows = await query<AliasRecordRow>(
+      `SELECT r.id AS record_id, d.id AS domain_id, d.fqdn, r.value AS alias_target, r.alias_resolved
        FROM domains d
        JOIN dns_records r ON r.domain_id = d.id
        WHERE d.status = 'active' AND r.type = 'ALIAS' AND r.is_deleted = 0`
     )
     if (rows.length === 0) return
-    for (const { id } of rows) {
+
+    const changedDomains = new Set<number>()
+
+    for (const row of rows) {
+      let v4: string[] = []
+      let v6: string[] = []
+      try {
+        v4 = await dns.resolve4(row.alias_target)
+      } catch (err: any) {
+        if (err.code === 'ESERVFAIL' || err.code === 'ETIMEDOUT') continue
+        // ENOTFOUND / ENODATA → no IPs, treat as empty
+      }
+      try {
+        v6 = await dns.resolve6(row.alias_target)
+      } catch { /* IPv6 is optional */ }
+
+      const fingerprint = [...v4, ...v6].sort().join(',')
+      if (fingerprint === (row.alias_resolved ?? '')) continue
+
+      await execute('UPDATE dns_records SET alias_resolved = ? WHERE id = ?', [fingerprint, row.record_id])
+      changedDomains.add(row.domain_id)
+    }
+
+    for (const domainId of changedDomains) {
       await execute(
         `INSERT INTO zone_render_queue (domain_id, priority)
          VALUES (?, 1)
          ON DUPLICATE KEY UPDATE status = 'pending', retries = 0, error = NULL`,
-        [id]
+        [domainId]
       )
     }
-    console.log(`[worker] ALIAS refresh: re-queued ${rows.length} zone(s) — ${rows.map(r => r.fqdn).join(', ')}`)
+
+    if (changedDomains.size > 0) {
+      console.log(`[worker] ALIAS refresh: re-queued ${changedDomains.size} zone(s) with changed IPs`)
+    }
   } catch (err: any) {
     console.error('[worker] requeueAliasZones failed:', err.message)
   }

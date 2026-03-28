@@ -118,7 +118,8 @@ CREATE TABLE dns_records (
   priority   SMALLINT UNSIGNED NULL,                       -- MX, SRV
   weight     SMALLINT UNSIGNED NULL,                       -- SRV
   port       SMALLINT UNSIGNED NULL,                       -- SRV
-  value      TEXT NOT NULL,                                -- normalized rdata string
+  value          TEXT NOT NULL,                            -- normalized rdata string
+  alias_resolved TEXT NULL,                                -- last-resolved IPs for ALIAS records (comma-separated, sorted)
   is_deleted TINYINT(1)   NOT NULL DEFAULT 0,
   created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
