@@ -571,7 +571,12 @@ export default function DomainDetailPage() {
       <style>{INLINE_STYLES}</style>
       <div style={styles.header}>
         <button onClick={() => navigate('/domains')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#9ca3af', padding: '0 4px', lineHeight: 1, flexShrink: 0 }} title="Close">×</button>
-        <h2 style={styles.h2}>{domain.fqdn}</h2>
+        <h2 style={styles.h2}>
+          {domain.fqdn}
+          <a href={`https://${domain.fqdn}`} target="_blank" rel="noopener noreferrer" title={`Open ${domain.fqdn}`} style={{ marginLeft: '0.4rem', color: '#9ca3af', verticalAlign: 'middle', lineHeight: 1, textDecoration: 'none' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </a>
+        </h2>
         <ZoneStatusBadge status={domain.zone_status} />
         {(isAdmin || isOperator) && (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '.5rem' }}>
