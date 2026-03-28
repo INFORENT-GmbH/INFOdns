@@ -1,6 +1,7 @@
 import { promises as dns } from 'dns'
 import { query, execute } from './db.js'
 import { broadcastEvent } from './broadcast.js'
+import { queueMail } from './mailer.js'
 
 interface DomainRow {
   id: number
@@ -60,6 +61,14 @@ export async function checkNsDelegation(
         zone_status: domain.zone_status,
         ns_ok: newOk,
       })
+
+      const template = newOk === 1 ? 'ns_delegation_ok' : 'ns_delegation_broken'
+      const admins = await query<{ email: string }>(
+        "SELECT email FROM users WHERE role = 'admin' AND is_active = 1"
+      )
+      for (const admin of admins) {
+        queueMail(admin.email, template, { fqdn: domain.fqdn })
+      }
     }
   }
 

@@ -345,6 +345,37 @@ ${infoTable([
   return { subject, html: wrap(subject, bodyHtml), text }
 }
 
+// ── NS delegation OK ─────────────────────────────────────────
+
+interface NsDelegationOkPayload {
+  fqdn: string
+}
+
+function nsDelegationOk(_locale: Locale, p: NsDelegationOkPayload): MailContent {
+  const subject = `[INFOdns] NS delegation OK: ${p.fqdn}`
+  const bodyHtml = `<h2 style="color:#15803d;">NS delegation confirmed</h2>
+<p>The name servers for the following domain now correctly point to this DNS service.</p>
+${infoTable([['Domain', p.fqdn]])}`
+  const text = `NS delegation OK: ${p.fqdn}\nThe domain's NS records now point to this DNS service.`
+  return { subject, html: wrap(subject, bodyHtml), text }
+}
+
+// ── NS delegation broken ──────────────────────────────────────
+
+interface NsDelegationBrokenPayload {
+  fqdn: string
+}
+
+function nsDelegationBroken(_locale: Locale, p: NsDelegationBrokenPayload): MailContent {
+  const subject = `[INFOdns] NS delegation BROKEN: ${p.fqdn}`
+  const bodyHtml = `<h2 style="color:#b91c1c;">NS delegation lost</h2>
+<p>The name servers for the following domain no longer point to this DNS service.</p>
+${infoTable([['Domain', p.fqdn]])}
+<p>DNS queries for this domain may be answered by a different provider or fail entirely.</p>`
+  const text = `NS delegation BROKEN: ${p.fqdn}\nThe domain's NS records no longer point to this DNS service.`
+  return { subject, html: wrap(subject, bodyHtml), text }
+}
+
 // ── Domain purge reminder (admin notification) ────────────────
 
 interface DomainPurgeReminderPayload {
@@ -390,6 +421,8 @@ const templates: Record<string, (locale: Locale, payload: any) => MailContent> =
   ticket_new_admin: ticketNewAdmin,
   domain_deleted: domainDeleted,
   domain_purge_reminder: domainPurgeReminder,
+  ns_delegation_ok: nsDelegationOk,
+  ns_delegation_broken: nsDelegationBroken,
 }
 
 export function renderTemplate(template: string, locale: Locale, payload: unknown): MailContent {
