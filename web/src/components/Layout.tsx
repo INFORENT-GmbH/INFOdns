@@ -128,6 +128,9 @@ export default function Layout() {
       <main style={styles.main}>
         <Outlet />
       </main>
+      <footer style={styles.footer}>
+        &copy; 1988&ndash;2026 INFORENT GmbH
+      </footer>
     </div>
   )
 }
@@ -173,4 +176,5 @@ const styles: Record<string, React.CSSProperties> = {
   impersonationBar: { display: 'flex', alignItems: 'center', gap: '.75rem', background: '#fbbf24', color: '#78350f', fontSize: '.8125rem', fontWeight: 600, padding: '.5rem 1.5rem', position: 'sticky' as const, top: 0, zIndex: 49 },
   impersonationBtn: { background: '#78350f', color: '#fef3c7', border: 'none', borderRadius: 4, padding: '.25rem .75rem', fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' },
   dropdown:  { position: 'absolute' as const, top: 'calc(100% + 6px)', left: '50%', transform: 'translateX(-50%)', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.08)', zIndex: 100, minWidth: 140 },
+  footer:    { textAlign: 'center' as const, padding: '.75rem', fontSize: '.75rem', color: '#9ca3af', borderTop: '1px solid #e5e7eb', marginTop: 'auto' },
 }

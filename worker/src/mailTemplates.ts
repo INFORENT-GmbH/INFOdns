@@ -33,7 +33,7 @@ function wrap(title: string, bodyHtml: string): string {
 <div class="card">
   <div class="hdr"><img src="${process.env.APP_PUBLIC_URL ?? ''}/logo-wide.png" alt="INFOdns"></div>
   <div class="body">${bodyHtml}</div>
-  <div class="ftr">INFOdns &mdash; DNS Management</div>
+  <div class="ftr">&copy; 1988&ndash;2026 INFORENT GmbH</div>
 </div>
 </div>
 </body>
