@@ -1,29 +1,11 @@
 import mysql from 'mysql2/promise.js'
 
-/** Returns today as YYYYMMDD integer in UTC */
-function todayInt(): number {
-  const d = new Date()
-  const y = d.getUTCFullYear()
-  const m = String(d.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(d.getUTCDate()).padStart(2, '0')
-  return Number(`${y}${m}${day}`)
-}
-
 /**
- * Atomically increments the SOA serial for a domain.
- * Must be called inside an existing transaction with a FOR UPDATE lock.
- * Format: YYYYMMDDnn (max 99 increments per day).
+ * Returns the next SOA serial. Uses Unix timestamp (seconds since epoch).
+ * Math.max ensures monotonic increase if two renders happen within the same second.
  */
 export function nextSerial(currentSerial: number): number {
-  const today = todayInt()
-  const currentDatePart = Math.floor(currentSerial / 100)
-
-  if (currentDatePart === today) {
-    const nn = currentSerial % 100
-    if (nn >= 99) throw new Error(`SOA serial exhausted for today (${today}99). Try again tomorrow.`)
-    return currentSerial + 1
-  }
-  return today * 100 + 1
+  return Math.max(currentSerial + 1, Math.floor(Date.now() / 1000))
 }
 
 /**
