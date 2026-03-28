@@ -1,7 +1,12 @@
-import { promises as dns } from 'dns'
+import { Resolver } from 'dns'
+import { promisify } from 'util'
 import { query, execute } from './db.js'
 import { broadcastEvent } from './broadcast.js'
 import { queueMail } from './mailer.js'
+
+const resolver = new Resolver()
+resolver.setServers(['8.8.8.8', '1.1.1.1'])
+const resolveNs = promisify(resolver.resolveNs.bind(resolver))
 
 interface DomainRow {
   id: number
@@ -33,7 +38,7 @@ export async function checkNsDelegation(
     let newOk: number | null = domain.ns_ok
 
     try {
-      const resolved = await dns.resolveNs(domain.fqdn)
+      const resolved = await resolveNs(domain.fqdn)
       const actual = resolved.map(r => r.toLowerCase().replace(/\.$/, ''))
       newOk = (actual.length === expected.size && actual.every(ns => expected.has(ns))) ? 1 : 0
     } catch (err: any) {
