@@ -15,9 +15,10 @@ import { join } from 'path'
 
 const BIND_KEYS_DIR = process.env.BIND_KEYS_DIR ?? '/bind/primary/keys'
 
-const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS ?? 2000)
-const BATCH_SIZE       = Number(process.env.BATCH_SIZE ?? 10)
-const MAIL_ADMIN_TO    = process.env.MAIL_ADMIN_TO ?? ''
+const POLL_INTERVAL_MS         = Number(process.env.POLL_INTERVAL_MS ?? 2000)
+const BATCH_SIZE               = Number(process.env.BATCH_SIZE ?? 10)
+const MAIL_ADMIN_TO            = process.env.MAIL_ADMIN_TO ?? ''
+const ALIAS_REFRESH_INTERVAL_MS = Number(process.env.ALIAS_REFRESH_INTERVAL_MS ?? 10_000)
 
 const NS_RECORDS: string[] = (process.env.NS_RECORDS ?? '')
   .split(',').map(s => s.trim()).filter(Boolean)
@@ -341,6 +342,32 @@ async function requeueMissingZones(): Promise<void> {
   }
 }
 
+// ── ALIAS refresh: re-queue zones with ALIAS records ─────────
+// Ensures CNAME-flattened A/AAAA values stay fresh when upstream IPs change.
+
+async function requeueAliasZones(): Promise<void> {
+  try {
+    const rows = await query<{ id: number; fqdn: string }>(
+      `SELECT DISTINCT d.id, d.fqdn
+       FROM domains d
+       JOIN dns_records r ON r.domain_id = d.id
+       WHERE d.status = 'active' AND r.type = 'ALIAS' AND r.is_deleted = 0`
+    )
+    if (rows.length === 0) return
+    for (const { id } of rows) {
+      await execute(
+        `INSERT INTO zone_render_queue (domain_id, priority)
+         VALUES (?, 1)
+         ON DUPLICATE KEY UPDATE status = 'pending', retries = 0, error = NULL`,
+        [id]
+      )
+    }
+    console.log(`[worker] ALIAS refresh: re-queued ${rows.length} zone(s) — ${rows.map(r => r.fqdn).join(', ')}`)
+  } catch (err: any) {
+    console.error('[worker] requeueAliasZones failed:', err.message)
+  }
+}
+
 // ── Entry point ───────────────────────────────────────────────
 
 console.log('[worker] Starting INFOdns Worker')
@@ -355,6 +382,9 @@ setInterval(syncNamedConf, 60_000)
 // Domain lifecycle: reminders + hard purge, hourly
 await processDomainLifecycle()
 setInterval(processDomainLifecycle, 60 * 60 * 1000)
+
+// ALIAS refresh: re-queue domains with ALIAS records on a fixed interval
+setInterval(requeueAliasZones, ALIAS_REFRESH_INTERVAL_MS)
 
 // NS delegation check: all on startup, then split by status
 await checkNsDelegation(NS_RECORDS, 'all')
