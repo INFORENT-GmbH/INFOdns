@@ -64,10 +64,10 @@ export default function LoginPage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  wrapper: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f3f4f6', gap: '1rem' },
+  wrapper: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'url(/header-skyline.png) no-repeat bottom center, url(/background.jpg) no-repeat center center', backgroundSize: '800px 123px, cover', gap: '1rem' },
   langBtn: { position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: '1px solid #d1d5db', borderRadius: 4, padding: '.25rem .6rem', cursor: 'pointer', fontSize: '.8rem' },
-  card: { background: '#fff', padding: '2rem', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,.12)', width: 360, display: 'flex', flexDirection: 'column', gap: '1rem' },
-  logo: { height: 160, width: 'auto', alignSelf: 'flex-start' },
+card: { background: '#fff', padding: '2rem', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,.12)', width: 360, display: 'flex', flexDirection: 'column', gap: '1rem' },
+  logo: { height: 112, width: 'auto', alignSelf: 'center' },
   subtitle: { margin: 0, color: '#6b7280', fontSize: '.875rem' },
   error: { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 4, fontSize: '.875rem' },
   label: { display: 'flex', flexDirection: 'column', gap: '.25rem', fontSize: '.875rem', fontWeight: 500 },
