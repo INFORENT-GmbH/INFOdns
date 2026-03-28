@@ -76,24 +76,22 @@ async function writePrimaryConf(zones: ZoneEntry[]): Promise<void> {
 
 /**
  * Generate a catalog zone serial that always increments.
- * Uses YYYYMMDD00 as the daily floor and reads the current serial
- * from the zone file so we never go backwards (unless the file is lost).
+ * Uses Unix timestamp (seconds since epoch) as the floor.
  */
 async function catalogSerial(zonePath: string): Promise<number> {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-  const baseSerial = Number(`${date}00`)
+  const unixNow = Math.floor(Date.now() / 1000)
 
   try {
     const content = await readFile(zonePath, 'utf8')
     const match = content.match(/(\d+)\s*;\s*serial/)
     if (match) {
       const current = Number(match[1])
-      return Math.max(current + 1, baseSerial)
+      return Math.max(current + 1, unixNow)
     }
   } catch {
     // File doesn't exist yet
   }
-  return baseSerial
+  return unixNow
 }
 
 async function deployCatalogZone(zones: ZoneEntry[]): Promise<void> {
