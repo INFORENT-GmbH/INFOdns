@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { parseZoneImport, type DnsRecord, type ParsedImportRecord, type ImportConflict, type ZoneImportParseResult } from '../api/client'
+import { useI18n } from '../i18n/I18nContext'
 
 interface EditRow { name: string; type: string; ttl: string; value: string; priority: string; weight: string; port: string }
 interface NewRow extends EditRow { _newId: string }
@@ -28,6 +29,7 @@ function formatExistingValue(rec: DnsRecord): string {
 }
 
 export default function ImportZoneModal({ domainId, onStage, onClose }: Props) {
+  const { t } = useI18n()
   const fileRef = useRef<HTMLInputElement>(null)
   const [fileName, setFileName] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -113,14 +115,14 @@ export default function ImportZoneModal({ domainId, onStage, onClose }: Props) {
     <div style={s.overlay} onClick={onClose}>
       <div style={s.modal} onClick={e => e.stopPropagation()}>
         <div style={s.header}>
-          <h3 style={s.title}>Import Zone File</h3>
+          <h3 style={s.title}>{t('importZone_title')}</h3>
           <button onClick={onClose} style={s.closeBtn}>✕</button>
         </div>
 
         {/* File picker */}
         <div style={s.filePicker}>
           <button style={s.btnSecondary} onClick={() => fileRef.current?.click()} disabled={loading}>
-            {loading ? 'Parsing…' : 'Choose file'}
+            {loading ? t('importZone_parsing') : t('importZone_chooseFile')}
           </button>
           {fileName && <span style={s.fileLabel}>{fileName}</span>}
           {loading && <div style={s.spinner} />}
@@ -137,25 +139,25 @@ export default function ImportZoneModal({ domainId, onStage, onClose }: Props) {
 
         {result && entries.length === 0 && (
           <p style={{ color: '#6b7280', fontSize: '.875rem', margin: 0 }}>
-            No importable records found.{result.skipped.length > 0 ? ' See skipped below.' : ''}
+            {t('importZone_noRecords')}{result.skipped.length > 0 ? ' ' + t('importZone_seeSkipped') : ''}
           </p>
         )}
 
         {newEntries.length > 0 && (
           <section>
             <div style={s.sectionHeader}>
-              <span style={s.sectionTitle}>New records ({newEntries.length})</span>
-              <button style={s.linkBtn} onClick={() => selectAll(true)}>Select all</button>
-              <button style={s.linkBtn} onClick={() => selectAll(false)}>None</button>
+              <span style={s.sectionTitle}>{t('importZone_newRecords')} ({newEntries.length})</span>
+              <button style={s.linkBtn} onClick={() => selectAll(true)}>{t('bulk_selectAll')}</button>
+              <button style={s.linkBtn} onClick={() => selectAll(false)}>{t('bulk_selectNone')}</button>
             </div>
             <table style={s.table}>
               <thead>
                 <tr>
                   <th style={s.th}></th>
-                  <th style={s.th}>Name</th>
-                  <th style={s.th}>Type</th>
-                  <th style={s.th}>TTL</th>
-                  <th style={s.th}>Value</th>
+                  <th style={s.th}>{t('name')}</th>
+                  <th style={s.th}>{t('type')}</th>
+                  <th style={s.th}>{t('ttl')}</th>
+                  <th style={s.th}>{t('value')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -185,8 +187,8 @@ export default function ImportZoneModal({ domainId, onStage, onClose }: Props) {
         {conflictEntries.length > 0 && (
           <section>
             <div style={s.sectionHeader}>
-              <span style={s.sectionTitle}>Conflicts ({conflictEntries.length})</span>
-              <span style={s.hintText}>A record at this name+type already exists</span>
+              <span style={s.sectionTitle}>{t('importZone_conflicts')} ({conflictEntries.length})</span>
+              <span style={s.hintText}>{t('importZone_conflictHint')}</span>
             </div>
             {entries.map((entry, idx) => {
               if (entry.kind !== 'conflict') return null
@@ -200,32 +202,32 @@ export default function ImportZoneModal({ domainId, onStage, onClose }: Props) {
                   <table style={{ ...s.table, marginTop: '.25rem' }}>
                     <thead>
                       <tr>
-                        <th style={s.th}>Source</th>
-                        <th style={s.th}>TTL</th>
-                        <th style={s.th}>Value</th>
+                        <th style={s.th}>{t('importZone_source')}</th>
+                        <th style={s.th}>{t('ttl')}</th>
+                        <th style={s.th}>{t('value')}</th>
                         <th style={s.th}></th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr style={choice === 'keep' ? s.rowChecked : s.row}>
-                        <td style={s.td}><span style={s.existingBadge}>Existing</span></td>
+                        <td style={s.td}><span style={s.existingBadge}>{t('importZone_existing')}</span></td>
                         <td style={{ ...s.td, color: '#6b7280' }}>{conflict.existing.ttl ?? '—'}</td>
                         <td style={{ ...s.td, ...s.mono, wordBreak: 'break-all' }}>{formatExistingValue(conflict.existing)}</td>
                         <td style={s.td}>
                           <label style={s.radioLabel}>
                             <input type="radio" name={`conflict-${idx}`} checked={choice === 'keep'} onChange={() => setConflictChoice(idx, 'keep')} />
-                            Keep
+                            {t('importZone_keep')}
                           </label>
                         </td>
                       </tr>
                       <tr style={choice === 'overwrite' ? s.rowImport : s.row}>
-                        <td style={s.td}><span style={s.incomingBadge}>Incoming</span></td>
+                        <td style={s.td}><span style={s.incomingBadge}>{t('importZone_incoming')}</span></td>
                         <td style={{ ...s.td, color: '#6b7280' }}>{conflict.incoming.ttl ?? '—'}</td>
                         <td style={{ ...s.td, ...s.mono, wordBreak: 'break-all' }}>{formatImportValue(conflict.incoming)}</td>
                         <td style={s.td}>
                           <label style={s.radioLabel}>
                             <input type="radio" name={`conflict-${idx}`} checked={choice === 'overwrite'} onChange={() => setConflictChoice(idx, 'overwrite')} />
-                            Use
+                            {t('importZone_use')}
                           </label>
                         </td>
                       </tr>
@@ -240,7 +242,7 @@ export default function ImportZoneModal({ domainId, onStage, onClose }: Props) {
         {result && result.skipped.length > 0 && (
           <section>
             <button style={s.linkBtn} onClick={() => setShowSkipped(v => !v)}>
-              {showSkipped ? '▾' : '▸'} Skipped ({result.skipped.length})
+              {showSkipped ? '▾' : '▸'} {t('importZone_skipped')} ({result.skipped.length})
             </button>
             {showSkipped && (
               <ul style={s.skippedList}>
@@ -251,13 +253,13 @@ export default function ImportZoneModal({ domainId, onStage, onClose }: Props) {
         )}
 
         <div style={s.footer}>
-          <button style={s.btnSecondary} onClick={onClose}>Cancel</button>
+          <button style={s.btnSecondary} onClick={onClose}>{t('cancel')}</button>
           <button
             style={selectedCount > 0 ? s.btnPrimary : s.btnDisabled}
             disabled={selectedCount === 0}
             onClick={handleStage}
           >
-            Stage {selectedCount} record{selectedCount !== 1 ? 's' : ''}
+            {t('importZone_stage', selectedCount)}
           </button>
         </div>
       </div>

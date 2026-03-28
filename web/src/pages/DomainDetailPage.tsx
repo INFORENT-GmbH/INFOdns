@@ -581,7 +581,7 @@ export default function DomainDetailPage() {
                 disabled={togglingStatus}
                 style={domain.status === 'suspended' ? styles.btnSuccess : styles.btnWarning}
               >
-                {togglingStatus ? '…' : domain.status === 'suspended' ? 'Activate' : 'Suspend'}
+                {togglingStatus ? '…' : domain.status === 'suspended' ? t('domainDetail_activate') : t('domainDetail_suspend')}
               </button>
             )}
             {domain.status !== 'deleted' && (
@@ -590,12 +590,12 @@ export default function DomainDetailPage() {
                 disabled={togglingDnssec}
                 style={domain.dnssec_enabled ? styles.btnWarning : styles.btnSecondary}
               >
-                {togglingDnssec ? '…' : domain.dnssec_enabled ? 'DNSSEC' : 'Enable DNSSEC'}
+                {togglingDnssec ? '…' : domain.dnssec_enabled ? t('domainDetail_dnssecBtn') : t('domainDetail_enableDnssec')}
               </button>
             )}
             {isAdmin && (
               <button onClick={handleDelete} disabled={deletingDomain} style={styles.btnDanger}>
-                {deletingDomain ? '…' : 'Delete'}
+                {deletingDomain ? '…' : t('delete')}
               </button>
             )}
           </div>
@@ -604,16 +604,16 @@ export default function DomainDetailPage() {
 
       {conflictWarning && (
         <div style={{ background: '#fef3c7', color: '#92400e', padding: '.6rem 1rem', borderRadius: 6, marginBottom: '.75rem', fontSize: '.875rem', display: 'flex', alignItems: 'center', gap: '.75rem', border: '1px solid #fde68a' }}>
-          <span>⚠ This zone was updated by someone else while you were away. Your unsaved edits may conflict.</span>
+          <span>⚠ {t('domainDetail_conflictWarning')}</span>
           <button onClick={handleForceReload} style={{ flexShrink: 0, padding: '3px 10px', borderRadius: 4, border: '1px solid #f59e0b', background: '#fff', color: '#92400e', fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' }}>
-            Discard &amp; reload
+            {t('domainDetail_discardReload')}
           </button>
         </div>
       )}
 
       {domain.status === 'suspended' && (
         <div style={{ background: '#fef3c7', color: '#92400e', padding: '.6rem 1rem', borderRadius: 6, marginBottom: '.75rem', fontSize: '.875rem', display: 'flex', alignItems: 'center', gap: '.5rem', border: '1px solid #fde68a' }}>
-          <strong>Suspended</strong> — zone is not served to secondaries. Click Activate to resume.
+          {t('domainDetail_suspendedMsg', t('domainDetail_activate'))}
         </div>
       )}
 
@@ -639,17 +639,17 @@ export default function DomainDetailPage() {
                   <span style={{ fontFamily: MONO, fontSize: '.8rem' }}>{ns}</span>
                   {copiedNs === ns && <span style={{ color: '#16a34a', marginLeft: '.25rem', fontSize: '.7rem' }}>✓</span>}
                   {hoveredNsItem === ns && copiedNs !== ns && (
-                    <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>click to copy</span>
+                    <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>{t('domainDetail_clickToCopy')}</span>
                   )}
                   {copiedNs === ns && hoveredNsItem === ns && (
-                    <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>Copied!</span>
+                    <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>{t('domainDetail_copied')}</span>
                   )}
                 </span>
               ))}
               </div>
             </div>
           )}
-          <div style={{ marginTop: '.5rem', fontSize: '.775rem', color: '#a16207' }}>This status is checked every 15 seconds.</div>
+          <div style={{ marginTop: '.5rem', fontSize: '.775rem', color: '#a16207' }}>{t('domainDetail_nsCheckedEvery')}</div>
         </div>
       )}
 
@@ -706,13 +706,13 @@ export default function DomainDetailPage() {
           ) : (
             <strong
               style={{ cursor: 'pointer', borderBottom: '1px dashed #9ca3af' }}
-              title="Click to edit"
+              title={t('domainDetail_clickToEdit')}
               onClick={() => { setTtlDraft(String(domain.default_ttl)); setEditingTtl(true) }}
             >{domain.default_ttl}s</strong>
           )}
         </span>
         <span>{t('serial')}: <code>{domain.last_serial || '—'}</code></span>
-        <span>Added: {new Date(domain.created_at).toLocaleDateString()}</span>
+        <span>{t('domainDetail_added')}: {new Date(domain.created_at).toLocaleDateString()}</span>
         <span>{t('domainDetail_lastRendered')} {domain.last_rendered_at ? new Date(domain.last_rendered_at).toLocaleString() : t('never')}</span>
       </div>
 
@@ -795,7 +795,7 @@ export default function DomainDetailPage() {
       <div style={styles.tableHeader}>
         <h3 style={styles.h3}>{t('domainDetail_dnsRecords')}</h3>
         <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
-          <button onClick={() => setShowImportModal(true)} style={styles.btnSecondary}>Import Zone</button>
+          <button onClick={() => setShowImportModal(true)} style={styles.btnSecondary}>{t('domainDetail_importZone')}</button>
           <button onClick={addNewRow} style={hasDirty ? styles.btnSecondary : styles.btnPrimary}>{t('domainDetail_addRecord')}</button>
         </div>
       </div>
@@ -835,7 +835,7 @@ export default function DomainDetailPage() {
                     {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
                   </select>
                   {row.type === 'CNAME' && row.name.trim() === '@' && (
-                    <span className="alias-hint" data-tip="CNAME flattening — resolved to A/AAAA at zone render time, allowing a CNAME-like record at the apex."
+                    <span className="alias-hint" data-tip={t('domainDetail_cnameFlatten')}
                       style={{ marginLeft: 4, cursor: 'help', color: '#9ca3af', fontWeight: 700, fontSize: '.8rem' }}>?</span>
                   )}
                 </td>
@@ -844,7 +844,7 @@ export default function DomainDetailPage() {
                     placeholder={t('domainDetail_ttlPlaceholder')} className="inline-field" style={{ ...styles.inlineInput, width: 70 }} />
                   {row.ttl !== '' && (
                     <button onClick={() => setNewField(row._newId, 'ttl', '')}
-                      className="alias-hint" data-tip="Reset to domain default" style={{ ...styles.btnIcon, color: '#9ca3af', marginLeft: 2 }}>↺</button>
+                      className="alias-hint" data-tip={t('domainDetail_resetDefault')} style={{ ...styles.btnIcon, color: '#9ca3af', marginLeft: 2 }}>↺</button>
                   )}
                 </td>
                 {showPriority && (
@@ -908,7 +908,7 @@ export default function DomainDetailPage() {
                       {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
                     </select>
                     {(row.type === 'ALIAS' || (row.type === 'CNAME' && row.name.trim() === '@')) && (
-                      <span className="alias-hint" data-tip="CNAME flattening — resolved to A/AAAA at zone render time, allowing a CNAME-like record at the apex."
+                      <span className="alias-hint" data-tip={t('domainDetail_cnameFlatten')}
                         style={{ marginLeft: 4, cursor: 'help', color: '#9ca3af', fontWeight: 700, fontSize: '.8rem' }}>?</span>
                     )}
                   </td>
@@ -918,7 +918,7 @@ export default function DomainDetailPage() {
                       style={{ ...styles.inlineInput, width: 70 }} />
                     {row.ttl !== '' && !isDeleted && (
                       <button onClick={() => setField(rec.id, rec, 'ttl', '')}
-                        className="alias-hint" data-tip="Reset to domain default" style={{ ...styles.btnIcon, color: '#9ca3af', marginLeft: 2 }}>↺</button>
+                        className="alias-hint" data-tip={t('domainDetail_resetDefault')} style={{ ...styles.btnIcon, color: '#9ca3af', marginLeft: 2 }}>↺</button>
                     )}
                   </td>
                   {showPriority && (

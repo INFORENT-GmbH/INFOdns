@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useI18n } from '../i18n/I18nContext'
 
 const MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
 
@@ -47,6 +48,7 @@ interface Props {
 }
 
 export default function DnssecModal({ fqdn, defaultTtl, dnssecDs, onDisable, disabling, onClose }: Props) {
+  const { t } = useI18n()
   const [copied, setCopied] = useState<string | null>(null)
   const [dsLine, setDsLine] = useState<string | null>(null)
 
@@ -88,7 +90,7 @@ export default function DnssecModal({ fqdn, defaultTtl, dnssecDs, onDisable, dis
       <div style={{ background: '#fff', borderRadius: 8, padding: '1.5rem', width: 680, maxWidth: '100%', boxShadow: '0 8px 32px rgba(0,0,0,.18)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
         onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: '#111827' }}>DNSSEC — {fqdn}</h3>
+          <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: '#111827' }}>{t('dnssec_title', fqdn)}</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#6b7280', lineHeight: 1 }}>×</button>
         </div>
 
@@ -112,30 +114,30 @@ export default function DnssecModal({ fqdn, defaultTtl, dnssecDs, onDisable, dis
                 <span style={{ color: '#6b7280', fontWeight: 500, fontSize: '.8125rem', flexShrink: 0, minWidth: 88 }}>DNSKEY RR</span>
                 <span style={copyValueStyle('dnskey')}>{dnskeyRr}</span>
                 <button style={copyBtnStyle} onClick={() => copyText('dnskey', dnskeyRr!)}>
-                  {copied === 'dnskey' ? 'Copied!' : 'Copy'}
+                  {copied === 'dnskey' ? t('dnssec_copied') : t('dnssec_copy')}
                 </button>
               </div>
               <div style={copyRowStyle}>
                 <span style={{ color: '#6b7280', fontWeight: 500, fontSize: '.8125rem', flexShrink: 0, minWidth: 88 }}>DS Record</span>
-                <span style={copyValueStyle('ds')}>{dsLine ?? 'computing…'}</span>
+                <span style={copyValueStyle('ds')}>{dsLine ?? t('dnssec_computing')}</span>
                 <button style={copyBtnStyle} disabled={!dsLine} onClick={() => dsLine && copyText('ds', dsLine)}>
-                  {copied === 'ds' ? 'Copied!' : 'Copy'}
+                  {copied === 'ds' ? t('dnssec_copied') : t('dnssec_copy')}
                 </button>
               </div>
             </div>
           </>
         ) : (
           <p style={{ margin: 0, fontSize: '.8125rem', color: '#6b7280' }}>
-            Signing in progress — DNSKEY will appear here once BIND has generated keys (may take ~10 seconds after enabling).
+            {t('dnssec_signing')}
           </p>
         )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '.5rem', paddingTop: '.25rem', borderTop: '1px solid #e5e7eb' }}>
           <button onClick={onDisable} disabled={disabling} style={{ padding: '6px 16px', borderRadius: 5, border: '1px solid #fca5a5', background: '#fff', color: '#dc2626', cursor: 'pointer', fontSize: '.875rem', fontWeight: 500 }}>
-            {disabling ? '…' : 'Disable DNSSEC'}
+            {disabling ? '…' : t('dnssec_disable')}
           </button>
           <button onClick={onClose} style={{ padding: '6px 16px', borderRadius: 5, border: '1px solid #d1d5db', background: '#fff', color: '#374151', cursor: 'pointer', fontSize: '.875rem', fontWeight: 500 }}>
-            Close
+            {t('close')}
           </button>
         </div>
       </div>

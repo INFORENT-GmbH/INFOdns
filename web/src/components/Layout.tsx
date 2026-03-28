@@ -99,13 +99,13 @@ export default function Layout() {
             >
               <span style={{ color: !s ? '#9ca3af' : s.ok ? '#16a34a' : '#dc2626' }}>●</span>
               {' '}{label.display}
-              {s && <span style={styles.nsLatency}>{s.ok ? `${s.latencyMs}ms` : 'down'}</span>}
+              {s && <span style={styles.nsLatency}>{s.ok ? `${s.latencyMs}ms` : t('layout_down')}</span>}
               {copiedNs === name && <span style={styles.nsCopied}>✓</span>}
               {hoveredNs === name && copiedNs !== name && (
-                <span style={styles.nsTooltip}>{label.fqdn} — click to copy</span>
+                <span style={styles.nsTooltip}>{t('layout_clickToCopy', label.fqdn)}</span>
               )}
               {copiedNs === name && hoveredNs === name && (
-                <span style={styles.nsTooltip}>Copied!</span>
+                <span style={styles.nsTooltip}>{t('layout_copied')}</span>
               )}
             </span>
           )

@@ -60,6 +60,14 @@ export const translations = {
     domains_noneFound:           'No domains found',
     domains_loadError:           'Failed to load domains',
     domains_columns:             'Columns',
+    domains_allCustomers:        'All customers',
+    domains_deleted:             'Deleted',
+    domains_purgeIn:             'Purge in',
+    domains_noDeleted:           'No deleted domains.',
+    domains_noLabels:            'No labels',
+    domains_nsWarning:           'NS records don\'t point to our nameservers',
+    domains_purging:             'Purging…',
+    domains_suspended:           'suspended',
 
     // Domain detail
     domainDetail_backLink:         '← Domains',
@@ -93,6 +101,20 @@ export const translations = {
     domainDetail_nsMismatchDesc:   'Public DNS returns different nameservers for this domain.',
     domainDetail_nsSetRecords:     'Set your domain\'s NS records at your registrar to:',
     domainDetail_nsCheckedEvery:   'This status is checked every 15 seconds.',
+    domainDetail_activate:         'Activate',
+    domainDetail_suspend:          'Suspend',
+    domainDetail_enableDnssec:     'Enable DNSSEC',
+    domainDetail_dnssecBtn:        'DNSSEC',
+    domainDetail_conflictWarning:  'This zone was updated by someone else while you were away. Your unsaved edits may conflict.',
+    domainDetail_discardReload:    'Discard & reload',
+    domainDetail_suspendedMsg:     (activate: string) => `Suspended — zone is not served to secondaries. Click ${activate} to resume.`,
+    domainDetail_clickToCopy:      'click to copy',
+    domainDetail_copied:           'Copied!',
+    domainDetail_clickToEdit:      'Click to edit',
+    domainDetail_added:            'Added',
+    domainDetail_importZone:       'Import Zone',
+    domainDetail_cnameFlatten:     'CNAME flattening — resolved to A/AAAA at zone render time, allowing a CNAME-like record at the apex.',
+    domainDetail_resetDefault:     'Reset to domain default',
 
     // Bulk jobs
     bulk_title:             'Bulk Jobs',
@@ -250,6 +272,39 @@ export const translations = {
     mailQueue_page:        'Page',
     mailQueue_of:          'of',
 
+    // Import zone modal
+    importZone_title:        'Import Zone File',
+    importZone_chooseFile:   'Choose file',
+    importZone_parsing:      'Parsing…',
+    importZone_noRecords:    'No importable records found.',
+    importZone_seeSkipped:   'See skipped below.',
+    importZone_newRecords:   'New records',
+    importZone_conflicts:    'Conflicts',
+    importZone_conflictHint: 'A record at this name+type already exists',
+    importZone_source:       'Source',
+    importZone_existing:     'Existing',
+    importZone_incoming:     'Incoming',
+    importZone_keep:         'Keep',
+    importZone_use:          'Use',
+    importZone_skipped:      'Skipped',
+    importZone_stage:        (n: number) => `Stage ${n} record${n !== 1 ? 's' : ''}`,
+
+    // DNSSEC modal
+    dnssec_title:    (fqdn: string) => `DNSSEC — ${fqdn}`,
+    dnssec_copy:     'Copy',
+    dnssec_copied:   'Copied!',
+    dnssec_disable:  'Disable DNSSEC',
+    dnssec_computing: 'computing…',
+    dnssec_signing:  'Signing in progress — DNSKEY will appear here once BIND has generated keys (may take ~10 seconds after enabling).',
+
+    // Layout NS bar
+    layout_clickToCopy: (fqdn: string) => `${fqdn} — click to copy`,
+    layout_copied:      'Copied!',
+    layout_down:        'down',
+
+    // Common
+    close: 'Close',
+
     // Record modal
     modal_editRecord: 'Edit Record',
     modal_addRecord:  'Add Record',
@@ -354,6 +409,14 @@ export const translations = {
     domains_noneFound:           'Keine Domains gefunden',
     domains_loadError:           'Fehler beim Laden der Domains',
     domains_columns:             'Spalten',
+    domains_allCustomers:        'Alle Kunden',
+    domains_deleted:             'Gelöscht',
+    domains_purgeIn:             'Löschung in',
+    domains_noDeleted:           'Keine gelöschten Domains.',
+    domains_noLabels:            'Keine Labels',
+    domains_nsWarning:           'NS-Einträge zeigen nicht auf unsere Nameserver',
+    domains_purging:             'Wird gelöscht…',
+    domains_suspended:           'gesperrt',
 
     // Domain detail
     domainDetail_backLink:         '← Domains',
@@ -387,6 +450,20 @@ export const translations = {
     domainDetail_nsMismatchDesc:   'Das öffentliche DNS meldet andere Nameserver für diese Domain.',
     domainDetail_nsSetRecords:     'Setzen Sie die NS-Einträge Ihrer Domain beim Registrar auf:',
     domainDetail_nsCheckedEvery:   'Dieser Status wird alle 15 Sekunden geprüft.',
+    domainDetail_activate:         'Aktivieren',
+    domainDetail_suspend:          'Sperren',
+    domainDetail_enableDnssec:     'DNSSEC aktivieren',
+    domainDetail_dnssecBtn:        'DNSSEC',
+    domainDetail_conflictWarning:  'Diese Zone wurde von jemand anderem geändert, während Sie weg waren. Ihre ungespeicherten Änderungen könnten Konflikte verursachen.',
+    domainDetail_discardReload:    'Verwerfen & neu laden',
+    domainDetail_suspendedMsg:     (activate: string) => `Gesperrt — Zone wird nicht an Sekundärnameserver ausgespielt. Klicken Sie auf ${activate}, um fortzufahren.`,
+    domainDetail_clickToCopy:      'Klicken zum Kopieren',
+    domainDetail_copied:           'Kopiert!',
+    domainDetail_clickToEdit:      'Zum Bearbeiten klicken',
+    domainDetail_added:            'Hinzugefügt',
+    domainDetail_importZone:       'Zone importieren',
+    domainDetail_cnameFlatten:     'CNAME-Flattening — wird beim Rendern zu A/AAAA aufgelöst, ermöglicht CNAME-ähnliche Einträge an der Apex.',
+    domainDetail_resetDefault:     'Auf Domain-Standard zurücksetzen',
 
     // Bulk jobs
     bulk_title:             'Massenaufgaben',
@@ -543,6 +620,39 @@ export const translations = {
     mailQueue_retrying:    'Wird erneut gesendet…',
     mailQueue_page:        'Seite',
     mailQueue_of:          'von',
+
+    // Import zone modal
+    importZone_title:        'Zonendatei importieren',
+    importZone_chooseFile:   'Datei wählen',
+    importZone_parsing:      'Wird gelesen…',
+    importZone_noRecords:    'Keine importierbaren Einträge gefunden.',
+    importZone_seeSkipped:   'Siehe übersprungene Einträge unten.',
+    importZone_newRecords:   'Neue Einträge',
+    importZone_conflicts:    'Konflikte',
+    importZone_conflictHint: 'Ein Eintrag mit diesem Namen+Typ existiert bereits',
+    importZone_source:       'Quelle',
+    importZone_existing:     'Vorhanden',
+    importZone_incoming:     'Eingehend',
+    importZone_keep:         'Behalten',
+    importZone_use:          'Verwenden',
+    importZone_skipped:      'Übersprungen',
+    importZone_stage:        (n: number) => `${n} Eintrag${n !== 1 ? 'e' : ''} übernehmen`,
+
+    // DNSSEC modal
+    dnssec_title:    (fqdn: string) => `DNSSEC — ${fqdn}`,
+    dnssec_copy:     'Kopieren',
+    dnssec_copied:   'Kopiert!',
+    dnssec_disable:  'DNSSEC deaktivieren',
+    dnssec_computing: 'wird berechnet…',
+    dnssec_signing:  'Signierung läuft — DNSKEY erscheint hier, sobald BIND die Schlüssel generiert hat (kann ~10 Sekunden dauern).',
+
+    // Layout NS bar
+    layout_clickToCopy: (fqdn: string) => `${fqdn} — Klicken zum Kopieren`,
+    layout_copied:      'Kopiert!',
+    layout_down:        'nicht erreichbar',
+
+    // Common
+    close: 'Schließen',
 
     // Record modal
     modal_editRecord: 'Eintrag bearbeiten',

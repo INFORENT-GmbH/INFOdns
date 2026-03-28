@@ -185,7 +185,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                   </button>
                 ))}
                 {labelSuggestions.length === 0 && (
-                  <div style={{ padding: '.5rem .75rem', color: '#9ca3af', fontSize: '.8rem' }}>No labels</div>
+                  <div style={{ padding: '.5rem .75rem', color: '#9ca3af', fontSize: '.8rem' }}>{t('domains_noLabels')}</div>
                 )}
               </div>
             )}
@@ -196,7 +196,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
               onChange={e => setCustomerFilter(e.target.value)}
               style={{ ...styles.searchInput, width: '100%', boxSizing: 'border-box' as const, marginTop: '.375rem', cursor: 'pointer' }}
             >
-              <option value="">All customers</option>
+              <option value="">{t('domains_allCustomers')}</option>
               {customers.map(c => (
                 <option key={c.id} value={String(c.id)}>{c.name}</option>
               ))}
@@ -242,13 +242,13 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 3, flexWrap: 'wrap' as const }}>
                   <ZoneStatusBadge status={d.zone_status} />
                   {d.ns_ok === 0 && (
-                    <span title="NS records don't point to our nameservers" style={{ fontSize: '.6rem', fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 4px', borderRadius: 6 }}>NS</span>
+                    <span title={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 4px', borderRadius: 6 }}>NS</span>
                   )}
                   {!!d.dnssec_enabled && (
                     <span style={{ fontSize: '.6rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '1px 4px', borderRadius: 6 }}>DNSSEC</span>
                   )}
                   {suspended && (
-                    <span style={{ fontSize: '.65rem', color: '#92400e' }}>suspended</span>
+                    <span style={{ fontSize: '.65rem', color: '#92400e' }}>{t('domains_suspended')}</span>
                   )}
                 </div>
                 {d.customer_name && (
@@ -340,7 +340,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                   </button>
                 ))}
                 {labelSuggestions.length === 0 && (
-                  <div style={{ padding: '.5rem .75rem', color: '#9ca3af', fontSize: '.8rem' }}>No labels</div>
+                  <div style={{ padding: '.5rem .75rem', color: '#9ca3af', fontSize: '.8rem' }}>{t('domains_noLabels')}</div>
                 )}
               </div>
             )}
@@ -351,7 +351,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
               onChange={e => setCustomerFilter(e.target.value)}
               style={{ ...styles.searchInput, width: 160, cursor: 'pointer' }}
             >
-              <option value="">All customers</option>
+              <option value="">{t('domains_allCustomers')}</option>
               {customers.map(c => (
                 <option key={c.id} value={String(c.id)}>{c.name}</option>
               ))}
@@ -390,9 +390,8 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
             <button
               onClick={() => { setShowDeleted(v => !v); setSearch(''); setLabelFilter(''); setCustomerFilter('') }}
               style={showDeleted ? styles.btnTrashActive : styles.btnSecondary}
-              title="Show deleted domains"
             >
-              Deleted
+              {t('domains_deleted')}
             </button>
           )}
           {!showDeleted && (
@@ -446,8 +445,8 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
             <tr>
               <th style={styles.th}>FQDN</th>
               <th style={styles.th}>{t('customer')}</th>
-              <th style={styles.th}>Deleted</th>
-              <th style={styles.th}>Purge in</th>
+              <th style={styles.th}>{t('domains_deleted')}</th>
+              <th style={styles.th}>{t('domains_purgeIn')}</th>
               <th style={styles.th}></th>
             </tr>
           ) : (
@@ -477,7 +476,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                     {d.deleted_at ? new Date(d.deleted_at).toLocaleDateString() : '—'}
                   </td>
                   <td style={{ ...styles.td, color: urgent ? '#dc2626' : '#374151', fontWeight: urgent ? 600 : 400 }}>
-                    {purgeDays !== null ? (purgeDays <= 0 ? 'Purging…' : `${purgeDays}d`) : '—'}
+                    {purgeDays !== null ? (purgeDays <= 0 ? t('domains_purging') : `${purgeDays}d`) : '—'}
                   </td>
                   <td style={styles.td}>
                     <button
@@ -485,7 +484,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                       disabled={restoringId === d.id}
                       style={styles.btnSuccess}
                     >
-                      {restoringId === d.id ? '…' : 'Restore'}
+                      {restoringId === d.id ? '…' : t('domainDetail_restore')}
                     </button>
                   </td>
                 </tr>
@@ -521,7 +520,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                   {show('zone') && <td style={styles.td}>
                     <ZoneStatusBadge status={d.zone_status} />
                     {d.ns_ok === 0 && (
-                      <span title="NS records don't point to our nameservers" style={{ marginLeft: 4, fontSize: '.7rem', fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 5px', borderRadius: 8, verticalAlign: 'middle' }}>NS</span>
+                      <span title={t('domains_nsWarning')} style={{ marginLeft: 4, fontSize: '.7rem', fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 5px', borderRadius: 8, verticalAlign: 'middle' }}>NS</span>
                     )}
                   </td>}
                   {show('labels') && <td style={styles.td} onClick={e => e.stopPropagation()}>
@@ -548,7 +547,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
           )}
           {!isLoading && domains.length === 0 && (
             <tr><td colSpan={showDeleted ? 5 : visibleCols.length} style={{ ...styles.td, textAlign: 'center', ...styles.muted }}>
-              {showDeleted ? 'No deleted domains.' : t('domains_noneFound')}
+              {showDeleted ? t('domains_noDeleted') : t('domains_noneFound')}
             </td></tr>
           )}
         </tbody>
