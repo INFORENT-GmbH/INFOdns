@@ -17,7 +17,7 @@ function wrap(title: string, bodyHtml: string): string {
   body { margin:0; padding:0; background:#f4f5f7; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:#1f2937; }
   .outer { padding:32px 16px; }
   .card  { max-width:560px; margin:0 auto; background:#fff; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,.08); overflow:hidden; }
-  .hdr   { background:#1e40af; padding:16px 28px; }
+  .hdr   { background:linear-gradient(rgba(255,255,255,0.85),rgba(255,255,255,0.65)),url(${process.env.APP_PUBLIC_URL ?? ''}/header-skyline.png) no-repeat bottom center; background-size:auto,800px 123px; padding:16px 28px; border-bottom:1px solid #e5e7eb; }
   .hdr img { display:block; height:36px; width:auto; }
   .body  { padding:28px; line-height:1.6; font-size:14px; }
   .body h2 { margin:0 0 12px; font-size:16px; }
