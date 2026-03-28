@@ -240,7 +240,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 3, flexWrap: 'wrap' as const }}>
-                  <ZoneStatusBadge status={d.zone_status} />
+                  <ZoneStatusBadge status={d.zone_status} suspended={d.status === 'suspended'} />
                   {d.ns_ok === 0 && (
                     <span title={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 4px', borderRadius: 6 }}>NS</span>
                   )}
@@ -518,7 +518,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                     }}>{d.status}</span>
                   </td>}
                   {show('zone') && <td style={styles.td}>
-                    <ZoneStatusBadge status={d.zone_status} />
+                    <ZoneStatusBadge status={d.zone_status} suspended={d.status === 'suspended'} />
                     {d.ns_ok === 0 && (
                       <span title={t('domains_nsWarning')} style={{ marginLeft: 4, fontSize: '.7rem', fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 5px', borderRadius: 8, verticalAlign: 'middle' }}>NS</span>
                     )}

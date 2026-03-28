@@ -256,6 +256,7 @@ export const translations = {
     zone_clean: 'clean',
     zone_dirty: 'dirty',
     zone_error: 'error',
+    zone_suspended: 'suspended',
 
     // Mail queue
     nav_mailQueue:         'Mail Queue',
@@ -605,6 +606,7 @@ export const translations = {
     zone_clean: 'sauber',
     zone_dirty: 'ausstehend',
     zone_error: 'Fehler',
+    zone_suspended: 'gesperrt',
 
     // Mail queue
     nav_mailQueue:         'E-Mail-Warteschlange',
