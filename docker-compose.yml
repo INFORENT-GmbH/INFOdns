@@ -20,6 +20,8 @@ services:
       timeout: 5s
       retries: 10
       start_period: 30s
+    ports:
+      - "3306:3306"
 
   # PHPMYADMIN with auto login on port 8080
   phpmyadmin:
