@@ -408,6 +408,37 @@ ${infoTable([
   return { subject, html: wrap(subject, bodyHtml), text }
 }
 
+// ── DNSSEC OK ────────────────────────────────────────────────
+
+interface DnssecOkPayload {
+  fqdn: string
+}
+
+function dnssecOk(_locale: Locale, p: DnssecOkPayload): MailContent {
+  const subject = `[INFOdns] DNSSEC OK: ${p.fqdn}`
+  const bodyHtml = `<h2 style="color:#15803d;">DNSSEC signing confirmed</h2>
+<p>The DNSKEY record for the following domain is now visible in public DNS.</p>
+${infoTable([['Domain', p.fqdn]])}`
+  const text = `DNSSEC OK: ${p.fqdn}\nThe DNSKEY record is now visible in public DNS.`
+  return { subject, html: wrap(subject, bodyHtml), text }
+}
+
+// ── DNSSEC broken ─────────────────────────────────────────────
+
+interface DnssecBrokenPayload {
+  fqdn: string
+}
+
+function dnssecBroken(_locale: Locale, p: DnssecBrokenPayload): MailContent {
+  const subject = `[INFOdns] DNSSEC BROKEN: ${p.fqdn}`
+  const bodyHtml = `<h2 style="color:#b91c1c;">DNSSEC signing lost</h2>
+<p>The DNSKEY record for the following domain is no longer visible in public DNS.</p>
+${infoTable([['Domain', p.fqdn]])}
+<p>DNSSEC validation may fail for this domain until the signed zone propagates to all nameservers.</p>`
+  const text = `DNSSEC BROKEN: ${p.fqdn}\nThe DNSKEY record is no longer visible in public DNS.`
+  return { subject, html: wrap(subject, bodyHtml), text }
+}
+
 // ── Template registry ────────────────────────────────────────
 
 const templates: Record<string, (locale: Locale, payload: any) => MailContent> = {
@@ -423,6 +454,8 @@ const templates: Record<string, (locale: Locale, payload: any) => MailContent> =
   domain_purge_reminder: domainPurgeReminder,
   ns_delegation_ok: nsDelegationOk,
   ns_delegation_broken: nsDelegationBroken,
+  dnssec_ok: dnssecOk,
+  dnssec_broken: dnssecBroken,
 }
 
 export function renderTemplate(template: string, locale: Locale, payload: unknown): MailContent {

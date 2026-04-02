@@ -36,8 +36,11 @@ export async function deployZone(fqdn: string, content: string): Promise<void> {
 
   // Delete stale BIND journal files before replacing the zone file.
   // A full zone file replacement invalidates any existing journal (serial mismatch).
+  // With inline-signing, BIND also maintains signed-zone journals — delete those too.
   await unlink(`${zonePath}.jnl`).catch(() => {})
   await unlink(`${zonePath}.jbk`).catch(() => {})
+  await unlink(`${zonePath}.signed.jnl`).catch(() => {})
+  await unlink(`${zonePath}.signed.jbk`).catch(() => {})
 
   await writeAtomic(zonePath, content)
   await rndcReconfig(RNDC_HOST, RNDC_PORT)

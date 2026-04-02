@@ -91,6 +91,8 @@ export interface Domain {
   ns_ok: number | null
   ns_checked_at: string | null
   expected_ns: string[]
+  dnssec_ok: number | null
+  dnssec_checked_at: string | null
 }
 
 export interface DnsRecord {

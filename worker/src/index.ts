@@ -6,6 +6,7 @@ import { deployZone } from './deployZone.js'
 import { regenerateNamedConf } from './namedConf.js'
 import { pollBulkJobs } from './bulkExecutor.js'
 import { checkNsDelegation } from './nsDelegation.js'
+import { checkDnssec } from './dnssecCheck.js'
 import { broadcastEvent } from './broadcast.js'
 import { queueMail, pollMailQueue } from './mailer.js'
 import { pollImap } from './ticketMailImporter.js'
@@ -73,7 +74,7 @@ interface RecordRow {
 function extractDnskeyFromKeyFile(content: string): string | null {
   for (const line of content.split('\n')) {
     if (line.trimStart().startsWith(';')) continue
-    const m = line.match(/DNSKEY\s+(\d+)\s+(\d+)\s+(\d+)\s+(\S+)/)
+    const m = line.match(/DNSKEY\s+(\d+)\s+(\d+)\s+(\d+)\s+(.+?)$/)
     if (!m) continue
     const [, flags, protocol, algorithm, key] = m
     if (Number(flags) & 1) return `${flags} ${protocol} ${algorithm} ${key}`
@@ -170,7 +171,7 @@ async function processJob(job: QueueRow): Promise<void> {
       await execute('UPDATE domains SET dnssec_ds = ? WHERE id = ?', [ds, domainId])
     }
   } else {
-    await execute('UPDATE domains SET dnssec_ds = NULL WHERE id = ?', [domainId])
+    await execute('UPDATE domains SET dnssec_ds = NULL, dnssec_ok = NULL, dnssec_checked_at = NULL WHERE id = ?', [domainId])
   }
 
   // Step 8: Mark domain clean
@@ -431,6 +432,17 @@ setInterval(() => checkNsDelegation(NS_RECORDS, 'pending').catch(err =>
 setInterval(() => checkNsDelegation(NS_RECORDS, 'ok').catch(err =>
   console.error('[worker] checkNsDelegation (ok) failed:', err.message)
 ), 5 * 60 * 1000)
+
+// DNSSEC check: DNSKEY visibility in public DNS
+await checkDnssec('all')
+// Pending/broken: every 30s (DNSKEY propagation takes time after signing)
+setInterval(() => checkDnssec('pending').catch(err =>
+  console.error('[worker] checkDnssec (pending) failed:', err.message)
+), 30_000)
+// Ok domains: every 10 minutes (steady-state confirmation)
+setInterval(() => checkDnssec('ok').catch(err =>
+  console.error('[worker] checkDnssec (ok) failed:', err.message)
+), 10 * 60 * 1000)
 
 // Poll loop
 ;(async function loop() {

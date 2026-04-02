@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 type WsEvent =
-  | { type: 'domain_status'; domainId: number; fqdn: string; zone_status: string; last_serial?: number; last_rendered_at?: string | null; zone_error?: string | null; ns_ok?: number | null }
+  | { type: 'domain_status'; domainId: number; fqdn: string; zone_status: string; last_serial?: number; last_rendered_at?: string | null; zone_error?: string | null; ns_ok?: number | null; dnssec_ok?: number | null }
   | { type: 'bulk_job_progress'; jobId: number; status: string; processed_domains: number; affected_domains: number }
   | { type: 'record_changed'; domainId: number }
   | { type: 'ns_status'; status: Record<string, { ok: boolean; latencyMs: number | null; checkedAt: string }> }
@@ -67,6 +67,7 @@ export function useWs(token: string | null): WsStatus {
                 last_rendered_at: event.last_rendered_at ?? old.last_rendered_at,
                 zone_error: event.zone_error ?? null,
                 ...(event.ns_ok !== undefined && { ns_ok: event.ns_ok }),
+                ...(event.dnssec_ok !== undefined && { dnssec_ok: event.dnssec_ok }),
               }
             })
             qc.invalidateQueries({ queryKey: ['domains'] })

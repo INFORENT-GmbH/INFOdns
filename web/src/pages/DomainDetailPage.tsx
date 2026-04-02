@@ -658,6 +658,13 @@ export default function DomainDetailPage() {
         </div>
       )}
 
+      {domain.dnssec_enabled && domain.dnssec_ok === 0 && domain.status === 'active' && (
+        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.6rem 1rem', borderRadius: 6, marginBottom: '.75rem', fontSize: '.875rem', border: '1px solid #fde68a' }}>
+          <strong>{t('domainDetail_dnssecNotVisible')}</strong> — {t('domainDetail_dnssecNotVisibleDesc')}
+          <div style={{ marginTop: '.5rem', fontSize: '.775rem', color: '#a16207' }}>{t('domainDetail_dnssecCheckedEvery')}</div>
+        </div>
+      )}
+
       {domain.zone_status === 'error' && (
         <div style={styles.errorBanner}>
           <strong>{t('domainDetail_zoneFailed')}</strong>
