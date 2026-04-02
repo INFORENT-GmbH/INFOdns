@@ -41,7 +41,7 @@ interface DomainRow {
   id: number
   fqdn: string
   default_ttl: number
-  customer_id: number
+  tenant_id: number
   status: string
 }
 
@@ -109,7 +109,7 @@ async function processJob(job: QueueRow): Promise<void> {
   console.log(`[worker] Processing job ${job.id} for domain ${domainId}`)
 
   // Step 2: Load domain + records + SOA template
-  const domain = await queryOne<DomainRow>('SELECT id, fqdn, default_ttl, customer_id, status FROM domains WHERE id = ?', [domainId])
+  const domain = await queryOne<DomainRow>('SELECT id, fqdn, default_ttl, tenant_id, status FROM domains WHERE id = ?', [domainId])
   if (!domain) throw new Error(`Domain ${domainId} not found`)
 
   // Non-active domain: just sync named.conf to remove it from BIND, skip render
@@ -131,9 +131,9 @@ async function processJob(job: QueueRow): Promise<void> {
 
   const soa = await queryOne<SoaRow>(
     `SELECT mname, rname, refresh, retry, expire, minimum_ttl
-     FROM soa_templates WHERE customer_id = ? OR customer_id IS NULL
-     ORDER BY customer_id DESC LIMIT 1`,
-    [domain.customer_id]
+     FROM soa_templates WHERE tenant_id = ? OR tenant_id IS NULL
+     ORDER BY tenant_id DESC LIMIT 1`,
+    [domain.tenant_id]
   )
   if (!soa) throw new Error('No SOA template found')
 

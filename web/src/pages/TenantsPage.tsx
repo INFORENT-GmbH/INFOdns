@@ -1,26 +1,26 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getCustomers, createCustomer, updateCustomer, deleteCustomer, type Customer } from '../api/client'
+import { getTenants, createTenant, updateTenant, deleteTenant, type Tenant } from '../api/client'
 import { useI18n } from '../i18n/I18nContext'
 
-export default function CustomersPage() {
+export default function TenantsPage() {
   const { t } = useI18n()
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
-  const [editTarget, setEditTarget] = useState<Customer | null>(null)
+  const [editTarget, setEditTarget] = useState<Tenant | null>(null)
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const { data: customers = [], isLoading } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => getCustomers().then(r => r.data),
+  const { data: tenants = [], isLoading } = useQuery({
+    queryKey: ['tenants'],
+    queryFn: () => getTenants().then(r => r.data),
   })
 
   function openCreate() {
     setEditTarget(null); setName(''); setError(null); setShowForm(true)
   }
-  function openEdit(c: Customer) {
+  function openEdit(c: Tenant) {
     setEditTarget(c); setName(c.name); setError(null); setShowForm(true)
   }
 
@@ -29,11 +29,11 @@ export default function CustomersPage() {
     setSaving(true); setError(null)
     try {
       if (editTarget) {
-        await updateCustomer(editTarget.id, { name })
+        await updateTenant(editTarget.id, { name })
       } else {
-        await createCustomer({ name })
+        await createTenant({ name })
       }
-      qc.invalidateQueries({ queryKey: ['customers'] })
+      qc.invalidateQueries({ queryKey: ['tenants'] })
       setShowForm(false)
     } catch (err: any) {
       setError(err.response?.data?.message ?? err.message)
@@ -42,22 +42,22 @@ export default function CustomersPage() {
     }
   }
 
-  async function handleDelete(c: Customer) {
-    if (!confirm(t('customers_deleteConfirm', c.name))) return
-    await deleteCustomer(c.id)
-    qc.invalidateQueries({ queryKey: ['customers'] })
+  async function handleDelete(c: Tenant) {
+    if (!confirm(t('tenants_deleteConfirm', c.name))) return
+    await deleteTenant(c.id)
+    qc.invalidateQueries({ queryKey: ['tenants'] })
   }
 
   return (
     <div>
       <div style={styles.header}>
-        <h2 style={styles.h2}>{t('customers_title')}</h2>
-        <button onClick={openCreate} style={styles.btnPrimary}>{t('customers_add')}</button>
+        <h2 style={styles.h2}>{t('tenants_title')}</h2>
+        <button onClick={openCreate} style={styles.btnPrimary}>{t('tenants_add')}</button>
       </div>
 
       {showForm && (
         <form onSubmit={handleSubmit} style={styles.formCard}>
-          <h4 style={{ margin: 0 }}>{editTarget ? t('customers_editTitle') : t('customers_newTitle')}</h4>
+          <h4 style={{ margin: 0 }}>{editTarget ? t('tenants_editTitle') : t('tenants_newTitle')}</h4>
           {error && <div style={styles.error}>{error}</div>}
           <label style={styles.label}>
             {t('name')}
@@ -81,7 +81,7 @@ export default function CustomersPage() {
             </tr>
           </thead>
           <tbody>
-            {customers.map((c: Customer) => (
+            {tenants.map((c: Tenant) => (
               <tr key={c.id} style={styles.tr}>
                 <td style={styles.td}>{c.name}</td>
                 <td style={styles.td}>{c.is_active ? '✓' : '—'}</td>

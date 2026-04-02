@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useMatch } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { getDomains, createDomain, getCustomers, getLabelSuggestions, restoreDomain, type Domain } from '../api/client'
+import { getDomains, createDomain, getTenants, getLabelSuggestions, restoreDomain, type Domain } from '../api/client'
 import LabelChip from '../components/LabelChip'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import { useAuth } from '../context/AuthContext'
@@ -16,9 +16,9 @@ const INLINE_STYLES = `
 `
 
 const COOKIE_KEY = 'infodns_domain_cols'
-const ALL_COLUMNS = ['fqdn', 'customer', 'status', 'zone', 'labels', 'serial', 'lastRendered'] as const
+const ALL_COLUMNS = ['fqdn', 'tenant', 'status', 'zone', 'labels', 'serial', 'lastRendered'] as const
 type ColId = typeof ALL_COLUMNS[number]
-const DEFAULT_COLUMNS: ColId[] = ['fqdn', 'customer', 'zone', 'labels']
+const DEFAULT_COLUMNS: ColId[] = ['fqdn', 'tenant', 'zone', 'labels']
 
 function readColsCookie(): ColId[] {
   const m = document.cookie.match(new RegExp(`(?:^|; )${COOKIE_KEY}=([^;]*)`))
@@ -46,12 +46,12 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
   const labelDropdownRef = useRef<HTMLDivElement>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [newFqdn, setNewFqdn] = useState('')
-  const [newCustomerId, setNewCustomerId] = useState('')
+  const [newTenantId, setNewTenantId] = useState('')
   const [creating, setCreating] = useState(false)
   const [visibleCols, setVisibleCols] = useState<ColId[]>(readColsCookie)
   const [colDropdownOpen, setColDropdownOpen] = useState(false)
   const colDropdownRef = useRef<HTMLDivElement>(null)
-  const [customerFilter, setCustomerFilter] = useState('')
+  const [tenantFilter, setTenantFilter] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
   const [restoringId, setRestoringId] = useState<number | null>(null)
 
@@ -62,19 +62,19 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
     staleTime: 30_000,
   })
 
-  const { data: customers = [] } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => getCustomers().then(r => r.data),
+  const { data: tenants = [] } = useQuery({
+    queryKey: ['tenants'],
+    queryFn: () => getTenants().then(r => r.data),
     enabled: !!user,
   })
 
   const { data: domains = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['domains', search, labelFilter, customerFilter, showDeleted],
+    queryKey: ['domains', search, labelFilter, tenantFilter, showDeleted],
     queryFn: () => {
       const params: Record<string, string> = {}
       if (search) params.search = search
       if (labelFilter) params.label = labelFilter
-      if (customerFilter) params.customer_id = customerFilter
+      if (tenantFilter) params.tenant_id = tenantFilter
       if (showDeleted) params.show_deleted = 'true'
       return getDomains(Object.keys(params).length ? params : undefined).then(r => r.data)
     },
@@ -84,9 +84,9 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
     e.preventDefault()
     setCreating(true)
     try {
-      await createDomain({ fqdn: newFqdn, customer_id: Number(newCustomerId) as any })
+      await createDomain({ fqdn: newFqdn, tenant_id: Number(newTenantId) as any })
       setNewFqdn('')
-      setNewCustomerId('')
+      setNewTenantId('')
       setShowCreate(false)
       refetch()
     } catch (err: any) {
@@ -119,7 +119,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
 
   const colLabels: Record<ColId, string> = {
     fqdn: 'FQDN',
-    customer: t('customer'),
+    tenant: t('tenant'),
     status: t('status'),
     zone: t('domains_zone'),
     labels: t('domains_labels'),
@@ -190,14 +190,14 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
               </div>
             )}
           </div>
-          {customers.length > 1 && (
+          {tenants.length > 1 && (
             <select
-              value={customerFilter}
-              onChange={e => setCustomerFilter(e.target.value)}
+              value={tenantFilter}
+              onChange={e => setTenantFilter(e.target.value)}
               style={{ ...styles.searchInput, width: '100%', boxSizing: 'border-box' as const, marginTop: '.375rem', cursor: 'pointer' }}
             >
-              <option value="">{t('domains_allCustomers')}</option>
-              {customers.map(c => (
+              <option value="">{t('domains_allTenants')}</option>
+              {tenants.map(c => (
                 <option key={c.id} value={String(c.id)}>{c.name}</option>
               ))}
             </select>
@@ -251,9 +251,9 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                     <span style={{ fontSize: '.65rem', color: '#92400e' }}>{t('domains_suspended')}</span>
                   )}
                 </div>
-                {d.customer_name && (
+                {d.tenant_name && (
                   <div style={{ fontSize: '.7rem', color: '#9ca3af', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
-                    {d.customer_name}
+                    {d.tenant_name}
                   </div>
                 )}
                 {d.labels && d.labels.length > 0 && (
@@ -345,14 +345,14 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
               </div>
             )}
           </div>
-          {customers.length > 1 && (
+          {tenants.length > 1 && (
             <select
-              value={customerFilter}
-              onChange={e => setCustomerFilter(e.target.value)}
+              value={tenantFilter}
+              onChange={e => setTenantFilter(e.target.value)}
               style={{ ...styles.searchInput, width: 160, cursor: 'pointer' }}
             >
-              <option value="">{t('domains_allCustomers')}</option>
-              {customers.map(c => (
+              <option value="">{t('domains_allTenants')}</option>
+              {tenants.map(c => (
                 <option key={c.id} value={String(c.id)}>{c.name}</option>
               ))}
             </select>
@@ -388,7 +388,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
           </div>
           {user?.role === 'admin' && (
             <button
-              onClick={() => { setShowDeleted(v => !v); setSearch(''); setLabelFilter(''); setCustomerFilter('') }}
+              onClick={() => { setShowDeleted(v => !v); setSearch(''); setLabelFilter(''); setTenantFilter('') }}
               style={showDeleted ? styles.btnTrashActive : styles.btnSecondary}
             >
               {t('domains_deleted')}
@@ -412,13 +412,13 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
             style={styles.input}
           />
           <select
-            value={newCustomerId}
-            onChange={e => setNewCustomerId(e.target.value)}
+            value={newTenantId}
+            onChange={e => setNewTenantId(e.target.value)}
             required
             style={{ ...styles.input, width: 200 }}
           >
-            <option value="">{t('domains_selectCustomer')}</option>
-            {customers.map(c => (
+            <option value="">{t('domains_selectTenant')}</option>
+            {tenants.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
@@ -444,7 +444,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
           {showDeleted ? (
             <tr>
               <th style={styles.th}>FQDN</th>
-              <th style={styles.th}>{t('customer')}</th>
+              <th style={styles.th}>{t('tenant')}</th>
               <th style={styles.th}>{t('domains_deleted')}</th>
               <th style={styles.th}>{t('domains_purgeIn')}</th>
               <th style={styles.th}></th>
@@ -452,7 +452,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
           ) : (
             <tr>
               {show('fqdn') && <th style={styles.th}>FQDN</th>}
-              {show('customer') && <th style={styles.th}>{t('customer')}</th>}
+              {show('tenant') && <th style={styles.th}>{t('tenant')}</th>}
               {show('status') && <th style={styles.th}>{t('status')}</th>}
               {show('zone') && <th style={styles.th}>{t('domains_zone')}</th>}
               {show('labels') && <th style={styles.th}>{t('domains_labels')}</th>}
@@ -471,7 +471,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
               return (
                 <tr key={d.id} style={styles.tr}>
                   <td style={{ ...styles.td, color: '#6b7280' }}>{d.fqdn}</td>
-                  <td style={styles.td}>{d.customer_name}</td>
+                  <td style={styles.td}>{d.tenant_name}</td>
                   <td style={styles.td}>
                     {d.deleted_at ? new Date(d.deleted_at).toLocaleDateString() : '—'}
                   </td>
@@ -509,7 +509,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                       <span style={{ marginLeft: 6, fontSize: '.7rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '1px 5px', borderRadius: 8, verticalAlign: 'middle' }}>DNSSEC</span>
                     )}
                   </td>}
-                  {show('customer') && <td style={styles.td}>{d.customer_name}</td>}
+                  {show('tenant') && <td style={styles.td}>{d.tenant_name}</td>}
                   {show('status') && <td style={styles.td}>
                     <span style={{
                       display: 'inline-block', padding: '1px 8px', borderRadius: 10, fontSize: '.75rem', fontWeight: 600,

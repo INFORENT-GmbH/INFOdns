@@ -36,7 +36,7 @@ export default function Layout() {
     queryFn: () => getNsStatus().then(r => r.data),
     staleTime: Infinity,
   })
-  const visibleNs = user?.role === 'customer' ? ['ns2', 'ns3'] : ['ns1', 'ns2', 'ns3']
+  const visibleNs = user?.role === 'tenant' ? ['ns2', 'ns3'] : ['ns1', 'ns2', 'ns3']
   const isImpersonating = !!user?.impersonatingId
 
   async function handleLogout() {
@@ -54,7 +54,7 @@ export default function Layout() {
           <NavLink to="/domains" style={navStyle}>{t('nav_domains')}</NavLink>
           <NavLink to="/jobs" style={navStyle}>{t('nav_jobs')}</NavLink>
           <NavLink to="/tickets" style={navStyle}>{t('nav_support')}</NavLink>
-          {isAdminOrOp && <NavLink to="/customers" style={navStyle}>{t('nav_customers')}</NavLink>}
+          {isAdminOrOp && <NavLink to="/tenants" style={navStyle}>{t('nav_tenants')}</NavLink>}
           {user?.role === 'admin' && <NavLink to="/users" style={navStyle}>{t('nav_users')}</NavLink>}
           <div style={{ position: 'relative' }} onMouseEnter={openLogs} onMouseLeave={closeLogs}>
             <span style={{ ...navStyle({ isActive: logsActive }), cursor: 'pointer', userSelect: 'none' }}>

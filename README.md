@@ -1,6 +1,6 @@
 # INFOdns
 
-An internal DNS management panel modelled on AutoDNS. Staff and customers manage DNS records for many domains via a hidden primary BIND server that pushes zones to three public secondaries via AXFR/IXFR. The database is the single source of truth; zone files are always derived from it.
+An internal DNS management panel modelled on AutoDNS. Staff and tenants manage DNS records for many domains via a hidden primary BIND server that pushes zones to three public secondaries via AXFR/IXFR. The database is the single source of truth; zone files are always derived from it.
 
 ---
 
@@ -81,7 +81,7 @@ INFOdns/
 │       │   ├── routes.ts       ← CRUD for dns_records, enqueues render
 │       │   └── validators.ts   ← per-type Zod validators (A/AAAA/MX/SRV/…)
 │       ├── bulk/routes.ts      ← bulk job CRUD, preview, approve
-│       ├── customers/routes.ts
+│       ├── tenants/routes.ts
 │       ├── users/routes.ts
 │       ├── audit/              ← audit log middleware + read routes
 │       └── ws/
@@ -119,7 +119,7 @@ INFOdns/
 │           ├── DomainsPage.tsx
 │           ├── DomainDetailPage.tsx  ← inline record editing, apply via bulk job
 │           ├── JobsPage.tsx          ← bulk job list + new bulk job wizard
-│           ├── CustomersPage.tsx
+│           ├── TenantsPage.tsx
 │           ├── UsersPage.tsx
 │           └── AuditLogPage.tsx
 ├── bind/
@@ -197,7 +197,7 @@ docker compose exec api node -e "
 const bcrypt = require('bcrypt');
 const { query } = require('./dist/db.js');
 bcrypt.hash('yourpassword', 12).then(h =>
-  query('INSERT INTO users (customer_id,email,password_hash,role,full_name) VALUES (NULL,?,?,?,?)',
+  query('INSERT INTO users (tenant_id,email,password_hash,role,full_name) VALUES (NULL,?,?,?,?)',
     ['admin@example.com', h, 'admin', 'Admin'])
 ).then(() => process.exit(0));
 "
@@ -264,7 +264,7 @@ Every record mutation (create / update / delete) calls `enqueueRender(domainId)`
 The worker polls every 2 seconds and processes pending jobs:
 
 1. **Claim** — `UPDATE zone_render_queue SET status='processing' WHERE id=? AND status='pending'` (optimistic lock; only one worker wins)
-2. **Load** — fetch domain, customer, SOA template, all non-deleted records
+2. **Load** — fetch domain, tenant, SOA template, all non-deleted records
 3. **Serial** — `SELECT last_serial FOR UPDATE`, compute `YYYYMMDDnn`, update atomically
 4. **Render** — pure TypeScript function builds the zone file string: `$ORIGIN`, `$TTL`, SOA, NS records (from env), then all records
 5. **Validate** — `named-checkzone <fqdn> <tmpfile>` — non-zero exit marks the job failed
@@ -324,7 +324,7 @@ Bulk jobs apply record mutations across many domains at once.
 
 ```json
 { "mode": "all" }
-{ "mode": "customer", "customer_ids": [1, 2] }
+{ "mode": "tenant", "tenant_ids": [1, 2] }
 { "mode": "explicit", "domain_ids": [10, 11] }
 ```
 
@@ -403,13 +403,13 @@ Apply order: new records first → deletes → edits (via bulk replace).
 
 ## RBAC
 
-| Role | Domains | Records | Bulk Jobs | Customers | Users | Audit |
+| Role | Domains | Records | Bulk Jobs | Tenants | Users | Audit |
 |---|---|---|---|---|---|---|
 | `admin` | all CRUD | all CRUD | all CRUD | all CRUD | all CRUD | read all |
 | `operator` | all CRUD | all CRUD | all CRUD | read | — | read all |
-| `customer` | own only | own only | own only | — | own profile | own only |
+| `tenant` | own only | own only | own only | — | own profile | own only |
 
-Ownership is enforced at the SQL level — `AND customer_id = ?` is injected for customer-role requests.
+Ownership is enforced at the SQL level — `AND tenant_id = ?` is injected for tenant-role requests.
 
 ---
 

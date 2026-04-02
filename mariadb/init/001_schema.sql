@@ -4,8 +4,8 @@
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';
 
--- ── customers ────────────────────────────────────────────────
-CREATE TABLE customers (
+-- ── tenants ────────────────────────────────────────────────
+CREATE TABLE tenants (
   id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   name       VARCHAR(255) NOT NULL,
   is_active  TINYINT(1)   NOT NULL DEFAULT 1,
@@ -16,25 +16,25 @@ CREATE TABLE customers (
 -- ── users ────────────────────────────────────────────────────
 CREATE TABLE users (
   id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  customer_id   INT UNSIGNED NULL,                         -- NULL = internal staff
+  tenant_id     INT UNSIGNED NULL,                          -- NULL = internal staff
   email         VARCHAR(255) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,                     -- bcrypt
-  role          ENUM('admin','operator','customer') NOT NULL DEFAULT 'customer',
+  role          ENUM('admin','operator','tenant') NOT NULL DEFAULT 'tenant',
   full_name     VARCHAR(255) NOT NULL,
   is_active     TINYINT(1)   NOT NULL DEFAULT 1,
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_email (email),
-  FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ── user_customers (many-to-many) ────────────────────────────
-CREATE TABLE user_customers (
-  user_id     INT UNSIGNED NOT NULL,
-  customer_id INT UNSIGNED NOT NULL,
-  PRIMARY KEY (user_id, customer_id),
-  FOREIGN KEY (user_id)     REFERENCES users(id)     ON DELETE CASCADE,
-  FOREIGN KEY (customer_id) REFERENCES customers(id)  ON DELETE CASCADE
+-- ── user_tenants (many-to-many) ────────────────────────────
+CREATE TABLE user_tenants (
+  user_id   INT UNSIGNED NOT NULL,
+  tenant_id INT UNSIGNED NOT NULL,
+  PRIMARY KEY (user_id, tenant_id),
+  FOREIGN KEY (user_id)   REFERENCES users(id)   ON DELETE CASCADE,
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── refresh_tokens ───────────────────────────────────────────
@@ -52,20 +52,20 @@ CREATE TABLE refresh_tokens (
 -- ── soa_templates ────────────────────────────────────────────
 CREATE TABLE soa_templates (
   id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  customer_id INT UNSIGNED NULL,                           -- NULL = global default
+  tenant_id   INT UNSIGNED NULL,                           -- NULL = global default
   mname       VARCHAR(253) NOT NULL,
   rname       VARCHAR(253) NOT NULL,
   refresh     INT UNSIGNED NOT NULL DEFAULT 3600,
   retry       INT UNSIGNED NOT NULL DEFAULT 900,
   expire      INT UNSIGNED NOT NULL DEFAULT 604800,
   minimum_ttl INT UNSIGNED NOT NULL DEFAULT 300,
-  FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── domains ──────────────────────────────────────────────────
 CREATE TABLE domains (
   id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  customer_id      INT UNSIGNED NOT NULL,
+  tenant_id        INT UNSIGNED NOT NULL,
   fqdn             VARCHAR(253) NOT NULL,
   status           ENUM('active','pending','suspended','deleted') NOT NULL DEFAULT 'pending',
   zone_status      ENUM('clean','dirty','error')                  NOT NULL DEFAULT 'dirty',
@@ -79,20 +79,20 @@ CREATE TABLE domains (
   created_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_fqdn (fqdn),
-  FOREIGN KEY (customer_id) REFERENCES customers(id)
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── labels ───────────────────────────────────────────────────
 -- One canonical row per distinct key+value combination.
--- customer_id = NULL means admin-only global (not customer-scoped).
+-- tenant_id = NULL means admin-only global (not tenant-scoped).
 CREATE TABLE labels (
   id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  customer_id INT UNSIGNED NULL,
+  tenant_id   INT UNSIGNED NULL,
   label_key   VARCHAR(63)  NOT NULL,
   label_value VARCHAR(63)  NOT NULL DEFAULT '',
   color       VARCHAR(20)  NULL DEFAULT NULL,
   admin_only  TINYINT(1)   NOT NULL DEFAULT 0,
-  FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── domain_labels ────────────────────────────────────────────
@@ -176,7 +176,7 @@ CREATE TABLE bulk_job_domains (
 CREATE TABLE audit_logs (
   id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id     INT UNSIGNED NULL,
-  customer_id INT UNSIGNED NULL,
+  tenant_id   INT UNSIGNED NULL,
   domain_id   INT UNSIGNED NULL,
   entity_type VARCHAR(64)  NOT NULL,
   entity_id   INT UNSIGNED NULL,
@@ -203,7 +203,7 @@ CREATE TABLE ns_checks (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── seed: global SOA template ────────────────────────────────
-INSERT INTO soa_templates (customer_id, mname, rname, refresh, retry, expire, minimum_ttl)
+INSERT INTO soa_templates (tenant_id, mname, rname, refresh, retry, expire, minimum_ttl)
 VALUES (NULL, 'ns1.example.com.', 'hostmaster.example.com.', 3600, 900, 604800, 300);
 
 -- ── seed: default admin user ─────────────────────────────────

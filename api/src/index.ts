@@ -7,7 +7,7 @@ import fws from '@fastify/websocket'
 import fmultipart from '@fastify/multipart'
 
 import { authRoutes } from './auth/routes.js'
-import { customerRoutes } from './customers/routes.js'
+import { tenantRoutes } from './tenants/routes.js'
 import { userRoutes } from './users/routes.js'
 import { domainRoutes } from './domains/routes.js'
 import { recordRoutes } from './records/routes.js'
@@ -61,7 +61,7 @@ await app.register(internalRoutes)
 // ── Routes (all under /api/v1) ────────────────────────────────
 await app.register(async (v1) => {
   await v1.register(authRoutes)
-  await v1.register(customerRoutes)
+  await v1.register(tenantRoutes)
   await v1.register(userRoutes)
   await v1.register(domainRoutes)
   await v1.register(recordRoutes)

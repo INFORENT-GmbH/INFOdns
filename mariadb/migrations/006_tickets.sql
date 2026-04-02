@@ -5,16 +5,16 @@ CREATE TABLE support_tickets (
   priority        ENUM('low','normal','high','urgent')          NOT NULL DEFAULT 'normal',
   requester_email VARCHAR(255)  NOT NULL,
   requester_name  VARCHAR(255)  NOT NULL DEFAULT '',
-  customer_id     INT UNSIGNED  NULL,
+  tenant_id       INT UNSIGNED  NULL,
   assigned_to     INT UNSIGNED  NULL,
   source          ENUM('web','email')                           NOT NULL DEFAULT 'web',
   message_id      VARCHAR(500)  NULL UNIQUE,
   created_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
-  FOREIGN KEY (assigned_to) REFERENCES users(id)     ON DELETE SET NULL,
+  FOREIGN KEY (tenant_id)   REFERENCES tenants(id) ON DELETE SET NULL,
+  FOREIGN KEY (assigned_to) REFERENCES users(id)   ON DELETE SET NULL,
   INDEX idx_status   (status),
-  INDEX idx_customer (customer_id),
+  INDEX idx_tenant   (tenant_id),
   INDEX idx_assigned (assigned_to)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

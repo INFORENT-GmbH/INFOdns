@@ -3,8 +3,8 @@ import { api, login as apiLogin, logout as apiLogout, setAccessToken, impersonat
 
 interface AuthUser {
   sub: number
-  role: 'admin' | 'operator' | 'customer'
-  customerId: number | null
+  role: 'admin' | 'operator' | 'tenant'
+  tenantId: number | null
   impersonatingId?: number
 }
 

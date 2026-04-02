@@ -12,8 +12,8 @@ import { useI18n } from '../i18n/I18nContext'
 interface SearchResult {
   id: number
   fqdn: string
-  customer_id: number
-  customer_name: string
+  tenant_id: number
+  tenant_name: string
   record_id: number
   record_name: string
   record_type: string
@@ -477,7 +477,7 @@ export default function JobsPage() {
                       <label key={d.id} style={styles.domainRow}>
                         <input type="checkbox" checked={selectedIds.has(d.id)} onChange={() => toggleDomain(d.id)} />
                         <span style={{ fontWeight: 500 }}>{d.fqdn}</span>
-                        <span style={{ color: '#6b7280', fontSize: '.8125rem' }}>{d.customer_name}</span>
+                        <span style={{ color: '#6b7280', fontSize: '.8125rem' }}>{d.tenant_name}</span>
                         <span style={styles.recordPill}>
                           {d.record_type} {d.record_name} {d.value}
                           {d.priority != null ? ` (${d.priority})` : ''}

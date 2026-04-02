@@ -23,11 +23,11 @@ function isStaff(role: string) {
   return role === 'admin' || role === 'operator'
 }
 
-// Build the WHERE clause for customer-role ticket scoping
-function customerFilter(userId: number, email: string): { clause: string; params: unknown[] } {
+// Build the WHERE clause for tenant-role ticket scoping
+function tenantFilter(userId: number, email: string): { clause: string; params: unknown[] } {
   return {
-    clause: `(t.requester_email = ? OR t.customer_id IN (
-               SELECT customer_id FROM user_customers WHERE user_id = ?
+    clause: `(t.requester_email = ? OR t.tenant_id IN (
+               SELECT tenant_id FROM user_tenants WHERE user_id = ?
              ))`,
     params: [email, userId],
   }
@@ -39,7 +39,7 @@ export async function ticketRoutes(app: FastifyInstance) {
 
   // GET /tickets
   app.get('/tickets', { preHandler: requireAuth }, async (req: any) => {
-    const { status, priority, assigned_to, customer_id, page = '1', limit = '50' } = req.query as Record<string, string>
+    const { status, priority, assigned_to, tenant_id, page = '1', limit = '50' } = req.query as Record<string, string>
     const pageNum  = Math.max(1, Number(page))
     const limitNum = Math.min(200, Math.max(1, Number(limit)))
     const offset   = (pageNum - 1) * limitNum
@@ -49,7 +49,7 @@ export async function ticketRoutes(app: FastifyInstance) {
 
     if (!isStaff(req.user.role)) {
       const userRow = await queryOne<{ email: string }>('SELECT email FROM users WHERE id = ?', [req.user.sub])
-      const f = customerFilter(req.user.sub, userRow?.email ?? '')
+      const f = tenantFilter(req.user.sub, userRow?.email ?? '')
       clauses.push(f.clause)
       params.push(...f.params)
     }
@@ -57,14 +57,14 @@ export async function ticketRoutes(app: FastifyInstance) {
     if (status)      { clauses.push('t.status = ?');      params.push(status) }
     if (priority)    { clauses.push('t.priority = ?');    params.push(priority) }
     if (assigned_to) { clauses.push('t.assigned_to = ?'); params.push(Number(assigned_to)) }
-    if (customer_id) { clauses.push('t.customer_id = ?'); params.push(Number(customer_id)) }
+    if (tenant_id) { clauses.push('t.tenant_id = ?'); params.push(Number(tenant_id)) }
 
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
 
     const [rows, countRow] = await Promise.all([
       query(
         `SELECT t.id, t.subject, t.status, t.priority, t.requester_email, t.requester_name,
-                t.customer_id, t.assigned_to, u.full_name AS assigned_to_name,
+                t.tenant_id, t.assigned_to, u.full_name AS assigned_to_name,
                 t.source, t.created_at, t.updated_at,
                 (SELECT COUNT(*) FROM ticket_messages tm WHERE tm.ticket_id = t.id) AS message_count
          FROM support_tickets t
@@ -106,27 +106,27 @@ export async function ticketRoutes(app: FastifyInstance) {
     const data = parsed.data
 
     // Resolve requester info
-    const userRow = await queryOne<{ email: string; full_name: string; customer_id: number | null }>(
-      'SELECT email, full_name, customer_id FROM users WHERE id = ?',
+    const userRow = await queryOne<{ email: string; full_name: string; tenant_id: number | null }>(
+      'SELECT email, full_name, tenant_id FROM users WHERE id = ?',
       [req.user.sub]
     )
     const requesterEmail = data.requester_email ?? userRow?.email ?? ''
     const requesterName  = data.requester_name  ?? userRow?.full_name ?? ''
 
-    // Resolve customer_id: use from user unless admin override provided
-    let customerId: number | null = userRow?.customer_id ?? null
-    if (req.user.role === 'customer' && !customerId) {
-      const ucRow = await queryOne<{ customer_id: number }>(
-        'SELECT customer_id FROM user_customers WHERE user_id = ? LIMIT 1',
+    // Resolve tenant_id: use from user unless admin override provided
+    let tenantId: number | null = userRow?.tenant_id ?? null
+    if (req.user.role === 'tenant' && !tenantId) {
+      const ucRow = await queryOne<{ tenant_id: number }>(
+        'SELECT tenant_id FROM user_tenants WHERE user_id = ? LIMIT 1',
         [req.user.sub]
       )
-      customerId = ucRow?.customer_id ?? null
+      tenantId = ucRow?.tenant_id ?? null
     }
 
     const result = await execute(
-      `INSERT INTO support_tickets (subject, priority, requester_email, requester_name, customer_id, source)
+      `INSERT INTO support_tickets (subject, priority, requester_email, requester_name, tenant_id, source)
        VALUES (?, ?, ?, ?, ?, 'web')`,
-      [data.subject, data.priority, requesterEmail, requesterName, customerId]
+      [data.subject, data.priority, requesterEmail, requesterName, tenantId]
     )
     const ticketId = result.insertId
 
@@ -177,15 +177,15 @@ export async function ticketRoutes(app: FastifyInstance) {
     )
     if (!ticket) return reply.status(404).send({ code: 'NOT_FOUND' })
 
-    // RBAC: customers may only see their own tickets
+    // RBAC: tenants may only see their own tickets
     if (!isStaff(req.user.role)) {
       const userRow = await queryOne<{ email: string }>(
         'SELECT email FROM users WHERE id = ?', [req.user.sub]
       )
       const userEmail = userRow?.email ?? ''
       const isOwned = ticket.requester_email === userEmail || await queryOne(
-        'SELECT 1 FROM user_customers WHERE user_id = ? AND customer_id = ?',
-        [req.user.sub, ticket.customer_id]
+        'SELECT 1 FROM user_tenants WHERE user_id = ? AND tenant_id = ?',
+        [req.user.sub, ticket.tenant_id]
       )
       if (!isOwned) return reply.status(403).send({ code: 'FORBIDDEN' })
     }
@@ -293,15 +293,15 @@ export async function ticketRoutes(app: FastifyInstance) {
     )
     if (!ticket) return reply.status(404).send({ code: 'NOT_FOUND' })
 
-    // RBAC check for customers
+    // RBAC check for tenants
     if (!isStaff(req.user.role)) {
       const userRow = await queryOne<{ email: string }>(
         'SELECT email FROM users WHERE id = ?', [req.user.sub]
       )
       const userEmail = userRow?.email ?? ''
       const isOwned = ticket.requester_email === userEmail || await queryOne(
-        `SELECT 1 FROM user_customers uc
-         JOIN support_tickets t ON t.customer_id = uc.customer_id
+        `SELECT 1 FROM user_tenants uc
+         JOIN support_tickets t ON t.tenant_id = uc.tenant_id
          WHERE uc.user_id = ? AND t.id = ?`,
         [req.user.sub, id]
       )
@@ -338,14 +338,14 @@ export async function ticketRoutes(app: FastifyInstance) {
   // ── Attachment helpers ────────────────────────────────────────
 
   async function ticketAccessCheck(req: any, reply: any, ticketId: number): Promise<boolean> {
-    const ticket = await queryOne<any>('SELECT id, requester_email, customer_id FROM support_tickets WHERE id = ?', [ticketId])
+    const ticket = await queryOne<any>('SELECT id, requester_email, tenant_id FROM support_tickets WHERE id = ?', [ticketId])
     if (!ticket) { reply.status(404).send({ code: 'NOT_FOUND' }); return false }
     if (isStaff(req.user.role)) return true
     const userRow = await queryOne<{ email: string }>('SELECT email FROM users WHERE id = ?', [req.user.sub])
     const userEmail = userRow?.email ?? ''
     const owned = ticket.requester_email === userEmail || await queryOne(
-      'SELECT 1 FROM user_customers WHERE user_id = ? AND customer_id = ?',
-      [req.user.sub, ticket.customer_id]
+      'SELECT 1 FROM user_tenants WHERE user_id = ? AND tenant_id = ?',
+      [req.user.sub, ticket.tenant_id]
     )
     if (!owned) { reply.status(403).send({ code: 'FORBIDDEN' }); return false }
     return true

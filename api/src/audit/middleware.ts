@@ -23,11 +23,11 @@ export async function writeAuditLog({
   const user = (req as any).user
   await execute(
     `INSERT INTO audit_logs
-       (user_id, customer_id, domain_id, entity_type, entity_id, action, old_value, new_value, ip_address, user_agent)
+       (user_id, tenant_id, domain_id, entity_type, entity_id, action, old_value, new_value, ip_address, user_agent)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       user?.sub ?? null,
-      user?.customerId ?? null,
+      user?.tenantId ?? null,
       domainId ?? null,
       entityType,
       entityId ?? null,

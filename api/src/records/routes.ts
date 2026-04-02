@@ -108,13 +108,13 @@ async function enqueueRender(domainId: number) {
 
 /** Resolve domain and enforce ownership */
 async function resolveDomain(domainId: string, req: any, reply: any) {
-  const ownerClause = req.user.role === 'admin' ? '' : ` AND customer_id IN (SELECT customer_id FROM user_customers WHERE user_id = ${Number(req.user.sub)})`
+  const ownerClause = req.user.role === 'admin' ? '' : ` AND tenant_id IN (SELECT tenant_id FROM user_tenants WHERE user_id = ${Number(req.user.sub)})`
   const domain = await queryOne(
-    `SELECT id, customer_id FROM domains WHERE id = ? AND status != 'deleted'${ownerClause}`,
+    `SELECT id, tenant_id FROM domains WHERE id = ? AND status != 'deleted'${ownerClause}`,
     [domainId]
   )
   if (!domain) { reply.status(404).send({ code: 'NOT_FOUND' }); return null }
-  return domain as { id: number; customer_id: number }
+  return domain as { id: number; tenant_id: number }
 }
 
 export async function recordRoutes(app: FastifyInstance) {
@@ -222,8 +222,8 @@ export async function recordRoutes(app: FastifyInstance) {
       const domain = await resolveDomain(req.params.domainId, req, reply)
       if (!domain) return
 
-      const domainData = await queryOne<{ fqdn: string; default_ttl: number; customer_id: number; last_serial: number }>(
-        'SELECT fqdn, default_ttl, customer_id, last_serial FROM domains WHERE id = ?',
+      const domainData = await queryOne<{ fqdn: string; default_ttl: number; tenant_id: number; last_serial: number }>(
+        'SELECT fqdn, default_ttl, tenant_id, last_serial FROM domains WHERE id = ?',
         [domain.id]
       )
       if (!domainData) return reply.status(404).send({ code: 'NOT_FOUND' })
@@ -235,9 +235,9 @@ export async function recordRoutes(app: FastifyInstance) {
 
       const soa = await queryOne<{ mname: string; rname: string; refresh: number; retry: number; expire: number; minimum_ttl: number }>(
         `SELECT mname, rname, refresh, retry, expire, minimum_ttl
-         FROM soa_templates WHERE customer_id = ? OR customer_id IS NULL
-         ORDER BY customer_id DESC LIMIT 1`,
-        [domainData.customer_id]
+         FROM soa_templates WHERE tenant_id = ? OR tenant_id IS NULL
+         ORDER BY tenant_id DESC LIMIT 1`,
+        [domainData.tenant_id]
       )
       if (!soa) return reply.status(500).send({ code: 'NO_SOA_TEMPLATE' })
 

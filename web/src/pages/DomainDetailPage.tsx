@@ -6,8 +6,8 @@ import {
   getDomain, getRecords, createRecord, deleteRecord,
   createBulkJob, previewBulkJob, approveBulkJob, searchByRecord,
   updateDomainLabels, getLabelSuggestions, updateDomain, deleteDomain, getZoneText,
-  getCustomers,
-  type DnsRecord, type Label, type Domain, type LabelSuggestion, type Customer,
+  getTenants,
+  type DnsRecord, type Label, type Domain, type LabelSuggestion, type Tenant,
 } from '../api/client'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import LabelChip, { getLabelColors } from '../components/LabelChip'
@@ -118,7 +118,7 @@ export default function DomainDetailPage() {
   const [savingLabels, setSavingLabels] = useState(false)
   const [togglingStatus, setTogglingStatus] = useState(false)
   const [togglingDnssec, setTogglingDnssec] = useState(false)
-  const [movingCustomer, setMovingCustomer] = useState(false)
+  const [movingTenant, setMovingTenant] = useState(false)
   const [editingTtl, setEditingTtl] = useState(false)
   const [ttlDraft, setTtlDraft] = useState('')
   const [savingTtl, setSavingTtl] = useState(false)
@@ -186,15 +186,15 @@ export default function DomainDetailPage() {
 
 
   const { data: labelSuggestions = [] } = useQuery({
-    queryKey: ['label-suggestions', domain?.customer_id],
-    queryFn: () => getLabelSuggestions(domain?.customer_id).then(r => r.data),
+    queryKey: ['label-suggestions', domain?.tenant_id],
+    queryFn: () => getLabelSuggestions(domain?.tenant_id).then(r => r.data),
     staleTime: 30_000,
     enabled: !!domain,
   })
 
-  const { data: customers = [] } = useQuery<Customer[]>({
-    queryKey: ['customers'],
-    queryFn: () => getCustomers().then(r => r.data),
+  const { data: tenants = [] } = useQuery<Tenant[]>({
+    queryKey: ['tenants'],
+    queryFn: () => getTenants().then(r => r.data),
     enabled: isAdmin,
     staleTime: 60_000,
   })
@@ -408,7 +408,7 @@ export default function DomainDetailPage() {
     setSavingLabels(true)
     const invalidate = () => {
       qc.invalidateQueries({ queryKey: ['domain', domainId] })
-      qc.invalidateQueries({ queryKey: ['label-suggestions', domain?.customer_id] })
+      qc.invalidateQueries({ queryKey: ['label-suggestions', domain?.tenant_id] })
     }
     try {
       await updateDomainLabels(domainId, next)
@@ -430,7 +430,7 @@ export default function DomainDetailPage() {
     setSavingLabels(true)
     const invalidate = () => {
       qc.invalidateQueries({ queryKey: ['domain', domainId] })
-      qc.invalidateQueries({ queryKey: ['label-suggestions', domain?.customer_id] })
+      qc.invalidateQueries({ queryKey: ['label-suggestions', domain?.tenant_id] })
     }
     try {
       await updateDomainLabels(domainId, next)
@@ -451,7 +451,7 @@ export default function DomainDetailPage() {
       await updateDomainLabels(domainId, next)
     } catch {
       qc.invalidateQueries({ queryKey: ['domain', domainId] })
-      qc.invalidateQueries({ queryKey: ['label-suggestions', domain?.customer_id] })
+      qc.invalidateQueries({ queryKey: ['label-suggestions', domain?.tenant_id] })
     } finally {
       setSavingLabels(false)
     }
@@ -496,17 +496,17 @@ export default function DomainDetailPage() {
     }
   }
 
-  async function handleMoveCustomer(newCustomerId: number) {
-    if (!domain || movingCustomer || newCustomerId === domain.customer_id) return
-    setMovingCustomer(true)
+  async function handleMoveTenant(newTenantId: number) {
+    if (!domain || movingTenant || newTenantId === domain.tenant_id) return
+    setMovingTenant(true)
     try {
-      await updateDomain(domainId, { customer_id: newCustomerId } as any)
+      await updateDomain(domainId, { tenant_id: newTenantId } as any)
       qc.invalidateQueries({ queryKey: ['domain', domainId] })
       qc.invalidateQueries({ queryKey: ['domains'] })
     } catch (err: any) {
       alert(err.response?.data?.message ?? err.message)
     } finally {
-      setMovingCustomer(false)
+      setMovingTenant(false)
     }
   }
 
@@ -679,25 +679,25 @@ export default function DomainDetailPage() {
         </span>
         {isAdmin ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
-            {t('customer')}:
+            {t('tenant')}:
             <select
-              value={domain.customer_id}
-              disabled={movingCustomer}
-              onChange={e => handleMoveCustomer(Number(e.target.value))}
+              value={domain.tenant_id}
+              disabled={movingTenant}
+              onChange={e => handleMoveTenant(Number(e.target.value))}
               style={{
                 fontSize: 'inherit', fontWeight: 600,
                 border: '1px solid transparent', borderRadius: 4,
                 background: 'none', cursor: 'pointer', padding: '0 2px',
               }}
             >
-              {customers.filter(c => c.is_active || c.id === domain.customer_id).map(c => (
+              {tenants.filter((c: Tenant) => c.is_active || c.id === domain.tenant_id).map((c: Tenant) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
-            {movingCustomer && <span style={{ color: '#9ca3af' }}>…</span>}
+            {movingTenant && <span style={{ color: '#9ca3af' }}>…</span>}
           </span>
         ) : (
-          <span>{t('customer')}: <strong>{domain.customer_name}</strong></span>
+          <span>{t('tenant')}: <strong>{domain.tenant_name}</strong></span>
         )}
         <span>{t('domainDetail_defaultTtl')}{' '}
           {editingTtl ? (

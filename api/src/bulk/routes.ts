@@ -9,7 +9,7 @@ import { broadcast } from '../ws/hub.js'
 
 function ownerClause(req: any): string {
   if (req.user.role === 'admin') return ''
-  return ` AND d.customer_id IN (SELECT customer_id FROM user_customers WHERE user_id = ${Number(req.user.sub)})`
+  return ` AND d.tenant_id IN (SELECT tenant_id FROM user_tenants WHERE user_id = ${Number(req.user.sub)})`
 }
 
 /** Resolve filter_json to a list of domain IDs the requesting user can access */
@@ -18,9 +18,9 @@ async function resolveDomainIds(filter: any, req: any): Promise<number[]> {
   let where = `d.status = 'active'${owner}`
   const params: unknown[] = []
 
-  if (filter.mode === 'customer' && filter.customer_ids?.length) {
-    where += ` AND d.customer_id IN (${filter.customer_ids.map(() => '?').join(',')})`
-    params.push(...filter.customer_ids)
+  if (filter.mode === 'tenant' && filter.tenant_ids?.length) {
+    where += ` AND d.tenant_id IN (${filter.tenant_ids.map(() => '?').join(',')})`
+    params.push(...filter.tenant_ids)
   } else if (filter.mode === 'explicit' && filter.domain_ids?.length) {
     where += ` AND d.id IN (${filter.domain_ids.map(() => '?').join(',')})`
     params.push(...filter.domain_ids)
@@ -94,8 +94,8 @@ async function computeDomainDiff(
 const CreateBulkJobBody = z.object({
   operation: z.enum(['add', 'replace', 'delete', 'change_ttl']),
   filter_json: z.object({
-    mode: z.enum(['all', 'customer', 'explicit']),
-    customer_ids: z.array(z.number()).optional(),
+    mode: z.enum(['all', 'tenant', 'explicit']),
+    tenant_ids: z.array(z.number()).optional(),
     domain_ids: z.array(z.number()).optional(),
     fqdn_pattern: z.string().optional(),
   }),
@@ -106,7 +106,7 @@ export async function bulkRoutes(app: FastifyInstance) {
 
   // GET /bulk-jobs
   app.get('/bulk-jobs', { preHandler: requireAuth }, async (req: any) => {
-    const owner = req.user.role === 'customer' ? ` WHERE created_by = ${req.user.sub}` : ''
+    const owner = req.user.role === 'tenant' ? ` WHERE created_by = ${req.user.sub}` : ''
     return query(`SELECT * FROM bulk_jobs${owner} ORDER BY created_at DESC LIMIT 100`)
   })
 
@@ -220,19 +220,19 @@ export async function bulkRoutes(app: FastifyInstance) {
     const { type, name, value } = req.query as Record<string, string>
     if (!type) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: 'type is required' })
 
-    const owner = req.user.role === 'admin' ? '' : ` AND d.customer_id IN (SELECT customer_id FROM user_customers WHERE user_id = ${Number(req.user.sub)})`
+    const owner = req.user.role === 'admin' ? '' : ` AND d.tenant_id IN (SELECT tenant_id FROM user_tenants WHERE user_id = ${Number(req.user.sub)})`
     const params: unknown[] = [type]
     let recordWhere = 'r.type = ? AND r.is_deleted = 0'
     if (name)  { recordWhere += ' AND r.name = ?';        params.push(name) }
     if (value) { recordWhere += ' AND r.value LIKE ?';    params.push(`%${value}%`) }
 
     const rows = await query(
-      `SELECT d.id, d.fqdn, d.customer_id, c.name AS customer_name,
+      `SELECT d.id, d.fqdn, d.tenant_id, c.name AS tenant_name,
               r.id AS record_id, r.name AS record_name, r.type AS record_type,
               r.ttl, r.priority, r.value
        FROM dns_records r
        JOIN domains d ON d.id = r.domain_id
-       JOIN customers c ON c.id = d.customer_id
+       JOIN tenants c ON c.id = d.tenant_id
        WHERE ${recordWhere} AND d.status = 'active'${owner}
        ORDER BY d.fqdn`,
       params

@@ -8,7 +8,7 @@ Internal DNS management panel. React SPA + Fastify API + Node worker + hidden pr
 
 All phases complete and working:
 - Auth (JWT + httpOnly refresh cookie, silent refresh on mount)
-- RBAC: admin / operator / customer (ownership enforced at SQL level)
+- RBAC: admin / operator / tenant (ownership enforced at SQL level)
 - Domain + record CRUD with per-type Zod validators
 - Zone render pipeline: Worker polls queue → renders zone → named-checkzone → atomic file replace → rndc reload
 - Catalog zones (RFC 9432): secondaries auto-discover member zones from primary — no manual per-zone config on secondaries

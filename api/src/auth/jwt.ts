@@ -3,8 +3,8 @@ import { query, queryOne, execute } from '../db.js'
 
 export interface JwtPayload {
   sub: number        // user id
-  role: 'admin' | 'operator' | 'customer'
-  customerId: number | null
+  role: 'admin' | 'operator' | 'tenant'
+  tenantId: number | null
   impersonatingId?: number   // real admin user id when impersonating
 }
 

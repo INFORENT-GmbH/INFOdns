@@ -21,9 +21,9 @@ const LoginBody = z.object({
 const InviteBody = z.object({
   email: z.string().email(),
   full_name: z.string().min(1).max(255),
-  role: z.enum(['admin', 'operator', 'customer']),
+  role: z.enum(['admin', 'operator', 'tenant']),
   locale: z.enum(['en', 'de']).optional().default('de'),
-  customer_ids: z.array(z.number().int().positive()).optional().default([]),
+  tenant_ids: z.array(z.number().int().positive()).optional().default([]),
 })
 
 const AcceptInviteBody = z.object({
@@ -35,8 +35,8 @@ type UserRow = {
   id: number
   email: string
   password_hash: string
-  role: 'admin' | 'operator' | 'customer'
-  customer_id: number | null
+  role: 'admin' | 'operator' | 'tenant'
+  tenant_id: number | null
   is_active: number
   locale: 'en' | 'de'
 }
@@ -48,7 +48,7 @@ export async function authRoutes(app: FastifyInstance) {
     if (!body.success) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: body.error.message })
 
     const user = await queryOne<UserRow>(
-      'SELECT id, email, password_hash, role, customer_id, is_active, locale FROM users WHERE email = ?',
+      'SELECT id, email, password_hash, role, tenant_id, is_active, locale FROM users WHERE email = ?',
       [body.data.email]
     )
     if (!user || !user.is_active) return reply.status(401).send({ code: 'INVALID_CREDENTIALS' })
@@ -56,7 +56,7 @@ export async function authRoutes(app: FastifyInstance) {
     const valid = await bcrypt.compare(body.data.password, user.password_hash)
     if (!valid) return reply.status(401).send({ code: 'INVALID_CREDENTIALS' })
 
-    const payload: JwtPayload = { sub: user.id, role: user.role, customerId: user.customer_id }
+    const payload: JwtPayload = { sub: user.id, role: user.role, tenantId: user.tenant_id }
     const accessToken = app.jwt.sign(payload, { expiresIn: '15m' })
     const refreshToken = generateRefreshToken()
     await saveRefreshToken(user.id, refreshToken)
@@ -91,14 +91,14 @@ export async function authRoutes(app: FastifyInstance) {
     const result = await rotateRefreshToken(raw)
     if (!result) return reply.status(401).send({ code: 'INVALID_REFRESH_TOKEN' })
 
-    type UserRow2 = { id: number; role: 'admin' | 'operator' | 'customer'; customer_id: number | null; is_active: number }
+    type UserRow2 = { id: number; role: 'admin' | 'operator' | 'tenant'; tenant_id: number | null; is_active: number }
     const user = await queryOne<UserRow2>(
-      'SELECT id, role, customer_id, is_active FROM users WHERE id = ?',
+      'SELECT id, role, tenant_id, is_active FROM users WHERE id = ?',
       [result.userId]
     )
     if (!user || !user.is_active) return reply.status(401).send({ code: 'USER_INACTIVE' })
 
-    const payload: JwtPayload = { sub: user.id, role: user.role, customerId: user.customer_id }
+    const payload: JwtPayload = { sub: user.id, role: user.role, tenantId: user.tenant_id }
     const accessToken = app.jwt.sign(payload, { expiresIn: '15m' })
     const newRefresh = generateRefreshToken()
     await saveRefreshToken(user.id, newRefresh)
@@ -129,14 +129,14 @@ export async function authRoutes(app: FastifyInstance) {
     if (!Number.isInteger(targetId) || targetId <= 0) return reply.status(400).send({ code: 'INVALID_ID' })
     if (targetId === req.user.sub) return reply.status(400).send({ code: 'CANNOT_IMPERSONATE_SELF' })
 
-    type Row = { id: number; role: 'admin' | 'operator' | 'customer'; customer_id: number | null; is_active: number }
-    const target = await queryOne<Row>('SELECT id, role, customer_id, is_active FROM users WHERE id = ?', [targetId])
+    type Row = { id: number; role: 'admin' | 'operator' | 'tenant'; tenant_id: number | null; is_active: number }
+    const target = await queryOne<Row>('SELECT id, role, tenant_id, is_active FROM users WHERE id = ?', [targetId])
     if (!target || !target.is_active) return reply.status(404).send({ code: 'NOT_FOUND' })
 
     const payload: JwtPayload = {
       sub: target.id,
       role: target.role,
-      customerId: target.customer_id,
+      tenantId: target.tenant_id,
       impersonatingId: req.user.sub,
     }
     const accessToken = app.jwt.sign(payload, { expiresIn: '15m' })
@@ -148,26 +148,26 @@ export async function authRoutes(app: FastifyInstance) {
     const realAdminId = req.user.impersonatingId
     if (!realAdminId) return reply.status(400).send({ code: 'NOT_IMPERSONATING' })
 
-    type Row = { id: number; role: 'admin' | 'operator' | 'customer'; customer_id: number | null; is_active: number }
-    const admin = await queryOne<Row>('SELECT id, role, customer_id, is_active FROM users WHERE id = ?', [realAdminId])
+    type Row = { id: number; role: 'admin' | 'operator' | 'tenant'; tenant_id: number | null; is_active: number }
+    const admin = await queryOne<Row>('SELECT id, role, tenant_id, is_active FROM users WHERE id = ?', [realAdminId])
     if (!admin || !admin.is_active || admin.role !== 'admin') {
       return reply.status(403).send({ code: 'FORBIDDEN' })
     }
 
-    const payload: JwtPayload = { sub: admin.id, role: admin.role, customerId: admin.customer_id }
+    const payload: JwtPayload = { sub: admin.id, role: admin.role, tenantId: admin.tenant_id }
     const accessToken = app.jwt.sign(payload, { expiresIn: '15m' })
     return { accessToken }
   })
 
   // GET /auth/invites  (admin only — list pending invites)
   app.get('/auth/invites', { preHandler: requireAdmin }, async () => {
-    type Row = { id: number; email: string; full_name: string; role: string; locale: string; customer_ids: string | null; expires_at: string; created_at: string }
+    type Row = { id: number; email: string; full_name: string; role: string; locale: string; tenant_ids: string | null; expires_at: string; created_at: string }
     const rows = await query(
-      'SELECT id, email, full_name, role, locale, customer_ids, expires_at, created_at FROM user_invites WHERE used_at IS NULL AND expires_at > NOW() ORDER BY created_at DESC'
+      'SELECT id, email, full_name, role, locale, tenant_ids, expires_at, created_at FROM user_invites WHERE used_at IS NULL AND expires_at > NOW() ORDER BY created_at DESC'
     ) as Row[]
     return rows.map(r => ({
       ...r,
-      customer_ids: r.customer_ids ? JSON.parse(r.customer_ids) as number[] : [],
+      tenant_ids: r.tenant_ids ? JSON.parse(r.tenant_ids) as number[] : [],
     }))
   })
 
@@ -195,10 +195,10 @@ export async function authRoutes(app: FastifyInstance) {
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
 
     await execute(
-      'INSERT INTO user_invites (email, token_hash, role, full_name, locale, customer_ids, invited_by, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO user_invites (email, token_hash, role, full_name, locale, tenant_ids, invited_by, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         body.data.email, tokenHash, body.data.role, body.data.full_name,
-        body.data.locale, JSON.stringify(body.data.customer_ids), req.user.sub,
+        body.data.locale, JSON.stringify(body.data.tenant_ids), req.user.sub,
         expiresAt.toISOString().slice(0, 19).replace('T', ' '),
       ]
     )
@@ -239,9 +239,9 @@ export async function authRoutes(app: FastifyInstance) {
     if (!body.success) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: body.error.message })
 
     const tokenHash = hashToken(body.data.token)
-    type InviteRow = { id: number; email: string; full_name: string; role: 'admin' | 'operator' | 'customer'; locale: 'en' | 'de'; customer_ids: string | null; expires_at: string; used_at: string | null }
+    type InviteRow = { id: number; email: string; full_name: string; role: 'admin' | 'operator' | 'tenant'; locale: 'en' | 'de'; tenant_ids: string | null; expires_at: string; used_at: string | null }
     const invite = await queryOne<InviteRow>(
-      'SELECT id, email, full_name, role, locale, customer_ids, expires_at, used_at FROM user_invites WHERE token_hash = ?',
+      'SELECT id, email, full_name, role, locale, tenant_ids, expires_at, used_at FROM user_invites WHERE token_hash = ?',
       [tokenHash]
     )
     if (!invite) return reply.status(404).send({ code: 'INVITE_NOT_FOUND' })
@@ -252,15 +252,15 @@ export async function authRoutes(app: FastifyInstance) {
     if (existing) return reply.status(409).send({ code: 'EMAIL_TAKEN' })
 
     const hash = await bcrypt.hash(body.data.password, 12)
-    const customerIds: number[] = invite.customer_ids ? JSON.parse(invite.customer_ids) : []
+    const tenantIds: number[] = invite.tenant_ids ? JSON.parse(invite.tenant_ids) : []
 
     const result = await execute(
-      'INSERT INTO users (email, password_hash, full_name, role, customer_id, is_active, locale) VALUES (?, ?, ?, ?, ?, 1, ?)',
-      [invite.email, hash, invite.full_name, invite.role, customerIds[0] ?? null, invite.locale]
+      'INSERT INTO users (email, password_hash, full_name, role, tenant_id, is_active, locale) VALUES (?, ?, ?, ?, ?, 1, ?)',
+      [invite.email, hash, invite.full_name, invite.role, tenantIds[0] ?? null, invite.locale]
     )
     const userId = result.insertId
-    for (const cid of customerIds) {
-      await execute('INSERT IGNORE INTO user_customers (user_id, customer_id) VALUES (?, ?)', [userId, cid])
+    for (const cid of tenantIds) {
+      await execute('INSERT IGNORE INTO user_tenants (user_id, tenant_id) VALUES (?, ?)', [userId, cid])
     }
 
     await execute('UPDATE user_invites SET used_at = NOW() WHERE id = ?', [invite.id])

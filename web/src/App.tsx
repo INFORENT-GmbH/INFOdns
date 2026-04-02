@@ -7,7 +7,7 @@ import LoginPage from './pages/LoginPage'
 import DomainsLayout from './pages/DomainsLayout'
 import DomainDetailPage from './pages/DomainDetailPage'
 import JobsPage from './pages/JobsPage'
-import CustomersPage from './pages/CustomersPage'
+import TenantsPage from './pages/TenantsPage'
 import UsersPage from './pages/UsersPage'
 import AuditLogPage from './pages/AuditLogPage'
 import MailQueuePage from './pages/MailQueuePage'
@@ -50,7 +50,7 @@ export default function App() {
                 <Route path=":id" element={<DomainDetailPage />} />
               </Route>
               <Route path="jobs" element={<JobsPage />} />
-              <Route path="customers" element={<CustomersPage />} />
+              <Route path="tenants" element={<TenantsPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="audit-logs" element={<AuditLogPage />} />
               <Route path="mail-queue" element={<MailQueuePage />} />

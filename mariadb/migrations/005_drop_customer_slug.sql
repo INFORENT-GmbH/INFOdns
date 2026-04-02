@@ -1,2 +1,2 @@
--- Drop the unused slug column from customers
-ALTER TABLE customers DROP INDEX uq_slug, DROP COLUMN slug;
+-- Drop the unused slug column from tenants
+ALTER TABLE tenants DROP INDEX uq_slug, DROP COLUMN slug;

@@ -27,7 +27,7 @@ const EXPECTED_NS: string[] = (process.env.NS_RECORDS ?? '')
 
 const CreateDomainBody = z.object({
   fqdn: z.string().min(1).max(253).refine(v => FQDN_RE.test(v), 'Invalid FQDN'),
-  customer_id: z.number().int().positive(),
+  tenant_id: z.number().int().positive(),
   default_ttl: z.number().int().positive().optional().default(3600),
   notes: z.string().optional(),
 })
@@ -37,7 +37,7 @@ const UpdateDomainBody = z.object({
   default_ttl: z.number().int().positive().optional(),
   notes: z.string().optional(),
   dnssec_enabled: z.boolean().optional(),
-  customer_id: z.number().int().positive().optional(),
+  tenant_id: z.number().int().positive().optional(),
 })
 
 const LabelSchema = z.object({
@@ -72,28 +72,28 @@ async function fetchLabels(domainIds: number[], isAdmin = false): Promise<Map<nu
 }
 
 
-/** Inject ownership filter for non-admin users via user_customers junction table */
+/** Inject ownership filter for non-admin users via user_tenants junction table */
 function ownerFilter(req: any): string {
   if (req.user.role === 'admin') return ''
-  return ` AND d.customer_id IN (SELECT customer_id FROM user_customers WHERE user_id = ${Number(req.user.sub)})`
+  return ` AND d.tenant_id IN (SELECT tenant_id FROM user_tenants WHERE user_id = ${Number(req.user.sub)})`
 }
 
 export async function domainRoutes(app: FastifyInstance) {
-  // GET /domains/labels  — distinct label keys + values scoped to a customer
+  // GET /domains/labels  — distinct label keys + values scoped to a tenant
   app.get('/domains/labels', { preHandler: requireAuth }, async (req: any, reply) => {
     const isAdmin = req.user.role === 'admin'
-    const { customer_id } = req.query as Record<string, string>
+    const { tenant_id } = req.query as Record<string, string>
 
     const params: unknown[] = []
     let where: string
-    if (!isAdmin && !customer_id) {
-      where = 'WHERE l.customer_id IN (SELECT customer_id FROM user_customers WHERE user_id = ?) AND l.admin_only = 0'
+    if (!isAdmin && !tenant_id) {
+      where = 'WHERE l.tenant_id IN (SELECT tenant_id FROM user_tenants WHERE user_id = ?) AND l.admin_only = 0'
       params.push(req.user.sub)
-    } else if (customer_id) {
+    } else if (tenant_id) {
       where = isAdmin
-        ? 'WHERE (l.customer_id = ? AND l.admin_only = 0) OR (l.admin_only = 1 AND l.customer_id IS NULL)'
-        : 'WHERE l.customer_id = ? AND l.admin_only = 0'
-      params.push(Number(customer_id))
+        ? 'WHERE (l.tenant_id = ? AND l.admin_only = 0) OR (l.admin_only = 1 AND l.tenant_id IS NULL)'
+        : 'WHERE l.tenant_id = ? AND l.admin_only = 0'
+      params.push(Number(tenant_id))
     } else {
       where = isAdmin ? '' : 'WHERE l.admin_only = 0'
     }
@@ -115,7 +115,7 @@ export async function domainRoutes(app: FastifyInstance) {
 
   // GET /domains
   app.get('/domains', { preHandler: requireAuth }, async (req: any, reply) => {
-    const { search, customer_id, label, page = '1', limit = '50', show_deleted } = req.query as Record<string, string>
+    const { search, tenant_id, label, page = '1', limit = '50', show_deleted } = req.query as Record<string, string>
     const isAdmin = req.user.role === 'admin'
     const offset = (Number(page) - 1) * Number(limit)
     const params: unknown[] = []
@@ -138,12 +138,12 @@ export async function domainRoutes(app: FastifyInstance) {
     }
 
     if (!isAdmin) {
-      where += ` AND d.customer_id IN (SELECT customer_id FROM user_customers WHERE user_id = ?)`
+      where += ` AND d.tenant_id IN (SELECT tenant_id FROM user_tenants WHERE user_id = ?)`
       params.push(req.user.sub)
     }
-    if (customer_id) {
-      where += ` AND d.customer_id = ?`
-      params.push(Number(customer_id))
+    if (tenant_id) {
+      where += ` AND d.tenant_id = ?`
+      params.push(Number(tenant_id))
     }
     if (search) {
       where += ` AND d.fqdn LIKE ?`
@@ -152,9 +152,9 @@ export async function domainRoutes(app: FastifyInstance) {
 
     const rows = await query(
       `SELECT d.id, d.fqdn, d.status, d.zone_status, d.last_serial, d.last_rendered_at,
-              d.default_ttl, d.customer_id, c.name AS customer_name, d.created_at, d.deleted_at,
+              d.default_ttl, d.tenant_id, c.name AS tenant_name, d.created_at, d.deleted_at,
               d.dnssec_enabled, d.ns_ok, d.ns_checked_at
-       FROM domains d JOIN customers c ON c.id = d.customer_id${join}
+       FROM domains d JOIN tenants c ON c.id = d.tenant_id${join}
        ${where}
        ORDER BY d.fqdn
        LIMIT ? OFFSET ?`,
@@ -169,11 +169,11 @@ export async function domainRoutes(app: FastifyInstance) {
     const body = CreateDomainBody.safeParse(req.body)
     if (!body.success) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: body.error.message })
 
-    // Non-admin/operator users can only create domains for their own customers
+    // Non-admin/operator users can only create domains for their own tenants
     if (!['admin', 'operator'].includes(req.user.role)) {
       const owned = await queryOne(
-        'SELECT 1 FROM user_customers WHERE user_id = ? AND customer_id = ?',
-        [req.user.sub, body.data.customer_id]
+        'SELECT 1 FROM user_tenants WHERE user_id = ? AND tenant_id = ?',
+        [req.user.sub, body.data.tenant_id]
       )
       if (!owned) return reply.status(403).send({ code: 'FORBIDDEN' })
     }
@@ -182,8 +182,8 @@ export async function domainRoutes(app: FastifyInstance) {
     if (existing) return reply.status(409).send({ code: 'FQDN_TAKEN' })
 
     const result = await execute(
-      'INSERT INTO domains (fqdn, customer_id, default_ttl, notes, status, zone_status) VALUES (?, ?, ?, ?, ?, ?)',
-      [body.data.fqdn, body.data.customer_id, body.data.default_ttl, body.data.notes ?? null, 'active', 'dirty']
+      'INSERT INTO domains (fqdn, tenant_id, default_ttl, notes, status, zone_status) VALUES (?, ?, ?, ?, ?, ?)',
+      [body.data.fqdn, body.data.tenant_id, body.data.default_ttl, body.data.notes ?? null, 'active', 'dirty']
     )
     const created = await queryOne('SELECT * FROM domains WHERE id = ?', [result.insertId])
     await writeAuditLog({ req, entityType: 'domain', entityId: result.insertId, domainId: result.insertId, action: 'create', newValue: created })
@@ -194,10 +194,10 @@ export async function domainRoutes(app: FastifyInstance) {
   // GET /domains/:id
   app.get<{ Params: { id: string } }>('/domains/:id', { preHandler: requireAuth }, async (req, reply) => {
     const row = await queryOne(
-      `SELECT d.*, c.name AS customer_name,
+      `SELECT d.*, c.name AS tenant_name,
               q.error AS zone_error, q.retries AS zone_retries
        FROM domains d
-       JOIN customers c ON c.id = d.customer_id
+       JOIN tenants c ON c.id = d.tenant_id
        LEFT JOIN zone_render_queue q ON q.domain_id = d.id AND q.id = (
          SELECT MAX(id) FROM zone_render_queue WHERE domain_id = d.id
        )
@@ -227,16 +227,16 @@ export async function domainRoutes(app: FastifyInstance) {
     if (body.data.dnssec_enabled !== undefined && !['admin', 'operator'].includes(req.user.role)) {
       return reply.status(403).send({ code: 'FORBIDDEN' })
     }
-    if (body.data.customer_id !== undefined && req.user.role !== 'admin') {
+    if (body.data.tenant_id !== undefined && req.user.role !== 'admin') {
       return reply.status(403).send({ code: 'FORBIDDEN' })
     }
 
-    if (body.data.customer_id !== undefined) {
-      const targetCustomer = await queryOne(
-        'SELECT id FROM customers WHERE id = ? AND is_active = 1',
-        [body.data.customer_id]
+    if (body.data.tenant_id !== undefined) {
+      const targetTenant = await queryOne(
+        'SELECT id FROM tenants WHERE id = ? AND is_active = 1',
+        [body.data.tenant_id]
       )
-      if (!targetCustomer) return reply.status(422).send({ code: 'CUSTOMER_NOT_FOUND' })
+      if (!targetTenant) return reply.status(422).send({ code: 'TENANT_NOT_FOUND' })
     }
 
     const dnssecVal = body.data.dnssec_enabled != null ? (body.data.dnssec_enabled ? 1 : 0) : null
@@ -246,9 +246,9 @@ export async function domainRoutes(app: FastifyInstance) {
          default_ttl    = COALESCE(?, default_ttl),
          notes          = COALESCE(?, notes),
          dnssec_enabled = COALESCE(?, dnssec_enabled),
-         customer_id    = COALESCE(?, customer_id)
+         tenant_id      = COALESCE(?, tenant_id)
        WHERE id = ?`,
-      [body.data.status ?? null, body.data.default_ttl ?? null, body.data.notes ?? null, dnssecVal, body.data.customer_id ?? null, req.params.id]
+      [body.data.status ?? null, body.data.default_ttl ?? null, body.data.notes ?? null, dnssecVal, body.data.tenant_id ?? null, req.params.id]
     )
     const updated = await queryOne('SELECT * FROM domains WHERE id = ?', [req.params.id])
     await writeAuditLog({ req, entityType: 'domain', entityId: Number(req.params.id), domainId: Number(req.params.id), action: 'update', oldValue: old, newValue: updated })
@@ -260,7 +260,7 @@ export async function domainRoutes(app: FastifyInstance) {
   // PUT /domains/:id/labels
   app.put<{ Params: { id: string } }>('/domains/:id/labels', { preHandler: requireAuth }, async (req: any, reply) => {
     const domain = await queryOne(
-      `SELECT id, customer_id FROM domains WHERE id = ? AND status != 'deleted'${ownerFilter(req)}`,
+      `SELECT id, tenant_id FROM domains WHERE id = ? AND status != 'deleted'${ownerFilter(req)}`,
       [req.params.id]
     ) as any
     if (!domain) return reply.status(404).send({ code: 'NOT_FOUND' })
@@ -270,7 +270,7 @@ export async function domainRoutes(app: FastifyInstance) {
 
     const domainId = Number(req.params.id)
     const isAdmin = req.user.role === 'admin'
-    const customerIdForLabel = domain.customer_id as number
+    const tenantIdForLabel = domain.tenant_id as number
 
     const labelIds: number[] = []
     for (const { id: existingId, key, value, color, admin_only } of body.data.labels) {
@@ -279,11 +279,11 @@ export async function domainRoutes(app: FastifyInstance) {
 
       if (existingId > 0) {
         // Update existing canonical row.
-        // When marking admin-only: move to global (customer_id = NULL).
-        // When un-marking: leave customer_id as-is — don't include it in the UPDATE.
+        // When marking admin-only: move to global (tenant_id = NULL).
+        // When un-marking: leave tenant_id as-is — don't include it in the UPDATE.
         if (useAdminOnly) {
           await execute(
-            'UPDATE labels SET label_key=?, label_value=?, color=?, admin_only=1, customer_id=NULL WHERE id=?',
+            'UPDATE labels SET label_key=?, label_value=?, color=?, admin_only=1, tenant_id=NULL WHERE id=?',
             [key, value, color ?? null, existingId]
           )
         } else {
@@ -297,17 +297,17 @@ export async function domainRoutes(app: FastifyInstance) {
         // New label: find existing by key+value+scope, or insert.
         const existing = await queryOne(
           useAdminOnly
-            ? 'SELECT id FROM labels WHERE label_key=? AND label_value=? AND admin_only=1 AND customer_id IS NULL'
-            : 'SELECT id FROM labels WHERE label_key=? AND label_value=? AND admin_only=0 AND customer_id=?',
-          useAdminOnly ? [key, value] : [key, value, customerIdForLabel]
+            ? 'SELECT id FROM labels WHERE label_key=? AND label_value=? AND admin_only=1 AND tenant_id IS NULL'
+            : 'SELECT id FROM labels WHERE label_key=? AND label_value=? AND admin_only=0 AND tenant_id=?',
+          useAdminOnly ? [key, value] : [key, value, tenantIdForLabel]
         ) as any
         if (existing) {
           if (color !== undefined) await execute('UPDATE labels SET color=? WHERE id=?', [color ?? null, existing.id])
           labelId = existing.id
         } else {
           const r = await execute(
-            'INSERT INTO labels (customer_id, label_key, label_value, color, admin_only) VALUES (?, ?, ?, ?, ?)',
-            [useAdminOnly ? null : customerIdForLabel, key, value, color ?? null, useAdminOnly ? 1 : 0]
+            'INSERT INTO labels (tenant_id, label_key, label_value, color, admin_only) VALUES (?, ?, ?, ?, ?)',
+            [useAdminOnly ? null : tenantIdForLabel, key, value, color ?? null, useAdminOnly ? 1 : 0]
           )
           labelId = r.insertId
         }
@@ -319,7 +319,7 @@ export async function domainRoutes(app: FastifyInstance) {
       if (isAdmin) {
         if (useAdminOnly) {
           await execute(
-            'UPDATE labels SET admin_only=1, customer_id=NULL, color=? WHERE label_key=? AND id!=?',
+            'UPDATE labels SET admin_only=1, tenant_id=NULL, color=? WHERE label_key=? AND id!=?',
             [color ?? null, key, labelId]
           )
           // Consolidate duplicate rows (same key+value) that now share scope
@@ -342,16 +342,16 @@ export async function domainRoutes(app: FastifyInstance) {
             await execute(`DELETE FROM labels WHERE id IN (${dupeIds.map(() => '?').join(',')})`, dupeIds)
           }
         } else {
-          // Un-mark admin_only globally, but scope color to same customer
+          // Un-mark admin_only globally, but scope color to same tenant
           await execute('UPDATE labels SET admin_only=0 WHERE label_key=? AND id!=?', [key, labelId])
-          await execute('UPDATE labels SET color=? WHERE label_key=? AND customer_id=? AND id!=?',
-            [color ?? null, key, customerIdForLabel, labelId])
+          await execute('UPDATE labels SET color=? WHERE label_key=? AND tenant_id=? AND id!=?',
+            [color ?? null, key, tenantIdForLabel, labelId])
         }
       } else {
-        // Non-admin: still propagate color within same customer scope
+        // Non-admin: still propagate color within same tenant scope
         await execute(
-          'UPDATE labels SET color=? WHERE label_key=? AND customer_id=? AND id!=?',
-          [color ?? null, key, customerIdForLabel, labelId]
+          'UPDATE labels SET color=? WHERE label_key=? AND tenant_id=? AND id!=?',
+          [color ?? null, key, tenantIdForLabel, labelId]
         )
       }
     }

@@ -35,14 +35,14 @@ function extractTicketRef(subject: string): number | null {
   return m ? Number(m[1]) : null
 }
 
-async function lookupCustomerByEmail(email: string): Promise<number | null> {
-  const row = await queryOne<{ customer_id: number }>(
-    `SELECT uc.customer_id FROM users u
-     JOIN user_customers uc ON uc.user_id = u.id
+async function lookupTenantByEmail(email: string): Promise<number | null> {
+  const row = await queryOne<{ tenant_id: number }>(
+    `SELECT uc.tenant_id FROM users u
+     JOIN user_tenants uc ON uc.user_id = u.id
      WHERE u.email = ? LIMIT 1`,
     [email]
   )
-  return row?.customer_id ?? null
+  return row?.tenant_id ?? null
 }
 
 // ── Ticket creation / threading ───────────────────────────────
@@ -93,14 +93,14 @@ async function handleParsedEmail(parsed: Awaited<ReturnType<typeof simpleParser>
     broadcastEvent({ type: 'ticket_message_added', ticketId })
     console.log(`[imap] Appended message to ticket #${ticketId}`)
   } else {
-    const customerId = fromAddr ? await lookupCustomerByEmail(fromAddr) : null
+    const tenantId = fromAddr ? await lookupTenantByEmail(fromAddr) : null
 
     let newTicketId: number
     try {
       const result = await execute(
-        `INSERT INTO support_tickets (subject, requester_email, requester_name, customer_id, source, message_id)
+        `INSERT INTO support_tickets (subject, requester_email, requester_name, tenant_id, source, message_id)
          VALUES (?, ?, ?, ?, 'email', ?)`,
-        [subject, fromAddr, fromName, customerId, msgId]
+        [subject, fromAddr, fromName, tenantId, msgId]
       )
       newTicketId = result.insertId
     } catch (err: any) {

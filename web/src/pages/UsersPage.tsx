@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getUsers, createUser, updateUser, inviteUser, getInvites, revokeInvite, getCustomers, type User, type PendingInvite } from '../api/client'
+import { getUsers, createUser, updateUser, inviteUser, getInvites, revokeInvite, getTenants, type User, type PendingInvite } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
 
@@ -9,21 +9,21 @@ export default function UsersPage() {
   const { user: currentUser, impersonate } = useAuth()
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ email: '', password: '', full_name: '', role: 'customer', locale: 'de' })
-  const [selectedCustomerIds, setSelectedCustomerIds] = useState<number[]>([])
+  const [form, setForm] = useState({ email: '', password: '', full_name: '', role: 'tenant', locale: 'de' })
+  const [selectedTenantIds, setSelectedTenantIds] = useState<number[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const [showInviteForm, setShowInviteForm] = useState(false)
-  const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', role: 'customer', locale: 'de' })
-  const [inviteCustomerIds, setInviteCustomerIds] = useState<number[]>([])
+  const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', role: 'tenant', locale: 'de' })
+  const [inviteTenantIds, setInviteTenantIds] = useState<number[]>([])
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
 
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [editForm, setEditForm] = useState({ email: '', full_name: '', role: 'customer', locale: 'de', is_active: true })
-  const [editCustomerIds, setEditCustomerIds] = useState<number[]>([])
+  const [editForm, setEditForm] = useState({ email: '', full_name: '', role: 'tenant', locale: 'de', is_active: true })
+  const [editTenantIds, setEditTenantIds] = useState<number[]>([])
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
@@ -37,17 +37,17 @@ export default function UsersPage() {
     queryFn: () => getInvites().then(r => r.data),
   })
 
-  const { data: customers = [] } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => getCustomers().then(r => r.data),
+  const { data: tenants = [] } = useQuery({
+    queryKey: ['tenants'],
+    queryFn: () => getTenants().then(r => r.data),
   })
 
   function setField(key: string, value: string) {
     setForm(f => ({ ...f, [key]: value }))
   }
 
-  function toggleCustomer(id: number) {
-    setSelectedCustomerIds(prev =>
+  function toggleTenant(id: number) {
+    setSelectedTenantIds(prev =>
       prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
     )
   }
@@ -56,8 +56,8 @@ export default function UsersPage() {
     setInviteForm(f => ({ ...f, [key]: value }))
   }
 
-  function toggleInviteCustomer(id: number) {
-    setInviteCustomerIds(prev =>
+  function toggleInviteTenant(id: number) {
+    setInviteTenantIds(prev =>
       prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
     )
   }
@@ -65,7 +65,7 @@ export default function UsersPage() {
   function startEdit(u: User) {
     setEditingId(u.id)
     setEditForm({ email: u.email, full_name: u.full_name, role: u.role, locale: u.locale, is_active: !!u.is_active })
-    setEditCustomerIds(u.customer_ids ?? [])
+    setEditTenantIds(u.tenant_ids ?? [])
     setEditError(null)
   }
 
@@ -73,8 +73,8 @@ export default function UsersPage() {
     setEditForm(f => ({ ...f, [key]: value }))
   }
 
-  function toggleEditCustomer(id: number) {
-    setEditCustomerIds(prev =>
+  function toggleEditTenant(id: number) {
+    setEditTenantIds(prev =>
       prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
     )
   }
@@ -83,7 +83,7 @@ export default function UsersPage() {
     if (!editingId) return
     setEditSaving(true); setEditError(null)
     try {
-      await updateUser(editingId, { ...editForm, customer_ids: editCustomerIds } as any)
+      await updateUser(editingId, { ...editForm, tenant_ids: editTenantIds } as any)
       qc.invalidateQueries({ queryKey: ['users'] })
       setEditingId(null)
     } catch (err: any) {
@@ -97,11 +97,11 @@ export default function UsersPage() {
     e.preventDefault()
     setInviting(true); setInviteError(null); setInviteSuccess(null)
     try {
-      await inviteUser({ ...inviteForm, customer_ids: inviteCustomerIds })
+      await inviteUser({ ...inviteForm, tenant_ids: inviteTenantIds })
       qc.invalidateQueries({ queryKey: ['invites'] })
       setInviteSuccess(inviteForm.email)
-      setInviteForm({ email: '', full_name: '', role: 'customer', locale: 'de' })
-      setInviteCustomerIds([])
+      setInviteForm({ email: '', full_name: '', role: 'tenant', locale: 'de' })
+      setInviteTenantIds([])
       setShowInviteForm(false)
     } catch (err: any) {
       setInviteError(err.response?.data?.message ?? err.message)
@@ -116,12 +116,12 @@ export default function UsersPage() {
     try {
       await createUser({
         ...form,
-        customer_ids: selectedCustomerIds,
+        tenant_ids: selectedTenantIds,
       } as any)
       qc.invalidateQueries({ queryKey: ['users'] })
       setShowForm(false)
-      setForm({ email: '', password: '', full_name: '', role: 'customer', locale: 'de' })
-      setSelectedCustomerIds([])
+      setForm({ email: '', password: '', full_name: '', role: 'tenant', locale: 'de' })
+      setSelectedTenantIds([])
     } catch (err: any) {
       setError(err.response?.data?.message ?? err.message)
     } finally {
@@ -129,16 +129,16 @@ export default function UsersPage() {
     }
   }
 
-  const customerNames = (ids: number[]) => {
+  const tenantNames = (ids: number[]) => {
     if (!ids.length) return <span style={styles.muted}>—</span>
     return ids.map(id => {
-      const c = customers.find(c => c.id === id)
+      const c = tenants.find(c => c.id === id)
       return c ? c.name : `#${id}`
     }).join(', ')
   }
 
   const roleBadge = (role: string) => {
-    const colors: Record<string, string> = { admin: '#b91c1c', operator: '#1d4ed8', customer: '#15803d' }
+    const colors: Record<string, string> = { admin: '#b91c1c', operator: '#1d4ed8', tenant: '#15803d' }
     return <span style={{ color: colors[role] ?? '#374151', fontWeight: 600, fontSize: '.75rem' }}>{role}</span>
   }
 
@@ -175,7 +175,7 @@ export default function UsersPage() {
               <select value={inviteForm.role} onChange={e => setInviteField('role', e.target.value)} style={styles.input}>
                 <option value="admin">admin</option>
                 <option value="operator">operator</option>
-                <option value="customer">customer</option>
+                <option value="tenant">tenant</option>
               </select>
             </label>
             <label style={styles.label}>
@@ -187,15 +187,15 @@ export default function UsersPage() {
             </label>
           </div>
           <div>
-            <div style={{ fontSize: '.875rem', fontWeight: 500, marginBottom: '.25rem' }}>{t('users_customers')}</div>
+            <div style={{ fontSize: '.875rem', fontWeight: 500, marginBottom: '.25rem' }}>{t('users_tenants')}</div>
             <div style={styles.checkboxGrid}>
-              {customers.map(c => (
+              {tenants.map(c => (
                 <label key={c.id} style={styles.checkboxLabel}>
-                  <input type="checkbox" checked={inviteCustomerIds.includes(c.id)} onChange={() => toggleInviteCustomer(c.id)} />
+                  <input type="checkbox" checked={inviteTenantIds.includes(c.id)} onChange={() => toggleInviteTenant(c.id)} />
                   {c.name}
                 </label>
               ))}
-              {customers.length === 0 && <span style={styles.muted}>{t('users_noCustomer')}</span>}
+              {tenants.length === 0 && <span style={styles.muted}>{t('users_noTenant')}</span>}
             </div>
           </div>
           <div style={styles.actions}>
@@ -218,7 +218,7 @@ export default function UsersPage() {
               <select value={form.role} onChange={e => setField('role', e.target.value)} style={styles.input}>
                 <option value="admin">admin</option>
                 <option value="operator">operator</option>
-                <option value="customer">customer</option>
+                <option value="tenant">tenant</option>
               </select>
             </label>
             <label style={styles.label}>
@@ -230,19 +230,19 @@ export default function UsersPage() {
             </label>
           </div>
           <div>
-            <div style={{ fontSize: '.875rem', fontWeight: 500, marginBottom: '.25rem' }}>{t('users_customers')}</div>
+            <div style={{ fontSize: '.875rem', fontWeight: 500, marginBottom: '.25rem' }}>{t('users_tenants')}</div>
             <div style={styles.checkboxGrid}>
-              {customers.map(c => (
+              {tenants.map(c => (
                 <label key={c.id} style={styles.checkboxLabel}>
                   <input
                     type="checkbox"
-                    checked={selectedCustomerIds.includes(c.id)}
-                    onChange={() => toggleCustomer(c.id)}
+                    checked={selectedTenantIds.includes(c.id)}
+                    onChange={() => toggleTenant(c.id)}
                   />
                   {c.name}
                 </label>
               ))}
-              {customers.length === 0 && <span style={styles.muted}>{t('users_noCustomer')}</span>}
+              {tenants.length === 0 && <span style={styles.muted}>{t('users_noTenant')}</span>}
             </div>
           </div>
           <div style={styles.actions}>
@@ -259,7 +259,7 @@ export default function UsersPage() {
               <th style={styles.th}>{t('email')}</th>
               <th style={styles.th}>{t('name')}</th>
               <th style={styles.th}>{t('role')}</th>
-              <th style={styles.th}>{t('users_customers')}</th>
+              <th style={styles.th}>{t('users_tenants')}</th>
               <th style={styles.th}>{t('active')}</th>
               <th style={styles.th}>{t('users_locale')}</th>
               <th style={styles.th}>{t('created')}</th>
@@ -273,7 +273,7 @@ export default function UsersPage() {
                   <td style={styles.td}>{u.email}</td>
                   <td style={styles.td}>{u.full_name}</td>
                   <td style={styles.td}>{roleBadge(u.role)}</td>
-                  <td style={styles.td}>{customerNames(u.customer_ids ?? [])}</td>
+                  <td style={styles.td}>{tenantNames(u.tenant_ids ?? [])}</td>
                   <td style={styles.td}>{u.is_active ? '✓' : '—'}</td>
                   <td style={styles.td}>{u.locale === 'en' ? t('locale_en') : t('locale_de')}</td>
                   <td style={styles.td}>{new Date(u.created_at).toLocaleDateString()}</td>
@@ -310,7 +310,7 @@ export default function UsersPage() {
                             <select value={editForm.role} onChange={e => setEditField('role', e.target.value)} style={styles.input}>
                               <option value="admin">admin</option>
                               <option value="operator">operator</option>
-                              <option value="customer">customer</option>
+                              <option value="tenant">tenant</option>
                             </select>
                           </label>
                           <label style={styles.label}>
@@ -326,15 +326,15 @@ export default function UsersPage() {
                           {t('active')}
                         </label>
                         <div>
-                          <div style={{ fontSize: '.875rem', fontWeight: 500, marginBottom: '.25rem' }}>{t('users_customers')}</div>
+                          <div style={{ fontSize: '.875rem', fontWeight: 500, marginBottom: '.25rem' }}>{t('users_tenants')}</div>
                           <div style={styles.checkboxGrid}>
-                            {customers.map(c => (
+                            {tenants.map(c => (
                               <label key={c.id} style={styles.checkboxLabel}>
-                                <input type="checkbox" checked={editCustomerIds.includes(c.id)} onChange={() => toggleEditCustomer(c.id)} />
+                                <input type="checkbox" checked={editTenantIds.includes(c.id)} onChange={() => toggleEditTenant(c.id)} />
                                 {c.name}
                               </label>
                             ))}
-                            {customers.length === 0 && <span style={styles.muted}>{t('users_noCustomer')}</span>}
+                            {tenants.length === 0 && <span style={styles.muted}>{t('users_noTenant')}</span>}
                           </div>
                         </div>
                         <div style={styles.actions}>
@@ -352,7 +352,7 @@ export default function UsersPage() {
                 <td style={styles.td}>{inv.email}</td>
                 <td style={{ ...styles.td, color: '#9ca3af' }}>{inv.full_name || <span style={styles.muted}>—</span>}</td>
                 <td style={styles.td}>{roleBadge(inv.role)}</td>
-                <td style={styles.td}>{customerNames(inv.customer_ids ?? [])}</td>
+                <td style={styles.td}>{tenantNames(inv.tenant_ids ?? [])}</td>
                 <td style={styles.td}>
                   <span style={{ background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: 12, fontSize: '.75rem', fontWeight: 600 }}>
                     {t('users_pendingInvite')}

@@ -79,8 +79,8 @@ export interface Domain {
   last_serial: number
   last_rendered_at: string | null
   default_ttl: number
-  customer_id: number
-  customer_name: string
+  tenant_id: number
+  tenant_name: string
   created_at: string
   deleted_at: string | null
   reminder_flags: number
@@ -107,7 +107,7 @@ export interface DnsRecord {
   updated_at: string
 }
 
-export interface Customer {
+export interface Tenant {
   id: number
   name: string
   is_active: number
@@ -118,9 +118,9 @@ export interface User {
   id: number
   email: string
   full_name: string
-  role: 'admin' | 'operator' | 'customer'
-  customer_id: number | null
-  customer_ids: number[]
+  role: 'admin' | 'operator' | 'tenant'
+  tenant_id: number | null
+  tenant_ids: number[]
   is_active: number
   locale: 'en' | 'de'
   created_at: string
@@ -200,9 +200,9 @@ export interface LabelSuggestion {
   admin_only: boolean
 }
 
-export const getLabelSuggestions = (customerId?: number) =>
+export const getLabelSuggestions = (tenantId?: number) =>
   api.get<LabelSuggestion[]>('/domains/labels', {
-    params: customerId != null ? { customer_id: customerId } : undefined,
+    params: tenantId != null ? { tenant_id: tenantId } : undefined,
   })
 
 // Zone import
@@ -249,11 +249,11 @@ export const updateRecord = (domainId: number, id: number, data: Partial<DnsReco
 export const deleteRecord = (domainId: number, id: number) =>
   api.delete(`/domains/${domainId}/records/${id}`)
 
-// Customers
-export const getCustomers = () => api.get<Customer[]>('/customers')
-export const createCustomer = (data: Partial<Customer>) => api.post<Customer>('/customers', data)
-export const updateCustomer = (id: number, data: Partial<Customer>) => api.put<Customer>(`/customers/${id}`, data)
-export const deleteCustomer = (id: number) => api.delete(`/customers/${id}`)
+// Tenants
+export const getTenants = () => api.get<Tenant[]>('/tenants')
+export const createTenant = (data: Partial<Tenant>) => api.post<Tenant>('/tenants', data)
+export const updateTenant = (id: number, data: Partial<Tenant>) => api.put<Tenant>(`/tenants/${id}`, data)
+export const deleteTenant = (id: number) => api.delete(`/tenants/${id}`)
 
 // Users
 export const getUsers = () => api.get<User[]>('/users')
@@ -265,16 +265,16 @@ export interface PendingInvite {
   id: number
   email: string
   full_name: string
-  role: 'admin' | 'operator' | 'customer'
+  role: 'admin' | 'operator' | 'tenant'
   locale: 'en' | 'de'
-  customer_ids: number[]
+  tenant_ids: number[]
   expires_at: string
   created_at: string
 }
 
 export const getInvites = () => api.get<PendingInvite[]>('/auth/invites')
 export const revokeInvite = (id: number) => api.delete(`/auth/invites/${id}`)
-export const inviteUser = (data: { email: string; full_name: string; role: string; locale: string; customer_ids: number[] }) =>
+export const inviteUser = (data: { email: string; full_name: string; role: string; locale: string; tenant_ids: number[] }) =>
   api.post('/auth/invite', data)
 export const getInvite = (token: string) =>
   api.get<{ email: string; full_name: string; role: string; locale: string }>(`/auth/invite/${token}`)
@@ -341,7 +341,7 @@ export interface Ticket {
   priority: 'low' | 'normal' | 'high' | 'urgent'
   requester_email: string
   requester_name: string
-  customer_id: number | null
+  tenant_id: number | null
   assigned_to: number | null
   assigned_to_name: string | null
   source: 'web' | 'email'

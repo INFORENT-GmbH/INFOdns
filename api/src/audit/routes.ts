@@ -12,8 +12,8 @@ export async function auditRoutes(app: FastifyInstance) {
     const params: unknown[] = []
     const clauses: string[] = []
 
-    if (req.user.role === 'customer') {
-      clauses.push('customer_id IN (SELECT customer_id FROM user_customers WHERE user_id = ?)')
+    if (req.user.role === 'tenant') {
+      clauses.push('tenant_id IN (SELECT tenant_id FROM user_tenants WHERE user_id = ?)')
       params.push(req.user.sub)
     }
 
@@ -27,7 +27,7 @@ export async function auditRoutes(app: FastifyInstance) {
 
     const [rows, countRow] = await Promise.all([
       query(
-        `SELECT id, user_id, customer_id, domain_id, entity_type, entity_id, action,
+        `SELECT id, user_id, tenant_id, domain_id, entity_type, entity_id, action,
                 old_value, new_value, ip_address, created_at
          FROM audit_logs ${where}
          ORDER BY created_at DESC
