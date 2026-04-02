@@ -142,8 +142,14 @@ export async function domainRoutes(app: FastifyInstance) {
       params.push(req.user.sub)
     }
     if (tenant_id) {
-      where += ` AND d.tenant_id = ?`
-      params.push(Number(tenant_id))
+      const ids = tenant_id.split(',').map(Number).filter(n => Number.isInteger(n) && n > 0)
+      if (ids.length === 1) {
+        where += ` AND d.tenant_id = ?`
+        params.push(ids[0])
+      } else if (ids.length > 1) {
+        where += ` AND d.tenant_id IN (${ids.map(() => '?').join(',')})`
+        params.push(...ids)
+      }
     }
     if (search) {
       where += ` AND d.fqdn LIKE ?`

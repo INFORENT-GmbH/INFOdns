@@ -51,7 +51,10 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
   const [visibleCols, setVisibleCols] = useState<ColId[]>(readColsCookie)
   const [colDropdownOpen, setColDropdownOpen] = useState(false)
   const colDropdownRef = useRef<HTMLDivElement>(null)
-  const [tenantFilter, setTenantFilter] = useState('')
+  const [tenantFilter, setTenantFilter] = useState<number[]>([])
+  const [tenantDropdownOpen, setTenantDropdownOpen] = useState(false)
+  const [tenantSearch, setTenantSearch] = useState('')
+  const tenantDropdownRef = useRef<HTMLDivElement>(null)
   const [showDeleted, setShowDeleted] = useState(false)
   const [restoringId, setRestoringId] = useState<number | null>(null)
 
@@ -69,12 +72,12 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
   })
 
   const { data: domains = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['domains', search, labelFilter, tenantFilter, showDeleted],
+    queryKey: ['domains', search, labelFilter, tenantFilter.join(','), showDeleted],
     queryFn: () => {
       const params: Record<string, string> = {}
       if (search) params.search = search
       if (labelFilter) params.label = labelFilter
-      if (tenantFilter) params.tenant_id = tenantFilter
+      if (tenantFilter.length > 0) params.tenant_id = tenantFilter.join(',')
       if (showDeleted) params.show_deleted = 'true'
       return getDomains(Object.keys(params).length ? params : undefined).then(r => r.data)
     },
@@ -115,6 +118,20 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
       writeColsCookie(result)
       return result
     })
+  }
+
+  function toggleTenant(id: number) {
+    setTenantFilter(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  const filteredTenants = tenants.filter(c =>
+    c.name.toLowerCase().includes(tenantSearch.toLowerCase())
+  )
+
+  function tenantButtonLabel(): string {
+    if (tenantFilter.length === 0) return t('domains_allTenants')
+    if (tenantFilter.length === 1) return tenants.find(c => c.id === tenantFilter[0])?.name ?? t('domains_allTenants')
+    return `${tenantFilter.length} ${t('domains_tenantsSelected')}`
   }
 
   const colLabels: Record<ColId, string> = {
@@ -191,16 +208,58 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
             )}
           </div>
           {tenants.length > 1 && (
-            <select
-              value={tenantFilter}
-              onChange={e => setTenantFilter(e.target.value)}
-              style={{ ...styles.searchInput, width: '100%', boxSizing: 'border-box' as const, marginTop: '.375rem', cursor: 'pointer' }}
-            >
-              <option value="">{t('domains_allTenants')}</option>
-              {tenants.map(c => (
-                <option key={c.id} value={String(c.id)}>{c.name}</option>
-              ))}
-            </select>
+            <div ref={tenantDropdownRef} style={{ position: 'relative', marginTop: '.375rem' }}>
+              <button
+                type="button"
+                onClick={() => setTenantDropdownOpen(v => !v)}
+                onBlur={e => { if (!tenantDropdownRef.current?.contains(e.relatedTarget as Node)) { setTenantDropdownOpen(false); setTenantSearch('') } }}
+                style={{
+                  ...styles.searchInput, width: '100%', boxSizing: 'border-box' as const,
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  cursor: 'pointer', background: '#fff', textAlign: 'left' as const,
+                  outline: tenantFilter.length > 0 ? '2px solid #2563eb' : undefined,
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, color: tenantFilter.length > 0 ? '#111827' : '#9ca3af' }}>
+                  {tenantButtonLabel()}
+                </span>
+                <span style={{ fontSize: '.65rem', color: '#9ca3af', marginLeft: 4, flexShrink: 0 }}>▼</span>
+              </button>
+              {tenantFilter.length > 0 && (
+                <button
+                  onClick={() => { setTenantFilter([]); setTenantDropdownOpen(false); setTenantSearch('') }}
+                  style={{ ...styles.btnClear, position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)' }}
+                  title="Clear"
+                >✕</button>
+              )}
+              {tenantDropdownOpen && (
+                <div style={styles.labelDropdown}>
+                  <div style={{ padding: '4px 8px 6px', borderBottom: '1px solid #f3f4f6' }}>
+                    <input
+                      value={tenantSearch}
+                      onChange={e => setTenantSearch(e.target.value)}
+                      onMouseDown={e => e.stopPropagation()}
+                      placeholder={t('domains_searchTenants')}
+                      style={{ width: '100%', boxSizing: 'border-box' as const, padding: '.25rem .5rem', border: '1px solid #e5e7eb', borderRadius: 3, fontSize: '.8125rem', outline: 'none' }}
+                    />
+                  </div>
+                  {filteredTenants.map(c => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onMouseDown={e => { e.preventDefault(); toggleTenant(c.id) }}
+                      style={{ ...styles.labelDropdownItem, gap: '.5rem' }}
+                    >
+                      <input type="checkbox" checked={tenantFilter.includes(c.id)} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
+                      {c.name}
+                    </button>
+                  ))}
+                  {filteredTenants.length === 0 && (
+                    <div style={{ padding: '.5rem .75rem', color: '#9ca3af', fontSize: '.8rem' }}>{t('domains_noTenantMatch')}</div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
           {!isLoading && (
             <div style={{ fontSize: '.7rem', color: '#9ca3af', marginTop: '.375rem' }}>
@@ -242,7 +301,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 3, flexWrap: 'wrap' as const }}>
                   <ZoneStatusBadge status={d.zone_status} suspended={d.status === 'suspended'} />
                   {d.ns_ok === 0 && (
-                    <span title={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 4px', borderRadius: 6 }}>NS</span>
+                    <span title={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '1px 4px', borderRadius: 6 }}>⚠ NS</span>
                   )}
                   {!!d.dnssec_enabled && (
                     <span style={{ fontSize: '.6rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '1px 4px', borderRadius: 6 }}>DNSSEC</span>
@@ -346,16 +405,58 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
             )}
           </div>
           {tenants.length > 1 && (
-            <select
-              value={tenantFilter}
-              onChange={e => setTenantFilter(e.target.value)}
-              style={{ ...styles.searchInput, width: 160, cursor: 'pointer' }}
-            >
-              <option value="">{t('domains_allTenants')}</option>
-              {tenants.map(c => (
-                <option key={c.id} value={String(c.id)}>{c.name}</option>
-              ))}
-            </select>
+            <div ref={tenantDropdownRef} style={{ position: 'relative' }}>
+              <button
+                type="button"
+                onClick={() => setTenantDropdownOpen(v => !v)}
+                onBlur={e => { if (!tenantDropdownRef.current?.contains(e.relatedTarget as Node)) { setTenantDropdownOpen(false); setTenantSearch('') } }}
+                style={{
+                  ...styles.searchInput, width: 180,
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  cursor: 'pointer', background: '#fff', textAlign: 'left' as const,
+                  outline: tenantFilter.length > 0 ? '2px solid #2563eb' : undefined,
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, color: tenantFilter.length > 0 ? '#111827' : '#9ca3af' }}>
+                  {tenantButtonLabel()}
+                </span>
+                <span style={{ fontSize: '.65rem', color: '#9ca3af', marginLeft: 4, flexShrink: 0 }}>▼</span>
+              </button>
+              {tenantFilter.length > 0 && (
+                <button
+                  onClick={() => { setTenantFilter([]); setTenantDropdownOpen(false); setTenantSearch('') }}
+                  style={{ ...styles.btnClear, position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)' }}
+                  title="Clear"
+                >✕</button>
+              )}
+              {tenantDropdownOpen && (
+                <div style={{ ...styles.labelDropdown, minWidth: 220 }}>
+                  <div style={{ padding: '4px 8px 6px', borderBottom: '1px solid #f3f4f6' }}>
+                    <input
+                      value={tenantSearch}
+                      onChange={e => setTenantSearch(e.target.value)}
+                      onMouseDown={e => e.stopPropagation()}
+                      placeholder={t('domains_searchTenants')}
+                      style={{ width: '100%', boxSizing: 'border-box' as const, padding: '.25rem .5rem', border: '1px solid #e5e7eb', borderRadius: 3, fontSize: '.8125rem', outline: 'none' }}
+                    />
+                  </div>
+                  {filteredTenants.map(c => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onMouseDown={e => { e.preventDefault(); toggleTenant(c.id) }}
+                      style={{ ...styles.labelDropdownItem, gap: '.5rem' }}
+                    >
+                      <input type="checkbox" checked={tenantFilter.includes(c.id)} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
+                      {c.name}
+                    </button>
+                  ))}
+                  {filteredTenants.length === 0 && (
+                    <div style={{ padding: '.5rem .75rem', color: '#9ca3af', fontSize: '.8rem' }}>{t('domains_noTenantMatch')}</div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
           <div ref={colDropdownRef} style={{ position: 'relative' }}>
             <button
@@ -388,7 +489,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
           </div>
           {user?.role === 'admin' && (
             <button
-              onClick={() => { setShowDeleted(v => !v); setSearch(''); setLabelFilter(''); setTenantFilter('') }}
+              onClick={() => { setShowDeleted(v => !v); setSearch(''); setLabelFilter(''); setTenantFilter([]) }}
               style={showDeleted ? styles.btnTrashActive : styles.btnSecondary}
             >
               {t('domains_deleted')}
@@ -520,7 +621,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                   {show('zone') && <td style={styles.td}>
                     <ZoneStatusBadge status={d.zone_status} suspended={d.status === 'suspended'} />
                     {d.ns_ok === 0 && (
-                      <span title={t('domains_nsWarning')} style={{ marginLeft: 4, fontSize: '.7rem', fontWeight: 600, color: '#92400e', background: '#fef3c7', padding: '1px 5px', borderRadius: 8, verticalAlign: 'middle' }}>NS</span>
+                      <span title={t('domains_nsWarning')} style={{ marginLeft: 4, fontSize: '.7rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '1px 5px', borderRadius: 8, verticalAlign: 'middle' }}>⚠ NS</span>
                     )}
                   </td>}
                   {show('labels') && <td style={styles.td} onClick={e => e.stopPropagation()}>
