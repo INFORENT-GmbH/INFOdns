@@ -21,7 +21,7 @@ const spinnerStyle: React.CSSProperties = {
   border: '2px solid currentColor',
   borderTopColor: 'transparent',
   borderRadius: '50%',
-  animation: 'zsb-spin 0.7s linear infinite',
+  animation: 'spin 0.7s linear infinite',
   marginRight: 4,
   verticalAlign: 'middle',
 }
@@ -32,12 +32,9 @@ export default function ZoneStatusBadge({ status, suspended }: { status: string;
   const c = colors[key as keyof typeof colors] ?? { bg: '#f3f4f6', text: '#374151' }
   const label = statusKey[key] ? t(statusKey[key]) : key
   return (
-    <>
-      <style>{`@keyframes zsb-spin { to { transform: rotate(360deg) } }`}</style>
-      <span style={{ background: c.bg, color: c.text, padding: '2px 8px', borderRadius: 12, fontSize: '.75rem', fontWeight: 600 }}>
-        {key === 'dirty' && <span style={spinnerStyle} />}
-        {label}
-      </span>
-    </>
+    <span style={{ background: c.bg, color: c.text, padding: '2px 8px', borderRadius: 12, fontSize: '.75rem', fontWeight: 600 }}>
+      {key === 'dirty' && <span style={spinnerStyle} />}
+      {label}
+    </span>
   )
 }

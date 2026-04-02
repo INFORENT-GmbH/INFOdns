@@ -269,7 +269,7 @@ export default function ImportZoneModal({ domainId, onStage, onClose }: Props) {
 
 const s: Record<string, React.CSSProperties> = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 100, overflowY: 'auto', padding: '2rem 1rem' },
-  modal: { background: '#fff', borderRadius: 8, padding: '1.5rem', width: 720, maxWidth: '100%', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 8px 32px rgba(0,0,0,.18)', maxHeight: 'none' },
+  modal: { background: '#fff', borderRadius: 8, padding: '1.5rem', width: 720, maxWidth: '100%', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 8px 32px rgba(0,0,0,.18)', maxHeight: 'none', animation: 'modal-in 0.12s ease' },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   title: { margin: 0, fontSize: '1.125rem', fontWeight: 700 },
   closeBtn: { background: 'none', border: 'none', fontSize: '1rem', color: '#6b7280', cursor: 'pointer', padding: '0 4px' },

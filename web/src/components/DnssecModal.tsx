@@ -87,7 +87,7 @@ export default function DnssecModal({ fqdn, defaultTtl, dnssecDs, onDisable, dis
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}
       onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 8, padding: '1.5rem', width: 680, maxWidth: '100%', boxShadow: '0 8px 32px rgba(0,0,0,.18)', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
+      <div style={{ background: '#fff', borderRadius: 8, padding: '1.5rem', width: 680, maxWidth: '100%', boxShadow: '0 8px 32px rgba(0,0,0,.18)', display: 'flex', flexDirection: 'column', gap: '1.25rem', animation: 'modal-in 0.12s ease' }}
         onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: '#111827' }}>{t('dnssec_title', fqdn)}</h3>

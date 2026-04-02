@@ -110,7 +110,7 @@ export default function RecordModal({ record, onSave, onClose }: Props) {
 
 const styles: Record<string, React.CSSProperties> = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 },
-  modal: { background: '#fff', borderRadius: 8, padding: '1.5rem', width: 560, maxWidth: '95vw', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 8px 32px rgba(0,0,0,.18)' },
+  modal: { background: '#fff', borderRadius: 8, padding: '1.5rem', width: 560, maxWidth: '95vw', display: 'flex', flexDirection: 'column', gap: '1rem', boxShadow: '0 8px 32px rgba(0,0,0,.18)', animation: 'modal-in 0.12s ease' },
   title: { margin: 0, fontSize: '1.125rem', fontWeight: 700 },
   error: { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 4, fontSize: '.875rem' },
   grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' },

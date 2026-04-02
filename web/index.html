@@ -22,6 +22,12 @@
         margin: 0 auto;
       }
       @keyframes spin { to { transform: rotate(360deg); } }
+      input, select, textarea { transition: border-color 0.12s, box-shadow 0.12s; }
+      :focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; border-radius: 3px; }
+      button { transition: filter 0.1s, opacity 0.1s; }
+      button:hover:not(:disabled) { filter: brightness(0.92); }
+      button:disabled { opacity: 0.55; cursor: not-allowed; }
+      td { transition: background 0.08s; }
     </style>
   </head>
   <body>

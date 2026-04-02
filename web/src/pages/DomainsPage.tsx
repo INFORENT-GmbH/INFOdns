@@ -9,9 +9,10 @@ import { useI18n } from '../i18n/I18nContext'
 import { getDirtyDomainIds, subscribe } from '../hooks/domainEditCache'
 
 const INLINE_STYLES = `
-  @keyframes spin { to { transform: rotate(360deg); } }
   .domain-row { cursor: pointer; }
+  .domain-row td { transition: background 0.08s; }
   .domain-row:hover td { background: #f8faff !important; }
+  .condensed-row { transition: background 0.08s; }
   .condensed-row:hover { background: #f0f4ff !important; }
 `
 

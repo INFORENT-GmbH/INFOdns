@@ -41,8 +41,8 @@ export default function LabelChip({ label, onRemove }: LabelChipProps) {
       {label.admin_only && <span className="tip" data-tip="Admin only" style={{ opacity: 0.6, fontSize: '.65rem', marginRight: 1 }}>🔒</span>}
       {display}
       {onRemove && (
-        <button onClick={e => onRemove(e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: text, padding: '0 0 0 3px', lineHeight: 1, fontSize: '.7rem', display: 'flex', alignItems: 'center' }}>
-          ✕
+        <button onClick={e => onRemove(e)} title="Remove" style={{ background: 'none', border: 'none', cursor: 'pointer', color: text, padding: '0 0 0 3px', lineHeight: 1, display: 'flex', alignItems: 'center' }}>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><line x1="1" y1="1" x2="9" y2="9"/><line x1="9" y1="1" x2="1" y2="9"/></svg>
         </button>
       )}
     </span>

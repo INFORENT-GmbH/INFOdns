@@ -55,24 +55,29 @@ export default function Layout() {
           position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
           background: #1f2937; color: #f9fafb; font-size: .75rem; font-weight: 400;
           padding: 5px 8px; border-radius: 5px; white-space: normal; width: max-content; max-width: 220px;
-          pointer-events: none; opacity: 0; transition: opacity 0s; z-index: 9999;
+          pointer-events: none; opacity: 0; transition: opacity 0.12s 0.25s; z-index: 9999;
         }
-        .tip:hover::after { opacity: 1; }
+        .tip:hover::after { opacity: 1; transition-delay: 0s; }
+        .nav-link { transition: color 0.1s; }
+        .nav-link:hover { color: #2563eb !important; }
+        @keyframes dropdown-in { from { opacity: 0; transform: translateX(-50%) translateY(-4px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+        .dropdown-animate { animation: dropdown-in 0.1s ease; }
+        @keyframes modal-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
       `}</style>
       <nav style={styles.nav}>
         <a href="/domains" style={{ marginRight: 'auto', display: 'flex' }}><img src="/logo-wide.png" alt="INFOdns" style={styles.brand} /></a>
         <div style={styles.links}>
-          <NavLink to="/domains" style={navStyle}>{t('nav_domains')}</NavLink>
-          <NavLink to="/jobs" style={navStyle}>{t('nav_jobs')}</NavLink>
-          <NavLink to="/tickets" style={navStyle}>{t('nav_support')}</NavLink>
-          {isAdminOrOp && <NavLink to="/tenants" style={navStyle}>{t('nav_tenants')}</NavLink>}
-          {user?.role === 'admin' && <NavLink to="/users" style={navStyle}>{t('nav_users')}</NavLink>}
+          <NavLink to="/domains" className="nav-link" style={navStyle}>{t('nav_domains')}</NavLink>
+          <NavLink to="/jobs" className="nav-link" style={navStyle}>{t('nav_jobs')}</NavLink>
+          <NavLink to="/tickets" className="nav-link" style={navStyle}>{t('nav_support')}</NavLink>
+          {isAdminOrOp && <NavLink to="/tenants" className="nav-link" style={navStyle}>{t('nav_tenants')}</NavLink>}
+          {user?.role === 'admin' && <NavLink to="/users" className="nav-link" style={navStyle}>{t('nav_users')}</NavLink>}
           <div style={{ position: 'relative' }} onMouseEnter={openLogs} onMouseLeave={closeLogs}>
-            <span style={{ ...navStyle({ isActive: logsActive }), cursor: 'pointer', userSelect: 'none' }}>
+            <span className="nav-link" style={{ ...navStyle({ isActive: logsActive }), cursor: 'pointer', userSelect: 'none' }}>
               {t('nav_logs')} ▾
             </span>
             {showLogs && (
-              <div style={styles.dropdown} onMouseEnter={openLogs} onMouseLeave={closeLogs}>
+              <div className="dropdown-animate" style={styles.dropdown} onMouseEnter={openLogs} onMouseLeave={closeLogs}>
                 <NavLink to="/audit-logs" style={dropdownItemStyle} onClick={() => setShowLogs(false)}>{t('nav_auditLog')}</NavLink>
                 {user?.role === 'admin' && <NavLink to="/mail-queue" style={dropdownItemStyle} onClick={() => setShowLogs(false)}>{t('nav_mailQueue')}</NavLink>}
               </div>
