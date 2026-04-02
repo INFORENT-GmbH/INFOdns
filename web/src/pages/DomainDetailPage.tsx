@@ -571,11 +571,16 @@ export default function DomainDetailPage() {
       <style>{INLINE_STYLES}</style>
       <div style={styles.header}>
         <button onClick={() => navigate('/domains')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#9ca3af', padding: '0 4px', lineHeight: 1, flexShrink: 0 }} title="Close">×</button>
-        <h2 style={styles.h2}>
+        <h2 style={{ ...styles.h2, display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
           {domain.fqdn}
-          <a href={`https://${domain.fqdn}`} target="_blank" rel="noopener noreferrer" title={`Open ${domain.fqdn}`} style={{ marginLeft: '0.4rem', color: '#9ca3af', verticalAlign: 'middle', lineHeight: 1, textDecoration: 'none' }}>
+          <a href={`https://${domain.fqdn}`} target="_blank" rel="noopener noreferrer" title={`Open ${domain.fqdn}`} style={{ color: '#9ca3af', verticalAlign: 'middle', lineHeight: 1, textDecoration: 'none' }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           </a>
+          <span style={{
+            display: 'inline-block', padding: '1px 8px', borderRadius: 10, fontSize: '.75rem', fontWeight: 600,
+            background: domain.status === 'active' ? '#dcfce7' : domain.status === 'suspended' ? '#fef3c7' : '#f3f4f6',
+            color:      domain.status === 'active' ? '#166534' : domain.status === 'suspended' ? '#92400e' : '#6b7280',
+          }}>{domain.status === 'active' ? 'Plan: Free' : (t(`domain_status_${domain.status}` as any) ?? domain.status)}</span>
         </h2>
         <ZoneStatusBadge status={domain.zone_status} suspended={domain.status === 'suspended'} />
         {(isAdmin || isOperator) && (
@@ -677,13 +682,6 @@ export default function DomainDetailPage() {
       )}
 
       <div style={styles.meta}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem' }}>
-          <span style={{
-            display: 'inline-block', padding: '1px 8px', borderRadius: 10, fontSize: '.75rem', fontWeight: 600,
-            background: domain.status === 'active' ? '#dcfce7' : domain.status === 'suspended' ? '#fef3c7' : '#f3f4f6',
-            color:      domain.status === 'active' ? '#166534' : domain.status === 'suspended' ? '#92400e' : '#6b7280',
-          }}>{t(`domain_status_${domain.status}` as any) ?? domain.status}</span>
-        </span>
         {isAdmin ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
             {t('tenant')}:

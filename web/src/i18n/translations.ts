@@ -264,7 +264,7 @@ export const translations = {
     domain_status_deleted:   'deleted',
 
     // Zone status
-    zone_clean: 'clean',
+    zone_clean: 'Zone active',
     zone_dirty: 'dirty',
     zone_error: 'error',
     zone_suspended: 'suspended',
@@ -625,7 +625,7 @@ export const translations = {
     domain_status_deleted:   'gelöscht',
 
     // Zone status
-    zone_clean: 'sauber',
+    zone_clean: 'Zone aktiv',
     zone_dirty: 'ausstehend',
     zone_error: 'Fehler',
     zone_suspended: 'gesperrt',
