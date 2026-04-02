@@ -38,7 +38,7 @@ export default function LabelChip({ label, onRemove }: LabelChipProps) {
 
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, background: bg, color: text, borderRadius: 12, padding: '1px 8px', fontSize: '.75rem', fontWeight: 500, whiteSpace: 'nowrap' }}>
-      {label.admin_only && <span style={{ opacity: 0.6, fontSize: '.65rem', marginRight: 1 }} title="Admin only">🔒</span>}
+      {label.admin_only && <span className="tip" data-tip="Admin only" style={{ opacity: 0.6, fontSize: '.65rem', marginRight: 1 }}>🔒</span>}
       {display}
       {onRemove && (
         <button onClick={e => onRemove(e)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: text, padding: '0 0 0 3px', lineHeight: 1, fontSize: '.7rem', display: 'flex', alignItems: 'center' }}>

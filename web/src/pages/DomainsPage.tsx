@@ -301,7 +301,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 3, flexWrap: 'wrap' as const }}>
                   <ZoneStatusBadge status={d.zone_status} suspended={d.status === 'suspended'} />
                   {d.ns_ok === 0 && (
-                    <span title={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '1px 4px', borderRadius: 6 }}>⚠ NS</span>
+                    <span className="tip" data-tip={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '1px 4px', borderRadius: 6 }}>⚠ NS</span>
                   )}
                   {!!d.dnssec_enabled && (
                     <span style={{ fontSize: '.6rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '1px 4px', borderRadius: 6 }}>DNSSEC</span>
@@ -621,7 +621,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                   {show('zone') && <td style={styles.td}>
                     <ZoneStatusBadge status={d.zone_status} suspended={d.status === 'suspended'} />
                     {d.ns_ok === 0 && (
-                      <span title={t('domains_nsWarning')} style={{ marginLeft: 4, fontSize: '.7rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '1px 5px', borderRadius: 8, verticalAlign: 'middle' }}>⚠ NS</span>
+                      <span className="tip" data-tip={t('domains_nsWarning')} style={{ marginLeft: 4, fontSize: '.7rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '1px 5px', borderRadius: 8, verticalAlign: 'middle' }}>⚠ NS</span>
                     )}
                   </td>}
                   {show('labels') && <td style={styles.td} onClick={e => e.stopPropagation()}>

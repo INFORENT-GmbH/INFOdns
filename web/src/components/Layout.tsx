@@ -48,6 +48,17 @@ export default function Layout() {
 
   return (
     <div style={styles.shell}>
+      <style>{`
+        .tip { position: relative; display: inline-block; }
+        .tip::after {
+          content: attr(data-tip);
+          position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+          background: #1f2937; color: #f9fafb; font-size: .75rem; font-weight: 400;
+          padding: 5px 8px; border-radius: 5px; white-space: normal; width: max-content; max-width: 220px;
+          pointer-events: none; opacity: 0; transition: opacity 0s; z-index: 9999;
+        }
+        .tip:hover::after { opacity: 1; }
+      `}</style>
       <nav style={styles.nav}>
         <a href="/domains" style={{ marginRight: 'auto', display: 'flex' }}><img src="/logo-wide.png" alt="INFOdns" style={styles.brand} /></a>
         <div style={styles.links}>
