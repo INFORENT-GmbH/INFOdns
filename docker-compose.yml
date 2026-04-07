@@ -50,6 +50,7 @@ services:
       DB_PORT: 3306
       DB_USER: infodns
       DB_PASSWORD: ${DB_PASSWORD}
+      DB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       DB_NAME: infodns
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}

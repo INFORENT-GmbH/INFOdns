@@ -75,12 +75,12 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
   const { data: domains = [], isLoading, error, refetch } = useQuery({
     queryKey: ['domains', search, labelFilter, tenantFilter.join(','), showDeleted],
     queryFn: () => {
-      const params: Record<string, string> = {}
+      const params: Record<string, string> = { limit: '9999' }
       if (search) params.search = search
       if (labelFilter) params.label = labelFilter
       if (tenantFilter.length > 0) params.tenant_id = tenantFilter.join(',')
       if (showDeleted) params.show_deleted = 'true'
-      return getDomains(Object.keys(params).length ? params : undefined).then(r => r.data)
+      return getDomains(params).then(r => r.data)
     },
   })
 
@@ -669,7 +669,7 @@ const styles: Record<string, React.CSSProperties> = {
   btnSecondary: { padding: '.375rem .875rem', background: '#fff', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem', cursor: 'pointer' },
   btnClear: { padding: '.25rem .5rem', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '.875rem', lineHeight: 1 },
   table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
+  th: { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', position: 'sticky' as const, top: 92, zIndex: 1 },
   tr: { borderBottom: '1px solid #e5e7eb' },
   td: { padding: '.625rem .75rem', fontSize: '.875rem' },
   link: { color: '#2563eb', textDecoration: 'none', fontWeight: 500 },

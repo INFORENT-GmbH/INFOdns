@@ -44,6 +44,7 @@ interface DomainRow {
   default_ttl: number
   tenant_id: number
   status: string
+  ns_reference: string | null
 }
 
 interface SoaRow {
@@ -110,7 +111,7 @@ async function processJob(job: QueueRow): Promise<void> {
   console.log(`[worker] Processing job ${job.id} for domain ${domainId}`)
 
   // Step 2: Load domain + records + SOA template
-  const domain = await queryOne<DomainRow>('SELECT id, fqdn, default_ttl, tenant_id, status FROM domains WHERE id = ?', [domainId])
+  const domain = await queryOne<DomainRow>('SELECT id, fqdn, default_ttl, tenant_id, status, ns_reference FROM domains WHERE id = ?', [domainId])
   if (!domain) throw new Error(`Domain ${domainId} not found`)
 
   // Non-active domain: just sync named.conf to remove it from BIND, skip render
@@ -124,10 +125,22 @@ async function processJob(job: QueueRow): Promise<void> {
     return
   }
 
+  // If ns_reference is set, mirror records from the referenced domain instead of own records
+  let recordSourceId = domainId
+  if (domain.ns_reference) {
+    const ref = await queryOne<{ id: number }>(
+      "SELECT id FROM domains WHERE fqdn = ? AND status = 'active'",
+      [domain.ns_reference]
+    )
+    if (!ref) throw new Error(`ns_reference target '${domain.ns_reference}' not found or not active`)
+    recordSourceId = ref.id
+    console.log(`[worker] ${domain.fqdn} mirrors records from ${domain.ns_reference} (id=${ref.id})`)
+  }
+
   const records = await query<RecordRow>(
     `SELECT name, type, ttl, priority, weight, port, value
      FROM dns_records WHERE domain_id = ? AND is_deleted = 0`,
-    [domainId]
+    [recordSourceId]
   )
 
   const soa = await queryOne<SoaRow>(

@@ -14,6 +14,8 @@ import MailQueuePage from './pages/MailQueuePage'
 import TicketsPage from './pages/TicketsPage'
 import TicketDetailPage from './pages/TicketDetailPage'
 import AcceptInvitePage from './pages/AcceptInvitePage'
+import ImportPage from './pages/ImportPage'
+import TldPricingPage from './pages/TldPricingPage'
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000 } } })
 
@@ -56,6 +58,8 @@ export default function App() {
               <Route path="mail-queue" element={<MailQueuePage />} />
               <Route path="tickets" element={<TicketsPage />} />
               <Route path="tickets/:id" element={<TicketDetailPage />} />
+              <Route path="import" element={<ImportPage />} />
+              <Route path="tld-pricing" element={<TldPricingPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/domains" replace />} />
           </Routes>

@@ -72,6 +72,8 @@ export default function Layout() {
           <NavLink to="/tickets" className="nav-link" style={navStyle}>{t('nav_support')}</NavLink>
           {isAdminOrOp && <NavLink to="/tenants" className="nav-link" style={navStyle}>{t('nav_tenants')}</NavLink>}
           {user?.role === 'admin' && <NavLink to="/users" className="nav-link" style={navStyle}>{t('nav_users')}</NavLink>}
+          {user?.role === 'admin' && <NavLink to="/tld-pricing" className="nav-link" style={navStyle}>TLDs</NavLink>}
+          {user?.role === 'admin' && <NavLink to="/import" className="nav-link" style={navStyle}>Import</NavLink>}
           <div style={{ position: 'relative' }} onMouseEnter={openLogs} onMouseLeave={closeLogs}>
             <span className="nav-link" style={{ ...navStyle({ isActive: logsActive }), cursor: 'pointer', userSelect: 'none' }}>
               {t('nav_logs')} ▾
@@ -175,7 +177,7 @@ function dropdownItemStyle({ isActive }: { isActive: boolean }): React.CSSProper
 
 const styles: Record<string, React.CSSProperties> = {
   shell:     { display: 'flex', flexDirection: 'column', minHeight: '100vh', maxWidth: 1920 },
-  nav:       { display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '.75rem 1.5rem', background: 'linear-gradient(rgba(255,255,255,0.85), rgba(255,255,255,0.65)), url(/header-skyline.png) no-repeat bottom center', backgroundSize: 'auto, 800px 123px', maxWidth: 1920, borderBottom: '1px solid #e5e7eb' },
+  nav:       { display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '.75rem 1.5rem', background: 'linear-gradient(rgba(255,255,255,0.85), rgba(255,255,255,0.65)), url(/header-skyline.png) no-repeat bottom center', backgroundSize: 'auto, 800px 123px', maxWidth: 1920, borderBottom: '1px solid #e5e7eb', position: 'sticky' as const, top: 0, zIndex: 40 },
   brand:     { height: 42, display: 'block' },
   links:     { display: 'flex', gap: '1.25rem' },
   right:     { display: 'flex', gap: '.5rem', alignItems: 'center' },

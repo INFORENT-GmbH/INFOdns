@@ -424,6 +424,113 @@ export const uploadAttachments = (ticketId: number, msgId: number, files: File[]
   return api.post<TicketAttachment[]>(`/tickets/${ticketId}/messages/${msgId}/attachments`, fd)
 }
 
+// Import wizard
+export type ImportStatus = 'insert' | 'update' | 'skip' | 'overwrite'
+
+export interface ImportTenantRow {
+  id: number
+  name: string
+  status: ImportStatus
+}
+
+export interface ImportTldPricingRow {
+  zone: string
+  tld: string
+  description: string | null
+  cost: number | null
+  fee: number | null
+  default_registrar: string | null
+  note: string | null
+  price_udr: number | null
+  price_cn: number | null
+  price_marcaria: number | null
+  price_ud: number | null
+  status: ImportStatus
+}
+
+export interface ImportDomainRow {
+  fqdn: string
+  tenant_id: number
+  publish: number
+  notes: string | null
+  notes_internal: string | null
+  cost_center: string | null
+  brand: string | null
+  ns_reference: string | null
+  smtp_to: string | null
+  spam_to: string | null
+  add_fee: number | null
+  we_registered: number
+  flag: string | null
+  status: ImportStatus
+}
+
+export interface ImportRecordRow {
+  domain_fqdn: string
+  name: string
+  type: string
+  priority: number | null
+  value: string
+  ttl: number | null
+  status: 'overwrite'
+}
+
+export interface ImportPreviewResult {
+  tenants: ImportTenantRow[]
+  tld_pricing: ImportTldPricingRow[]
+  domains: ImportDomainRow[]
+  records: ImportRecordRow[]
+}
+
+export interface ImportSelection {
+  tenant_ids?:   number[]
+  tld_zones?:    string[]
+  domain_fqdns?: string[]
+  record_fqdns?: string[]
+}
+
+export interface ImportRunResult {
+  tenants:    { inserted: number; updated: number }
+  tld_pricing: { inserted: number; updated: number }
+  domains:    { inserted: number; skipped: number }
+  records:    { deleted: number; inserted: number }
+}
+
+// TLD Pricing
+export interface TldPricing {
+  zone: string
+  tld: string
+  description: string | null
+  cost: number | null
+  fee: number | null
+  default_registrar: string | null
+  note: string | null
+  price_udr: number | null
+  price_cn: number | null
+  price_marcaria: number | null
+  price_ud: number | null
+  created_at: string
+  updated_at: string
+}
+
+export const getTldPricing = () =>
+  api.get<TldPricing[]>('/tld-pricing')
+
+export const createTldPricing = (data: Omit<TldPricing, 'created_at' | 'updated_at'>) =>
+  api.post<TldPricing>('/tld-pricing', data)
+
+export const updateTldPricing = (zone: string, data: Partial<Omit<TldPricing, 'zone' | 'created_at' | 'updated_at'>>) =>
+  api.put<TldPricing>(`/tld-pricing/${encodeURIComponent(zone)}`, data)
+
+export const deleteTldPricing = (zone: string) =>
+  api.delete(`/tld-pricing/${encodeURIComponent(zone)}`)
+
+export const getImportPreview = () =>
+  api.get<ImportPreviewResult>('/import/preview')
+
+export const runImport = (selection: ImportSelection) =>
+  api.post<ImportRunResult>('/import/run', selection)
+
 export const downloadAttachment = async (ticketId: number, fileId: number, originalName: string) => {
   const resp = await api.get(`/tickets/${ticketId}/attachments/${fileId}`, { responseType: 'blob' })
   const url = URL.createObjectURL(resp.data)
