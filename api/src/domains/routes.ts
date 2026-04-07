@@ -38,6 +38,7 @@ const UpdateDomainBody = z.object({
   notes: z.string().optional(),
   dnssec_enabled: z.boolean().optional(),
   tenant_id: z.number().int().positive().optional(),
+  ns_reference: z.string().max(253).nullable().optional(),
 })
 
 const LabelSchema = z.object({
@@ -246,19 +247,35 @@ export async function domainRoutes(app: FastifyInstance) {
     }
 
     const dnssecVal = body.data.dnssec_enabled != null ? (body.data.dnssec_enabled ? 1 : 0) : null
-    await execute(
-      `UPDATE domains SET
-         status         = COALESCE(?, status),
-         default_ttl    = COALESCE(?, default_ttl),
-         notes          = COALESCE(?, notes),
-         dnssec_enabled = COALESCE(?, dnssec_enabled),
-         tenant_id      = COALESCE(?, tenant_id)
-       WHERE id = ?`,
-      [body.data.status ?? null, body.data.default_ttl ?? null, body.data.notes ?? null, dnssecVal, body.data.tenant_id ?? null, req.params.id]
-    )
+    // ns_reference: undefined = don't touch; null = clear; string = set
+    const nsRefProvided = body.data.ns_reference !== undefined
+    if (nsRefProvided) {
+      await execute(
+        `UPDATE domains SET
+           status         = COALESCE(?, status),
+           default_ttl    = COALESCE(?, default_ttl),
+           notes          = COALESCE(?, notes),
+           dnssec_enabled = COALESCE(?, dnssec_enabled),
+           tenant_id      = COALESCE(?, tenant_id),
+           ns_reference   = ?
+         WHERE id = ?`,
+        [body.data.status ?? null, body.data.default_ttl ?? null, body.data.notes ?? null, dnssecVal, body.data.tenant_id ?? null, body.data.ns_reference, req.params.id]
+      )
+    } else {
+      await execute(
+        `UPDATE domains SET
+           status         = COALESCE(?, status),
+           default_ttl    = COALESCE(?, default_ttl),
+           notes          = COALESCE(?, notes),
+           dnssec_enabled = COALESCE(?, dnssec_enabled),
+           tenant_id      = COALESCE(?, tenant_id)
+         WHERE id = ?`,
+        [body.data.status ?? null, body.data.default_ttl ?? null, body.data.notes ?? null, dnssecVal, body.data.tenant_id ?? null, req.params.id]
+      )
+    }
     const updated = await queryOne('SELECT * FROM domains WHERE id = ?', [req.params.id])
     await writeAuditLog({ req, entityType: 'domain', entityId: Number(req.params.id), domainId: Number(req.params.id), action: 'update', oldValue: old, newValue: updated })
-    const zoneRelevant = body.data.status !== undefined || body.data.default_ttl !== undefined || body.data.dnssec_enabled !== undefined
+    const zoneRelevant = body.data.status !== undefined || body.data.default_ttl !== undefined || body.data.dnssec_enabled !== undefined || nsRefProvided
     if (zoneRelevant) await enqueueRender(Number(req.params.id))
     return updated
   })

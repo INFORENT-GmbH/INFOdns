@@ -93,6 +93,7 @@ export interface Domain {
   expected_ns: string[]
   dnssec_ok: number | null
   dnssec_checked_at: string | null
+  ns_reference: string | null
 }
 
 export interface DnsRecord {

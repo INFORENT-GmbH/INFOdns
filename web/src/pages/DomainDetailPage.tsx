@@ -122,6 +122,9 @@ export default function DomainDetailPage() {
   const [editingTtl, setEditingTtl] = useState(false)
   const [ttlDraft, setTtlDraft] = useState('')
   const [savingTtl, setSavingTtl] = useState(false)
+  const [editingNsRef, setEditingNsRef] = useState(false)
+  const [nsRefDraft, setNsRefDraft] = useState('')
+  const [savingNsRef, setSavingNsRef] = useState(false)
   const [showDnssecModal, setShowDnssecModal] = useState(false)
   const [copiedNs, setCopiedNs] = useState<string | null>(null)
   const [hoveredNsItem, setHoveredNsItem] = useState<string | null>(null)
@@ -527,6 +530,22 @@ export default function DomainDetailPage() {
     }
   }
 
+  async function handleSaveNsRef() {
+    if (!domain || savingNsRef) return
+    const val = nsRefDraft.trim() || null
+    if (val === domain.ns_reference) { setEditingNsRef(false); return }
+    setSavingNsRef(true)
+    try {
+      await updateDomain(domainId, { ns_reference: val } as any)
+      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+    } catch (err: any) {
+      alert(err.response?.data?.message ?? err.message)
+    } finally {
+      setSavingNsRef(false)
+      setEditingNsRef(false)
+    }
+  }
+
   async function handleToggleDnssec() {
     if (!domain || togglingDnssec) return
     setTogglingDnssec(true)
@@ -724,6 +743,26 @@ export default function DomainDetailPage() {
         <span>{t('serial')}: <code>{domain.last_serial || '—'}</code></span>
         <span>{t('domainDetail_added')}: {new Date(domain.created_at).toLocaleDateString()}</span>
         <span>{t('domainDetail_lastRendered')} {domain.last_rendered_at ? new Date(domain.last_rendered_at).toLocaleString() : t('never')}</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
+            NS-Ref:{' '}
+            {editingNsRef ? (
+              <input
+                type="text" value={nsRefDraft} autoFocus disabled={savingNsRef}
+                placeholder="e.g. example.com"
+                onChange={e => setNsRefDraft(e.target.value)}
+                onBlur={handleSaveNsRef}
+                onKeyDown={e => { if (e.key === 'Enter') handleSaveNsRef(); if (e.key === 'Escape') setEditingNsRef(false) }}
+                style={{ width: '14rem', fontWeight: 600, fontSize: 'inherit', padding: '0 2px', fontFamily: MONO }}
+              />
+            ) : (
+              <strong
+                style={{ cursor: 'pointer', borderBottom: '1px dashed #9ca3af', fontFamily: MONO }}
+                title="Click to edit NS reference (mirrors records from this FQDN)"
+                onClick={() => { setNsRefDraft(domain.ns_reference ?? ''); setEditingNsRef(true) }}
+              >{domain.ns_reference ?? '—'}</strong>
+            )}
+            {savingNsRef && <span style={{ color: '#9ca3af' }}>…</span>}
+          </span>
       </div>
 
       {showDnssecModal && (
