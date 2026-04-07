@@ -22,7 +22,7 @@ The source file is a phpMyAdmin SQL dump from a MariaDB database named `isp`. It
 | `company_id` | int | `tenants.id` | Use as the actual PK — do not auto-assign a new id |
 | `keyword` | varchar(10) | `tenants.name` | Short company name, e.g. `INFORENT` |
 
-**Conflict rule:** If a tenant with the same `id` already exists, skip it (do not update).
+**Conflict rule:** If a tenant with the same `id` already exists, update its `name` but leave all other fields unchanged.
 
 ---
 
@@ -34,7 +34,7 @@ The source `domains` table is keyed by `DOMAIN` (the FQDN string, e.g. `example.
 |---|---|---|---|
 | `DOMAIN` | varchar(80) | `domains.fqdn` | Primary identifier — skip if FQDN already exists |
 | `COMPANY_ID` | int | `domains.tenant_id` | FK to tenants |
-| `PUBLISH` | char(1) `'0'`/`'1'` | `domains.status` | `'1'` → `active`; `'0'` → `suspended` (we manage the domain but do not deploy DNS) |
+| `PUBLISH` | char(1) `'0'`/`'1'` | *(new)* `domains.publish` | `'1'` = deploy DNS to our nameservers; `'0'` = do not deploy (we manage the domain but serve no zone). Stored as a separate boolean — do not confuse with `domains.status` (active/suspended). |
 | `NOTE` | varchar(250) | `domains.notes` | Customer-visible note |
 | `NOTE_INTERNAL` | varchar(250) | *(new)* `domains.notes_internal` | Admin-only note; needs new column |
 | `COST_CENTER` | varchar(15) | *(new)* `domains.cost_center` | Searchable/filterable text field |
@@ -48,7 +48,7 @@ The source `domains` table is keyed by `DOMAIN` (the FQDN string, e.g. `example.
 | `TLD` | varchar(10) | — | Unused; derivable from FQDN |
 | `ZONE` | varchar(20) | — | Unused |
 
-**Conflict rule:** If a domain with the same `fqdn` already exists, skip it.
+**Conflict rule:** If a domain with the same `fqdn` already exists, skip creating/updating the domain row. DNS records for that domain are still imported (see below).
 
 **New DB columns required** (migration needed before import can run):
 ```sql
@@ -61,7 +61,8 @@ ALTER TABLE domains
   ADD COLUMN spam_to        VARCHAR(100) NULL,
   ADD COLUMN add_fee        DECIMAL(8,2) NULL,
   ADD COLUMN we_registered  TINYINT(1) NOT NULL DEFAULT 0,
-  ADD COLUMN flag           CHAR(1) NULL;
+  ADD COLUMN flag           CHAR(1) NULL,
+  ADD COLUMN publish        TINYINT(1) NOT NULL DEFAULT 1;
 ```
 
 ---
@@ -81,7 +82,7 @@ The source `ns` table is keyed by integer `id`, linked to domains by `DOMAIN` (F
 | `PTR` | char(1) | — | Legacy PTR flag; ignore |
 | `id` | int | — | Source id; discard |
 
-**Conflict rule:** Import all records for a domain that exists in the target. If the exact same `(domain_id, name, type, value)` tuple already exists, skip.
+**Conflict rule:** For every domain that exists in the target (whether it was just created or already existed), **delete all existing DNS records** for that domain and re-insert the records from the source. This is a full overwrite per domain.
 
 **Note:** Only import DNS records for domains whose FQDN exists in the target `domains` table after the domain import step.
 
@@ -107,7 +108,7 @@ This table holds per-TLD pricing and registrar information. It needs a new datab
 | `FLAG` | char(1) | — | Unused; discard |
 | `COUNT` | int | — | Computed count; discard |
 
-**Conflict rule:** If a row with the same `zone` already exists, skip it.
+**Conflict rule:** If a row with the same `zone` already exists, update all its columns with the values from the source (upsert).
 
 **New DB table required:**
 ```sql
