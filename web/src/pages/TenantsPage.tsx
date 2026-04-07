@@ -74,6 +74,7 @@ export default function TenantsPage() {
         <table style={styles.table}>
           <thead>
             <tr>
+              <th style={styles.th}>{t('id')}</th>
               <th style={styles.th}>{t('name')}</th>
               <th style={styles.th}>{t('active')}</th>
               <th style={styles.th}>{t('created')}</th>
@@ -83,6 +84,7 @@ export default function TenantsPage() {
           <tbody>
             {tenants.map((c: Tenant) => (
               <tr key={c.id} style={styles.tr}>
+                <td style={{ ...styles.td, color: '#6b7280' }}>{c.id}</td>
                 <td style={styles.td}>{c.name}</td>
                 <td style={styles.td}>{c.is_active ? '✓' : '—'}</td>
                 <td style={styles.td}>{new Date(c.created_at).toLocaleDateString()}</td>
