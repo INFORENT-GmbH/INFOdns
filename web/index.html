@@ -15,11 +15,14 @@
         font-family: 'Inter', system-ui, sans-serif;
         background: url('/background.jpg') no-repeat top center;
         background-size: 1920px 1200px;
-        min-height: 100vh;
+        height: 100vh;
+        overflow: hidden;
       }
       #root {
         max-width: 1920px;
         margin: 0 auto;
+        height: 100%;
+        overflow: hidden;
       }
       @keyframes spin { to { transform: rotate(360deg); } }
       input, select, textarea { transition: border-color 0.12s, box-shadow 0.12s; }
