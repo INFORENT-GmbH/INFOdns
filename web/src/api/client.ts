@@ -149,6 +149,20 @@ export interface BulkJobDomain {
   error: string | null
 }
 
+export interface ZoneRenderJob {
+  id: number
+  domain_id: number
+  domain_name: string
+  tenant_name: string
+  priority: number
+  retries: number
+  max_retries: number
+  status: 'pending' | 'processing' | 'done' | 'failed'
+  error: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface AuditLog {
   id: number
   user_id: number | null
@@ -284,6 +298,7 @@ export const acceptInvite = (data: { token: string; password: string }) =>
   api.post('/auth/accept-invite', data)
 
 // Bulk jobs
+export const getZoneRenderQueue = () => api.get<ZoneRenderJob[]>('/zone-render-queue').then(r => r.data)
 export const getBulkJobs = () => api.get<BulkJob[]>('/bulk-jobs')
 export const createBulkJob = (data: object) => api.post<BulkJob>('/bulk-jobs', data)
 export const previewBulkJob = (id: number) => api.post(`/bulk-jobs/${id}/preview`)

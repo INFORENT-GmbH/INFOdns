@@ -3,9 +3,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import {
   getBulkJobs, createBulkJob, previewBulkJob, approveBulkJob,
-  getBulkJob, getBulkJobDomains, searchByRecord, type BulkJob, type BulkJobDomain,
+  getBulkJob, getBulkJobDomains, searchByRecord, getZoneRenderQueue,
+  type BulkJob, type BulkJobDomain, type ZoneRenderJob,
 } from '../api/client'
 import { useI18n } from '../i18n/I18nContext'
+import { useAuth } from '../context/AuthContext'
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -262,6 +264,8 @@ function JobDetail({ job }: { job: BulkJob }) {
 
 export default function JobsPage() {
   const { t } = useI18n()
+  const { user } = useAuth()
+  const isStaff = user?.role === 'admin' || user?.role === 'operator'
   const qc = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const [expanded, setExpanded]     = useState<number | null>(null)
@@ -322,6 +326,13 @@ export default function JobsPage() {
     queryKey: ['bulk-job-domains', currentJobId],
     queryFn: () => getBulkJobDomains(currentJobId!).then(r => r.data),
     enabled: currentJobId !== null && step === 'preview',
+  })
+
+  const { data: renderQueue = [] } = useQuery<ZoneRenderJob[]>({
+    queryKey: ['zone-render-queue'],
+    queryFn: getZoneRenderQueue,
+    refetchInterval: 2000,
+    enabled: isStaff,
   })
 
   // ── Derived state ────────────────────────────────────────────
@@ -698,6 +709,54 @@ export default function JobsPage() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {/* ── Zone Render Queue ── */}
+      {isStaff && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginTop: '2rem', marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>{t('jobs_renderQueue')}</h3>
+            {renderQueue.filter(j => j.status === 'pending' || j.status === 'processing').length > 0 && (
+              <span style={styles.activeBadge}>
+                {renderQueue.filter(j => j.status === 'pending' || j.status === 'processing').length} active
+              </span>
+            )}
+          </div>
+          {renderQueue.length === 0 ? (
+            <p style={styles.muted}>{t('jobs_renderQueueEmpty')}</p>
+          ) : (
+            <table style={styles.table}>
+              <thead>
+                <tr>
+                  <th style={styles.th}>{t('jobs_id')}</th>
+                  <th style={styles.th}>{t('domain')}</th>
+                  <th style={styles.th}>{t('tenant')}</th>
+                  <th style={styles.th}>{t('jobs_status')}</th>
+                  <th style={styles.th}>{t('priority')}</th>
+                  <th style={styles.th}>{t('jobs_retries')}</th>
+                  <th style={styles.th}>{t('jobs_updated')}</th>
+                  <th style={styles.th}>{t('jobs_error')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(renderQueue as ZoneRenderJob[]).map(job => (
+                  <tr key={job.id} style={styles.tr}>
+                    <td style={styles.tdMono}>{job.id}</td>
+                    <td style={styles.tdMono}>{job.domain_name}</td>
+                    <td style={styles.td}>{job.tenant_name}</td>
+                    <td style={styles.td}><StatusBadge status={job.status} /></td>
+                    <td style={styles.td}>{job.priority}</td>
+                    <td style={styles.td}>{job.retries}/{job.max_retries}</td>
+                    <td style={styles.tdMono}>{new Date(job.updated_at).toLocaleString()}</td>
+                    <td style={{ ...styles.td, color: '#b91c1c', fontSize: '.8125rem', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {job.error ?? ''}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
       )}
     </div>
   )

@@ -214,6 +214,20 @@ export async function bulkRoutes(app: FastifyInstance) {
     return { ok: true, id: job.id }
   })
 
+  // GET /zone-render-queue — all zone render tasks (admin/operator only)
+  app.get('/zone-render-queue', { preHandler: requireOperatorOrAdmin }, async () => {
+    return query(`
+      SELECT q.id, q.domain_id, q.priority, q.retries, q.max_retries,
+             q.status, q.error, q.created_at, q.updated_at,
+             d.fqdn AS domain_name, t.name AS tenant_name
+      FROM zone_render_queue q
+      JOIN domains d ON d.id = q.domain_id
+      JOIN tenants t ON t.id = d.tenant_id
+      ORDER BY FIELD(q.status,'processing','pending','failed','done'), q.created_at DESC
+      LIMIT 200
+    `)
+  })
+
   // GET /domains/search-by-record — find domains that have a matching record
   // Used by the Bulk page to seed the domain list
   app.get('/domains/search-by-record', { preHandler: requireAuth }, async (req: any, reply) => {

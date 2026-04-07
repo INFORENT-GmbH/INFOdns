@@ -194,6 +194,10 @@ export const translations = {
     jobs_changes:          'Changes',
     jobs_error:            'Error',
     jobs_autoRefresh:      'Auto-refresh',
+    jobs_renderQueue:      'Zone Render Queue',
+    jobs_renderQueueEmpty: 'No render jobs in queue',
+    jobs_retries:          'Retries',
+    jobs_updated:          'Updated',
 
     // Tenants
     tenants_title:     'Tenants',
@@ -555,6 +559,10 @@ export const translations = {
     jobs_changes:          'Änderungen',
     jobs_error:            'Fehler',
     jobs_autoRefresh:      'Automatisch aktualisieren',
+    jobs_renderQueue:      'Zone-Render-Warteschlange',
+    jobs_renderQueueEmpty: 'Keine Render-Aufgaben in der Warteschlange',
+    jobs_retries:          'Versuche',
+    jobs_updated:          'Aktualisiert',
 
     // Tenants
     tenants_title:     'Mandanten',
