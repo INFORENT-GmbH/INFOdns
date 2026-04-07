@@ -659,7 +659,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  header: { display: 'flex', alignItems: 'center', marginBottom: '1rem' },
+  header: { display: 'flex', alignItems: 'center', paddingBottom: '1rem', position: 'sticky' as const, top: 0, zIndex: 2, background: 'rgba(255,255,255,0.92)' },
   headerRight: { marginLeft: 'auto', display: 'flex', gap: '.5rem', alignItems: 'center' },
   h2: { margin: 0, fontSize: '1.25rem', fontWeight: 700 },
   searchInput: { padding: '.375rem .75rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem', width: 240 },
@@ -669,7 +669,7 @@ const styles: Record<string, React.CSSProperties> = {
   btnSecondary: { padding: '.375rem .875rem', background: '#fff', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem', cursor: 'pointer' },
   btnClear: { padding: '.25rem .5rem', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '.875rem', lineHeight: 1 },
   table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', position: 'sticky' as const, top: 92, zIndex: 1 },
+  th: { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', position: 'sticky' as const, top: 52, zIndex: 1 },
   tr: { borderBottom: '1px solid #e5e7eb' },
   td: { padding: '.625rem .75rem', fontSize: '.875rem' },
   link: { color: '#2563eb', textDecoration: 'none', fontWeight: 500 },
