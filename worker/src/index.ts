@@ -45,6 +45,7 @@ interface DomainRow {
   tenant_id: number
   status: string
   ns_reference: string | null
+  publish: number
 }
 
 interface SoaRow {
@@ -111,17 +112,28 @@ async function processJob(job: QueueRow): Promise<void> {
   console.log(`[worker] Processing job ${job.id} for domain ${domainId}`)
 
   // Step 2: Load domain + records + SOA template
-  const domain = await queryOne<DomainRow>('SELECT id, fqdn, default_ttl, tenant_id, status, ns_reference FROM domains WHERE id = ?', [domainId])
+  const domain = await queryOne<DomainRow>('SELECT id, fqdn, default_ttl, tenant_id, status, ns_reference, publish FROM domains WHERE id = ?', [domainId])
   if (!domain) throw new Error(`Domain ${domainId} not found`)
 
   // Non-active domain: just sync named.conf to remove it from BIND, skip render
   if (domain.status !== 'active') {
     const allDomains = await query<{ fqdn: string; dnssec_enabled: number }>(
-      "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' ORDER BY fqdn"
+      "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' AND publish = 1 ORDER BY fqdn"
     )
     await regenerateNamedConf(allDomains.map(r => ({ fqdn: r.fqdn, dnssec_enabled: !!r.dnssec_enabled })))
     await execute("UPDATE zone_render_queue SET status = 'done', updated_at = NOW() WHERE id = ?", [job.id])
     console.log(`[worker] Job ${job.id} — ${domain.fqdn} is ${domain.status}, synced named.conf, skipped render`)
+    return
+  }
+
+  // publish=0: active but not deployed to nameservers — keep it out of named.conf
+  if (!domain.publish) {
+    const allDomains = await query<{ fqdn: string; dnssec_enabled: number }>(
+      "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' AND publish = 1 ORDER BY fqdn"
+    )
+    await regenerateNamedConf(allDomains.map(r => ({ fqdn: r.fqdn, dnssec_enabled: !!r.dnssec_enabled })))
+    await execute("UPDATE zone_render_queue SET status = 'done', updated_at = NOW() WHERE id = ?", [job.id])
+    console.log(`[worker] Job ${job.id} — ${domain.fqdn} has publish=0, synced named.conf, skipped render`)
     return
   }
 
@@ -165,7 +177,7 @@ async function processJob(job: QueueRow): Promise<void> {
 
   // Step 6: Ensure named.conf.local is up-to-date (covers newly added domains)
   const allDomains = await query<{ fqdn: string; dnssec_enabled: number }>(
-    "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' ORDER BY fqdn"
+    "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' AND publish = 1 ORDER BY fqdn"
   )
   const allZones = allDomains.map(r => r.fqdn)
   console.log(`[worker] Syncing named.conf.local with ${allZones.length} zones (includes ${domain.fqdn}: ${allZones.includes(domain.fqdn)})`)
@@ -265,7 +277,7 @@ async function poll(): Promise<void> {
 async function syncNamedConf(): Promise<void> {
   try {
     const rows = await query<{ fqdn: string; dnssec_enabled: number }>(
-      "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' ORDER BY fqdn"
+      "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' AND publish = 1 ORDER BY fqdn"
     )
     const zones = rows.map(r => ({ fqdn: r.fqdn, dnssec_enabled: !!r.dnssec_enabled }))
     await regenerateNamedConf(zones)
@@ -337,7 +349,7 @@ const ZONE_DIR = process.env.ZONE_DIR ?? '/bind/primary/zones'
 
 async function requeueMissingZones(): Promise<void> {
   const rows = await query<{ id: number; fqdn: string }>(
-    "SELECT id, fqdn FROM domains WHERE status = 'active'"
+    "SELECT id, fqdn FROM domains WHERE status = 'active' AND publish = 1"
   )
   const missing: string[] = []
   for (const { id, fqdn } of rows) {

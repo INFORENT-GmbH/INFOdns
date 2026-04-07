@@ -179,6 +179,16 @@ export async function importDomains(
     const newId = (result[0] as any).insertId
     fqdnToId.set(row.fqdn, newId)
     inserted++
+
+    if (row.publish) {
+      await conn.execute(
+        `INSERT INTO zone_render_queue (domain_id, priority)
+         VALUES (?, 5)
+         ON DUPLICATE KEY UPDATE status = 'pending', retries = 0, error = NULL`,
+        [newId]
+      )
+      await conn.execute("UPDATE domains SET zone_status = 'dirty' WHERE id = ?", [newId])
+    }
   }
 
   return { inserted, skipped, fqdnToId }
