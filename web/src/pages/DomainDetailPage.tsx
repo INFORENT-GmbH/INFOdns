@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { saveDomainEdits, loadDomainEdits, clearDomainEdits, setLiveDirty } from '../hooks/domainEditCache'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  getDomain, getRecords, createRecord, deleteRecord,
+  getDomain, getDomains, getRecords, createRecord, deleteRecord,
   createBulkJob, previewBulkJob, approveBulkJob, searchByRecord,
   updateDomainLabels, getLabelSuggestions, updateDomain, deleteDomain, getZoneText,
   getTenants,
@@ -123,7 +123,6 @@ export default function DomainDetailPage() {
   const [ttlDraft, setTtlDraft] = useState('')
   const [savingTtl, setSavingTtl] = useState(false)
   const [editingNsRef, setEditingNsRef] = useState(false)
-  const [nsRefDraft, setNsRefDraft] = useState('')
   const [savingNsRef, setSavingNsRef] = useState(false)
   const [showDnssecModal, setShowDnssecModal] = useState(false)
   const [copiedNs, setCopiedNs] = useState<string | null>(null)
@@ -200,6 +199,13 @@ export default function DomainDetailPage() {
     queryFn: () => getTenants().then(r => r.data),
     enabled: isAdmin,
     staleTime: 60_000,
+  })
+
+  const { data: allDomains = [] } = useQuery<Domain[]>({
+    queryKey: ['domains'],
+    queryFn: () => getDomains().then(r => r.data),
+    staleTime: 60_000,
+    enabled: !!domain,
   })
 
   // ── existing record helpers ──────────────────────────────────────────────
@@ -530,9 +536,8 @@ export default function DomainDetailPage() {
     }
   }
 
-  async function handleSaveNsRef() {
+  async function handleSaveNsRef(val: string | null) {
     if (!domain || savingNsRef) return
-    const val = nsRefDraft.trim() || null
     if (val === domain.ns_reference) { setEditingNsRef(false); return }
     setSavingNsRef(true)
     try {
@@ -746,19 +751,24 @@ export default function DomainDetailPage() {
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
             NS-Ref:{' '}
             {editingNsRef ? (
-              <input
-                type="text" value={nsRefDraft} autoFocus disabled={savingNsRef}
-                placeholder="e.g. example.com"
-                onChange={e => setNsRefDraft(e.target.value)}
-                onBlur={handleSaveNsRef}
-                onKeyDown={e => { if (e.key === 'Enter') handleSaveNsRef(); if (e.key === 'Escape') setEditingNsRef(false) }}
-                style={{ width: '14rem', fontWeight: 600, fontSize: 'inherit', padding: '0 2px', fontFamily: MONO }}
-              />
+              <select
+                autoFocus disabled={savingNsRef}
+                value={domain.ns_reference ?? ''}
+                onChange={e => handleSaveNsRef(e.target.value || null)}
+                onBlur={() => setEditingNsRef(false)}
+                onKeyDown={e => { if (e.key === 'Escape') setEditingNsRef(false) }}
+                style={{ fontWeight: 600, fontSize: 'inherit', fontFamily: MONO, padding: '0 2px', border: '1px solid #d1d5db', borderRadius: 4 }}
+              >
+                <option value="">— none —</option>
+                {allDomains.filter(d => d.id !== domainId).map(d => (
+                  <option key={d.id} value={d.fqdn}>{d.fqdn}</option>
+                ))}
+              </select>
             ) : (
               <strong
                 style={{ cursor: 'pointer', borderBottom: '1px dashed #9ca3af', fontFamily: MONO }}
                 title="Click to edit NS reference (mirrors records from this FQDN)"
-                onClick={() => { setNsRefDraft(domain.ns_reference ?? ''); setEditingNsRef(true) }}
+                onClick={() => setEditingNsRef(true)}
               >{domain.ns_reference ?? '—'}</strong>
             )}
             {savingNsRef && <span style={{ color: '#9ca3af' }}>…</span>}
