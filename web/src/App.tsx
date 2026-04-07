@@ -18,7 +18,7 @@ import ImportPage from './pages/ImportPage'
 import TldPricingPage from './pages/TldPricingPage'
 import RegistrarsPage from './pages/RegistrarsPage'
 
-const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000 } } })
+const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 0 } } })
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, ready } = useAuth()
