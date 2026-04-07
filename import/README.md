@@ -1,49 +1,164 @@
-I want to import the domains, customers, ns records and domain prices from inforent-domains.sql
+# Import: inforent-domains.sql
 
-The admin should be able to upload the file and select which data to import.
+## Goal
 
-This is quite complex as the source database does not really make use of IDs, please check.
+Build an admin-only import wizard that:
+1. Accepts an uploaded `.sql` file (the legacy `inforent-domains.sql` dump).
+2. Parses the four source tables from the file in memory (no temp DB needed).
+3. Presents a preview/selection UI — the admin chooses which entity types to import (tenants, domains, DNS records, TLD pricing).
+4. Executes the import with conflict-handling rules described below.
 
-table companies: all those companies need to be imported as tenants (skip if they exist already by id)
-company_id = is the id - we need to use this as id if we import
-keyword = is the company name
+The source file is a phpMyAdmin SQL dump from a MariaDB database named `isp`. It contains four tables:
+`companies`, `domains`, `ns`, `domain_fees`.
 
-table domains:
-DOMAIN = is the full domain name, like example.com. if it does not exist yet, it needs to be created.
-TLD = is the TLD, like .com, not needed
-ZONE = not needed
-COST_CENTER and BRAND = small text field. this should end up as a new additional field for domains which can be edited/searched.
-PUBLISH = 0 means we manage the domain somehow, but we do not deploy the DNS to our NS. 1 means we publish it on our NS.
-REGISTRAR = 1 means we have registered this domain for the customer. 0 means domain registration is managed by the customer.
-NOTE = note text to be set by customer
-NOTE_INTERNAL = note text to be set by admins only
-! FLAG = was ist das?
-NS_REFERENCE = e.g. example2.com - domain will always use the same dns records from the selected domain
-SMTP_TO = SMTP server (like smtp.inforent.net) or NULL
-SPAM_TO = e.g. spam@inforent.net or NULL
-ADD_FEE = extra fee for the customer
+---
 
-table ns: all DNS records
-DOMAIN = e.g. domain.com
-HOST = e.g. @ or www
-TYPE = record type, e.g. A
-PRIORITY
-ENTRY = the entry like 1.2.3.4
-PTR
-TTL
+## Source → Target Mapping
 
-table domain_fees:
-ZONE = e.g. .cn.com or .de
-TLD = for ZONE cn.com it would be com, for ZONE de it's de
-Description: Text field
-EK = buy price for us
-FEE = verkaufspreis
-NOTE = text field
-FLAG = kann weg
-COUNT = zählt anzahl der domains, brauchen wir nicht
+### Table: `companies` → `tenants`
 
-in the domain_fees table we also have:
-REGISTRAR = text field, this is where we registreted the domain. this is either CN, MARCARIA, UD or UDR.
-then we have the columns UDR, CN, MARCARIA and UD which include the price of the domain at the given registrar.
-basically this means we also need registrar management (those are all manual, no domain is auto-registered).
-most domains are registreted at the REGISTRAR. this should become a new reference with domains table, which defaults to the REGISTRAR for the TLD from domain_fees, but admins can change it to other registrar
+| Source column | Type | Target | Notes |
+|---|---|---|---|
+| `company_id` | int | `tenants.id` | Use as the actual PK — do not auto-assign a new id |
+| `keyword` | varchar(10) | `tenants.name` | Short company name, e.g. `INFORENT` |
+
+**Conflict rule:** If a tenant with the same `id` already exists, skip it (do not update).
+
+---
+
+### Table: `domains` → `domains` + new columns
+
+The source `domains` table is keyed by `DOMAIN` (the FQDN string, e.g. `example.com`), not by an integer id.
+
+| Source column | Type | Target column | Notes |
+|---|---|---|---|
+| `DOMAIN` | varchar(80) | `domains.fqdn` | Primary identifier — skip if FQDN already exists |
+| `COMPANY_ID` | int | `domains.tenant_id` | FK to tenants |
+| `PUBLISH` | char(1) `'0'`/`'1'` | `domains.status` | `'1'` → `active`; `'0'` → `suspended` (we manage the domain but do not deploy DNS) |
+| `NOTE` | varchar(250) | `domains.notes` | Customer-visible note |
+| `NOTE_INTERNAL` | varchar(250) | *(new)* `domains.notes_internal` | Admin-only note; needs new column |
+| `COST_CENTER` | varchar(15) | *(new)* `domains.cost_center` | Searchable/filterable text field |
+| `BRAND` | varchar(15) | *(new)* `domains.brand` | Searchable/filterable text field |
+| `NS_REFERENCE` | varchar(80) | *(new)* `domains.ns_reference` | Points to another FQDN whose DNS records this domain mirrors (e.g. `aliro.com`) |
+| `SMTP_TO` | varchar(100) | *(new)* `domains.smtp_to` | SMTP relay host, e.g. `smtp.inforent.net` — NULL if not set |
+| `SPAM_TO` | varchar(50) | *(new)* `domains.spam_to` | Spam address, e.g. `spam@inforent.net` — NULL if not set |
+| `ADD_FEE` | float | *(new)* `domains.add_fee` | Extra fee charged to the customer on top of base TLD price |
+| `REGISTRAR` | char(1) `'0'`/`'1'` | *(new)* `domains.we_registered` | `'1'` = we registered this domain for the customer; `'0'` = customer manages registration themselves |
+| `FLAG` | char(1) | *(new)* `domains.flag` | Meaning unclear — store as-is for now (values seen: `'0'`, `'1'`, `NULL`) |
+| `TLD` | varchar(10) | — | Unused; derivable from FQDN |
+| `ZONE` | varchar(20) | — | Unused |
+
+**Conflict rule:** If a domain with the same `fqdn` already exists, skip it.
+
+**New DB columns required** (migration needed before import can run):
+```sql
+ALTER TABLE domains
+  ADD COLUMN notes_internal TEXT NULL,
+  ADD COLUMN cost_center    VARCHAR(15) NULL,
+  ADD COLUMN brand          VARCHAR(15) NULL,
+  ADD COLUMN ns_reference   VARCHAR(253) NULL,
+  ADD COLUMN smtp_to        VARCHAR(100) NULL,
+  ADD COLUMN spam_to        VARCHAR(100) NULL,
+  ADD COLUMN add_fee        DECIMAL(8,2) NULL,
+  ADD COLUMN we_registered  TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN flag           CHAR(1) NULL;
+```
+
+---
+
+### Table: `ns` → `dns_records`
+
+The source `ns` table is keyed by integer `id`, linked to domains by `DOMAIN` (FQDN string).
+
+| Source column | Type | Target column | Notes |
+|---|---|---|---|
+| `DOMAIN` | varchar(80) | `dns_records.domain_id` | Resolve FQDN → `domains.id` |
+| `HOST` | varchar(50) | `dns_records.name` | Relative label, e.g. `@`, `www`, `_dmarc`. NULL in source → treat as `@` |
+| `TYPE` | varchar(5) | `dns_records.type` | Record type, e.g. `A`, `MX`, `TXT` |
+| `PRIORITY` | varchar(2) | `dns_records.priority` | Only meaningful for MX; NULL otherwise |
+| `ENTRY` | varchar(750) | `dns_records.value` | The rdata string, e.g. `1.2.3.4` or `"v=spf1 -all"` |
+| `TTL` | int | `dns_records.ttl` | NULL means use domain default |
+| `PTR` | char(1) | — | Legacy PTR flag; ignore |
+| `id` | int | — | Source id; discard |
+
+**Conflict rule:** Import all records for a domain that exists in the target. If the exact same `(domain_id, name, type, value)` tuple already exists, skip.
+
+**Note:** Only import DNS records for domains whose FQDN exists in the target `domains` table after the domain import step.
+
+---
+
+### Table: `domain_fees` → new table `tld_pricing`
+
+This table holds per-TLD pricing and registrar information. It needs a new database table.
+
+| Source column | Type | Target column | Notes |
+|---|---|---|---|
+| `ZONE` | varchar(20) | `tld_pricing.zone` | The TLD zone key, e.g. `de`, `cn.com`, `co.uk` — used as PK |
+| `TLD` | varchar(10) | `tld_pricing.tld` | The effective TLD, e.g. `de`, `com`, `uk` |
+| `DESCRIPTION` | varchar(30) | `tld_pricing.description` | Human-readable name, e.g. `Germany` |
+| `EK` | float | `tld_pricing.cost` | Our purchase price (Einkaufspreis) |
+| `FEE` | int | `tld_pricing.fee` | Selling price to customer (Verkaufspreis) |
+| `REGISTRAR` | varchar(10) | `tld_pricing.default_registrar` | Which registrar we primarily use for this TLD: `CN`, `MARCARIA`, `UD`, `UDR` |
+| `NOTE` | varchar(30) | `tld_pricing.note` | Free-text note, e.g. `last_UD: 175,63` |
+| `UDR` | float | `tld_pricing.price_udr` | Price at registrar UDR |
+| `CN` | float | `tld_pricing.price_cn` | Price at registrar CN |
+| `MARCARIA` | float | `tld_pricing.price_marcaria` | Price at registrar MARCARIA |
+| `UD` | float | `tld_pricing.price_ud` | Price at registrar UD |
+| `FLAG` | char(1) | — | Unused; discard |
+| `COUNT` | int | — | Computed count; discard |
+
+**Conflict rule:** If a row with the same `zone` already exists, skip it.
+
+**New DB table required:**
+```sql
+CREATE TABLE tld_pricing (
+  zone              VARCHAR(20)  NOT NULL PRIMARY KEY,
+  tld               VARCHAR(10)  NOT NULL,
+  description       VARCHAR(30)  NULL,
+  cost              DECIMAL(6,2) NULL,
+  fee               INT          NULL,
+  default_registrar VARCHAR(10)  NULL,   -- CN | MARCARIA | UD | UDR
+  note              VARCHAR(30)  NULL,
+  price_udr         DECIMAL(6,2) NULL,
+  price_cn          DECIMAL(6,2) NULL,
+  price_marcaria    DECIMAL(6,2) NULL,
+  price_ud          DECIMAL(6,2) NULL,
+  created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+---
+
+## Registrar Reference on Domains
+
+Each domain should also store which registrar actually holds it. This is separate from `we_registered`:
+
+- Default: copy `tld_pricing.default_registrar` for the domain's TLD at import time.
+- Admins can override it per domain after import.
+
+Add column:
+```sql
+ALTER TABLE domains
+  ADD COLUMN registrar VARCHAR(10) NULL;   -- CN | MARCARIA | UD | UDR | NULL
+```
+
+---
+
+## Import UI (Admin Page)
+
+- Upload a `.sql` file.
+- Parse the four tables client-side or server-side and display a preview:
+  - How many tenants found / how many would be skipped.
+  - How many domains found / how many would be skipped.
+  - How many DNS records found.
+  - How many TLD pricing rows found / how many would be skipped.
+- Checkboxes to select which entity types to include in this run.
+- "Run Import" button executes the selected steps in order: tenants → tld_pricing → domains → dns_records.
+- Show per-entity result counts (imported / skipped / errors) after completion.
+
+---
+
+## Open Questions
+
+- `domains.FLAG` (`char(1)`, values `'0'`, `'1'`, `NULL`): meaning unknown. Store as-is for now; can be clarified and mapped later.
