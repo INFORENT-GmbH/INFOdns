@@ -16,6 +16,7 @@ import TicketDetailPage from './pages/TicketDetailPage'
 import AcceptInvitePage from './pages/AcceptInvitePage'
 import ImportPage from './pages/ImportPage'
 import TldPricingPage from './pages/TldPricingPage'
+import RegistrarsPage from './pages/RegistrarsPage'
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 10_000 } } })
 
@@ -60,6 +61,7 @@ export default function App() {
               <Route path="tickets/:id" element={<TicketDetailPage />} />
               <Route path="import" element={<ImportPage />} />
               <Route path="tld-pricing" element={<TldPricingPage />} />
+              <Route path="registrars" element={<RegistrarsPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/domains" replace />} />
           </Routes>

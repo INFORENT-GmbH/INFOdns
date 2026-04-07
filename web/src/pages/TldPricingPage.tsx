@@ -20,6 +20,12 @@ function num(v: string): number | null {
   return isNaN(n) ? null : n
 }
 
+function dec(v: number | string | null): string | null {
+  if (v == null) return null
+  const n = typeof v === 'string' ? parseFloat(v) : v
+  return isNaN(n) ? null : n.toFixed(2)
+}
+
 function fmt(v: number | null): string {
   return v != null ? String(v) : ''
 }
@@ -204,17 +210,17 @@ export default function TldPricingPage() {
                     <td style={styles.td}><code style={styles.code}>{row.zone}</code></td>
                     <td style={styles.td}>{row.tld}</td>
                     <td style={styles.td}>{row.description ?? <span style={styles.muted}>—</span>}</td>
-                    <td style={styles.tdNum}>{row.cost != null ? row.cost.toFixed(2) : <span style={styles.muted}>—</span>}</td>
+                    <td style={styles.tdNum}>{dec(row.cost) ?? <span style={styles.muted}>—</span>}</td>
                     <td style={styles.tdNum}>{row.fee ?? <span style={styles.muted}>—</span>}</td>
                     <td style={styles.td}>
                       {row.default_registrar
                         ? <span style={styles.regBadge}>{row.default_registrar}</span>
                         : <span style={styles.muted}>—</span>}
                     </td>
-                    <td style={styles.tdNum}>{row.price_udr != null ? row.price_udr.toFixed(2) : <span style={styles.muted}>—</span>}</td>
-                    <td style={styles.tdNum}>{row.price_cn != null ? row.price_cn.toFixed(2) : <span style={styles.muted}>—</span>}</td>
-                    <td style={styles.tdNum}>{row.price_marcaria != null ? row.price_marcaria.toFixed(2) : <span style={styles.muted}>—</span>}</td>
-                    <td style={styles.tdNum}>{row.price_ud != null ? row.price_ud.toFixed(2) : <span style={styles.muted}>—</span>}</td>
+                    <td style={styles.tdNum}>{dec(row.price_udr) ?? <span style={styles.muted}>—</span>}</td>
+                    <td style={styles.tdNum}>{dec(row.price_cn) ?? <span style={styles.muted}>—</span>}</td>
+                    <td style={styles.tdNum}>{dec(row.price_marcaria) ?? <span style={styles.muted}>—</span>}</td>
+                    <td style={styles.tdNum}>{dec(row.price_ud) ?? <span style={styles.muted}>—</span>}</td>
                     <td style={styles.td}>{row.note ?? <span style={styles.muted}>—</span>}</td>
                     <td style={styles.tdActions}>
                       <button style={styles.btnEdit} onClick={() => { setEditZone(row.zone); setAdding(false) }}>Edit</button>

@@ -20,6 +20,7 @@ import { mailQueueRoutes } from './mail-queue/routes.js'
 import { ticketRoutes } from './tickets/routes.js'
 import { importRoutes } from './import/routes.js'
 import { tldPricingRoutes } from './tld-pricing/routes.js'
+import { registrarRoutes } from './registrars/routes.js'
 
 const app = Fastify({ logger: true, trustProxy: true })
 
@@ -75,6 +76,7 @@ await app.register(async (v1) => {
   await v1.register(ticketRoutes)
   await v1.register(importRoutes)
   await v1.register(tldPricingRoutes)
+  await v1.register(registrarRoutes)
 }, { prefix: '/api/v1' })
 
 // ── Start ────────────────────────────────────────────────────

@@ -513,6 +513,28 @@ export interface TldPricing {
   updated_at: string
 }
 
+// Registrars
+export interface Registrar {
+  code: string
+  name: string
+  url: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export const getRegistrars = () =>
+  api.get<Registrar[]>('/registrars')
+
+export const createRegistrar = (data: Omit<Registrar, 'created_at' | 'updated_at'>) =>
+  api.post<Registrar>('/registrars', data)
+
+export const updateRegistrar = (code: string, data: Partial<Omit<Registrar, 'code' | 'created_at' | 'updated_at'>>) =>
+  api.put<Registrar>(`/registrars/${encodeURIComponent(code)}`, data)
+
+export const deleteRegistrar = (code: string) =>
+  api.delete(`/registrars/${encodeURIComponent(code)}`)
+
 export const getTldPricing = () =>
   api.get<TldPricing[]>('/tld-pricing')
 

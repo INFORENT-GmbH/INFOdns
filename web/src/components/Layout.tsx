@@ -73,6 +73,7 @@ export default function Layout() {
           {isAdminOrOp && <NavLink to="/tenants" className="nav-link" style={navStyle}>{t('nav_tenants')}</NavLink>}
           {user?.role === 'admin' && <NavLink to="/users" className="nav-link" style={navStyle}>{t('nav_users')}</NavLink>}
           {user?.role === 'admin' && <NavLink to="/tld-pricing" className="nav-link" style={navStyle}>TLDs</NavLink>}
+          {user?.role === 'admin' && <NavLink to="/registrars" className="nav-link" style={navStyle}>Registrars</NavLink>}
           {user?.role === 'admin' && <NavLink to="/import" className="nav-link" style={navStyle}>Import</NavLink>}
           <div style={{ position: 'relative' }} onMouseEnter={openLogs} onMouseLeave={closeLogs}>
             <span className="nav-link" style={{ ...navStyle({ isActive: logsActive }), cursor: 'pointer', userSelect: 'none' }}>
