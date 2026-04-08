@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getAuditLogs, type AuditLog } from '../api/client'
+import Select from '../components/Select'
 import { useI18n } from '../i18n/I18nContext'
 
 const ACTIONS = ['', 'create', 'update', 'delete', 'bulk_apply']
@@ -56,15 +57,12 @@ export default function AuditLogPage() {
           onChange={e => setFilter('user_id', e.target.value)}
           style={styles.filterInput}
         />
-        <select
+        <Select
           value={filters.action}
-          onChange={e => setFilter('action', e.target.value)}
+          onChange={v => setFilter('action', v)}
           style={{ ...styles.filterInput, width: 160 }}
-        >
-          {ACTIONS.map(a => (
-            <option key={a} value={a}>{a || t('audit_allActions')}</option>
-          ))}
-        </select>
+          options={ACTIONS.map(a => ({ value: a, label: a || t('audit_allActions') }))}
+        />
         <input
           type="date"
           value={filters.from}

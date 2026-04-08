@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getMailQueue, retryMail, type MailQueueItem } from '../api/client'
+import Select from '../components/Select'
 import { useI18n } from '../i18n/I18nContext'
 
 const STATUSES = ['', 'pending', 'processing', 'done', 'failed']
@@ -65,14 +66,15 @@ export default function MailQueuePage() {
       </div>
 
       <div style={styles.filters}>
-        <select
+        <Select
           value={statusFilter}
-          onChange={e => { setStatusFilter(e.target.value); setPage(1) }}
+          onChange={v => { setStatusFilter(v); setPage(1) }}
           style={styles.select}
-        >
-          <option value="">{t('mailQueue_allStatuses')}</option>
-          {STATUSES.filter(Boolean).map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
+          options={[
+            { value: '', label: t('mailQueue_allStatuses') },
+            ...STATUSES.filter(Boolean).map(s => ({ value: s, label: s })),
+          ]}
+        />
       </div>
 
       {isLoading ? <p>{t('loading')}</p> : items.length === 0 ? (

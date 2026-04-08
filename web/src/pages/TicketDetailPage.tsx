@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTicket, getUsers, updateTicket, addTicketMessage, uploadAttachments, downloadAttachment, type TicketMessage, type TicketAttachment } from '../api/client'
+import Select from '../components/Select'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
 
@@ -118,43 +119,36 @@ export default function TicketDetailPage() {
         <div style={styles.staffControls}>
           <label style={styles.controlLabel}>
             {t('ticketDetail_status')}
-            <select
+            <Select
               style={styles.select}
               value={ticket.status}
               disabled={updating}
-              onChange={e => handleFieldUpdate('status', e.target.value)}
-            >
-              {['open', 'in_progress', 'waiting', 'closed'].map(s => (
-                <option key={s} value={s}>{statusLabel(s)}</option>
-              ))}
-            </select>
+              onChange={v => handleFieldUpdate('status', v)}
+              options={['open', 'in_progress', 'waiting', 'closed'].map(s => ({ value: s, label: statusLabel(s) }))}
+            />
           </label>
           <label style={styles.controlLabel}>
             {t('ticketDetail_priority')}
-            <select
+            <Select
               style={styles.select}
               value={ticket.priority}
               disabled={updating}
-              onChange={e => handleFieldUpdate('priority', e.target.value)}
-            >
-              {['low', 'normal', 'high', 'urgent'].map(p => (
-                <option key={p} value={p}>{priorityLabel(p)}</option>
-              ))}
-            </select>
+              onChange={v => handleFieldUpdate('priority', v)}
+              options={['low', 'normal', 'high', 'urgent'].map(p => ({ value: p, label: priorityLabel(p) }))}
+            />
           </label>
           <label style={styles.controlLabel}>
             {t('ticketDetail_assignee')}
-            <select
+            <Select
               style={styles.select}
-              value={ticket.assigned_to ?? ''}
+              value={ticket.assigned_to != null ? String(ticket.assigned_to) : ''}
               disabled={updating}
-              onChange={e => handleFieldUpdate('assigned_to', e.target.value ? Number(e.target.value) : null)}
-            >
-              <option value="">{t('tickets_unassigned')}</option>
-              {staffUsers.map(u => (
-                <option key={u.id} value={u.id}>{u.full_name || u.email}</option>
-              ))}
-            </select>
+              onChange={v => handleFieldUpdate('assigned_to', v ? Number(v) : null)}
+              options={[
+                { value: '', label: t('tickets_unassigned') },
+                ...staffUsers.map(u => ({ value: String(u.id), label: u.full_name || u.email })),
+              ]}
+            />
           </label>
         </div>
       )}

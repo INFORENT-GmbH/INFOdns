@@ -4,6 +4,7 @@ import {
   getTldPricing, createTldPricing, updateTldPricing, deleteTldPricing,
   type TldPricing,
 } from '../api/client'
+import Select from '../components/Select'
 
 const REGISTRARS = ['', 'CN', 'MARCARIA', 'UD', 'UDR'] as const
 
@@ -64,9 +65,12 @@ function EditRow({
         <input style={styles.inputNum} value={fmt(d.fee ?? null)} onChange={e => set('fee', num(e.target.value))} placeholder="0" type="number" step="1" />
       </td>
       <td style={styles.td}>
-        <select style={styles.inputSm} value={d.default_registrar ?? ''} onChange={e => set('default_registrar', e.target.value || null)}>
-          {REGISTRARS.map(r => <option key={r} value={r}>{r || '—'}</option>)}
-        </select>
+        <Select
+          style={styles.inputSm}
+          value={d.default_registrar ?? ''}
+          onChange={v => set('default_registrar', v || null)}
+          options={REGISTRARS.map(r => ({ value: r, label: r || '—' }))}
+        />
       </td>
       <td style={styles.td}>
         <input style={styles.inputNum} value={fmt(d.price_udr ?? null)} onChange={e => set('price_udr', num(e.target.value))} placeholder="—" type="number" step="0.01" />

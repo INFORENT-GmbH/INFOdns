@@ -10,6 +10,7 @@ import {
   type DnsRecord, type Label, type Domain, type LabelSuggestion, type Tenant,
 } from '../api/client'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
+import Select from '../components/Select'
 import LabelChip, { getLabelColors } from '../components/LabelChip'
 import ColorPicker from '../components/ColorPicker'
 import ImportZoneModal from '../components/ImportZoneModal'
@@ -122,7 +123,6 @@ export default function DomainDetailPage() {
   const [editingTtl, setEditingTtl] = useState(false)
   const [ttlDraft, setTtlDraft] = useState('')
   const [savingTtl, setSavingTtl] = useState(false)
-  const [editingNsRef, setEditingNsRef] = useState(false)
   const [savingNsRef, setSavingNsRef] = useState(false)
   const [showDnssecModal, setShowDnssecModal] = useState(false)
   const [copiedNs, setCopiedNs] = useState<string | null>(null)
@@ -536,18 +536,17 @@ export default function DomainDetailPage() {
     }
   }
 
-  async function handleSaveNsRef(val: string | null) {
-    if (!domain || savingNsRef) return
-    if (val === domain.ns_reference) { setEditingNsRef(false); return }
+  async function handleSaveNsRef(val: string) {
+    const v = val || null
+    if (!domain || v === domain.ns_reference) return
     setSavingNsRef(true)
     try {
-      await updateDomain(domainId, { ns_reference: val } as any)
+      await updateDomain(domainId, { ns_reference: v } as any)
       qc.invalidateQueries({ queryKey: ['domain', domainId] })
     } catch (err: any) {
       alert(err.response?.data?.message ?? err.message)
     } finally {
       setSavingNsRef(false)
-      setEditingNsRef(false)
     }
   }
 
@@ -709,20 +708,14 @@ export default function DomainDetailPage() {
         {isAdmin ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
             {t('tenant')}:
-            <select
-              value={domain.tenant_id}
+            <Select
+              value={String(domain.tenant_id)}
+              onChange={v => handleMoveTenant(Number(v))}
               disabled={movingTenant}
-              onChange={e => handleMoveTenant(Number(e.target.value))}
-              style={{
-                fontSize: 'inherit', fontWeight: 600,
-                border: '1px solid transparent', borderRadius: 4,
-                background: 'none', cursor: 'pointer', padding: '0 2px',
-              }}
-            >
-              {tenants.filter((c: Tenant) => c.is_active || c.id === domain.tenant_id).map((c: Tenant) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+              variant="ghost"
+              style={{ fontWeight: 600 }}
+              options={tenants.filter((c: Tenant) => c.is_active || c.id === domain.tenant_id).map((c: Tenant) => ({ value: String(c.id), label: c.name }))}
+            />
             {movingTenant && <span style={{ color: '#9ca3af' }}>…</span>}
           </span>
         ) : (
@@ -749,28 +742,18 @@ export default function DomainDetailPage() {
         <span>{t('domainDetail_added')}: {new Date(domain.created_at).toLocaleDateString()}</span>
         <span>{t('domainDetail_lastRendered')} {domain.last_rendered_at ? new Date(domain.last_rendered_at).toLocaleString() : t('never')}</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
-            NS-Ref:{' '}
-            {editingNsRef ? (
-              <select
-                autoFocus disabled={savingNsRef}
-                value={domain.ns_reference ?? ''}
-                onChange={e => handleSaveNsRef(e.target.value || null)}
-                onBlur={() => setEditingNsRef(false)}
-                onKeyDown={e => { if (e.key === 'Escape') setEditingNsRef(false) }}
-                style={{ fontWeight: 600, fontSize: 'inherit', fontFamily: MONO, padding: '0 2px', border: '1px solid #d1d5db', borderRadius: 4 }}
-              >
-                <option value="">— none —</option>
-                {allDomains.filter(d => d.id !== domainId).map(d => (
-                  <option key={d.id} value={d.fqdn}>{d.fqdn}</option>
-                ))}
-              </select>
-            ) : (
-              <strong
-                style={{ cursor: 'pointer', borderBottom: '1px dashed #9ca3af', fontFamily: MONO }}
-                title="Click to edit NS reference (mirrors records from this FQDN)"
-                onClick={() => setEditingNsRef(true)}
-              >{domain.ns_reference ?? '—'}</strong>
-            )}
+            NS-Ref:
+            <Select
+              value={domain.ns_reference ?? ''}
+              onChange={handleSaveNsRef}
+              disabled={savingNsRef}
+              variant="ghost"
+              style={{ fontFamily: MONO }}
+              options={[
+                { value: '', label: '— none —' },
+                ...allDomains.filter(d => d.id !== domainId).map(d => ({ value: d.fqdn, label: d.fqdn })),
+              ]}
+            />
             {savingNsRef && <span style={{ color: '#9ca3af' }}>…</span>}
           </span>
       </div>
@@ -889,10 +872,13 @@ export default function DomainDetailPage() {
                     className="inline-field" style={{ ...styles.inlineInput, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }} />
                 </td>
                 <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
-                  <select value={row.type} onChange={e => setNewField(row._newId, 'type', e.target.value)}
-                    className="inline-field" style={styles.inlineSelect}>
-                    {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
-                  </select>
+                  <Select
+                    value={row.type}
+                    onChange={v => setNewField(row._newId, 'type', v)}
+                    variant="ghost"
+                    options={RECORD_TYPES.map(rt => ({ value: rt, label: rt }))}
+                    style={{ fontSize: '.8125rem' }}
+                  />
                   {row.type === 'CNAME' && row.name.trim() === '@' && (
                     <span className="alias-hint" data-tip={t('domainDetail_cnameFlatten')}
                       style={{ marginLeft: 4, cursor: 'help', color: '#9ca3af', fontWeight: 700, fontSize: '.8rem' }}>?</span>
@@ -961,11 +947,14 @@ export default function DomainDetailPage() {
                       style={{ ...styles.inlineInput, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }} />
                   </td>
                   <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
-                    <select value={row.type === 'ALIAS' ? 'CNAME' : row.type}
-                      onChange={e => setField(rec.id, rec, 'type', e.target.value)}
-                      disabled={isDeleted} className="inline-field" style={styles.inlineSelect}>
-                      {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
-                    </select>
+                    <Select
+                      value={row.type === 'ALIAS' ? 'CNAME' : row.type}
+                      onChange={v => setField(rec.id, rec, 'type', v)}
+                      disabled={isDeleted}
+                      variant="ghost"
+                      options={RECORD_TYPES.map(rt => ({ value: rt, label: rt }))}
+                      style={{ fontSize: '.8125rem' }}
+                    />
                     {(row.type === 'ALIAS' || (row.type === 'CNAME' && row.name.trim() === '@')) && (
                       <span className="alias-hint" data-tip={t('domainDetail_cnameFlatten')}
                         style={{ marginLeft: 4, cursor: 'help', color: '#9ca3af', fontWeight: 700, fontSize: '.8rem' }}>?</span>

@@ -3,6 +3,7 @@ import { Link, useNavigate, useMatch } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getDomains, createDomain, getTenants, getLabelSuggestions, restoreDomain, type Domain } from '../api/client'
 import LabelChip from '../components/LabelChip'
+import Select from '../components/Select'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
@@ -513,17 +514,15 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
             required
             style={styles.input}
           />
-          <select
+          <Select
             value={newTenantId}
-            onChange={e => setNewTenantId(e.target.value)}
-            required
+            onChange={v => setNewTenantId(v)}
             style={{ ...styles.input, width: 200 }}
-          >
-            <option value="">{t('domains_selectTenant')}</option>
-            {tenants.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: t('domains_selectTenant') },
+              ...tenants.map(c => ({ value: String(c.id), label: c.name })),
+            ]}
+          />
           <button type="submit" disabled={creating} style={styles.btnPrimary}>
             {creating ? t('creating') : t('create')}
           </button>

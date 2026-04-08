@@ -1,4 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react'
+import Select from './Select'
 import { type DnsRecord } from '../api/client'
 import { useI18n } from '../i18n/I18nContext'
 
@@ -59,9 +60,12 @@ export default function RecordModal({ record, onSave, onClose }: Props) {
           </label>
           <label style={styles.label}>
             {t('type')}
-            <select value={form.type ?? 'A'} onChange={e => set('type', e.target.value)} style={styles.input}>
-              {RECORD_TYPES.map(tp => <option key={tp}>{tp}</option>)}
-            </select>
+            <Select
+              value={form.type ?? 'A'}
+              onChange={v => set('type', v)}
+              style={styles.input}
+              options={RECORD_TYPES.map(tp => ({ value: tp, label: tp }))}
+            />
           </label>
           <label style={styles.label}>
             {t('ttl')} <span style={styles.hint}>{t('modal_ttlHint')}</span>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getUsers, createUser, updateUser, inviteUser, getInvites, revokeInvite, getTenants, type User, type PendingInvite } from '../api/client'
+import Select from '../components/Select'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
 
@@ -172,18 +173,13 @@ export default function UsersPage() {
             <label style={styles.label}>{t('users_fullName')} <input value={inviteForm.full_name} onChange={e => setInviteField('full_name', e.target.value)} required style={styles.input} /></label>
             <label style={styles.label}>
               {t('role')}
-              <select value={inviteForm.role} onChange={e => setInviteField('role', e.target.value)} style={styles.input}>
-                <option value="admin">admin</option>
-                <option value="operator">operator</option>
-                <option value="tenant">tenant</option>
-              </select>
+              <Select value={inviteForm.role} onChange={v => setInviteField('role', v)} style={styles.input}
+                options={[{ value: 'admin', label: 'admin' }, { value: 'operator', label: 'operator' }, { value: 'tenant', label: 'tenant' }]} />
             </label>
             <label style={styles.label}>
               {t('users_locale')}
-              <select value={inviteForm.locale} onChange={e => setInviteField('locale', e.target.value)} style={styles.input}>
-                <option value="de">{t('locale_de')}</option>
-                <option value="en">{t('locale_en')}</option>
-              </select>
+              <Select value={inviteForm.locale} onChange={v => setInviteField('locale', v)} style={styles.input}
+                options={[{ value: 'de', label: t('locale_de') }, { value: 'en', label: t('locale_en') }]} />
             </label>
           </div>
           <div>
@@ -215,18 +211,13 @@ export default function UsersPage() {
             <label style={styles.label}>{t('users_fullName')} <input value={form.full_name} onChange={e => setField('full_name', e.target.value)} required style={styles.input} /></label>
             <label style={styles.label}>
               {t('role')}
-              <select value={form.role} onChange={e => setField('role', e.target.value)} style={styles.input}>
-                <option value="admin">admin</option>
-                <option value="operator">operator</option>
-                <option value="tenant">tenant</option>
-              </select>
+              <Select value={form.role} onChange={v => setField('role', v)} style={styles.input}
+                options={[{ value: 'admin', label: 'admin' }, { value: 'operator', label: 'operator' }, { value: 'tenant', label: 'tenant' }]} />
             </label>
             <label style={styles.label}>
               {t('users_locale')}
-              <select value={form.locale} onChange={e => setField('locale', e.target.value)} style={styles.input}>
-                <option value="de">{t('locale_de')}</option>
-                <option value="en">{t('locale_en')}</option>
-              </select>
+              <Select value={form.locale} onChange={v => setField('locale', v)} style={styles.input}
+                options={[{ value: 'de', label: t('locale_de') }, { value: 'en', label: t('locale_en') }]} />
             </label>
           </div>
           <div>
@@ -307,18 +298,13 @@ export default function UsersPage() {
                           <label style={styles.label}>{t('users_fullName')} <input value={editForm.full_name} onChange={e => setEditField('full_name', e.target.value)} style={styles.input} /></label>
                           <label style={styles.label}>
                             {t('role')}
-                            <select value={editForm.role} onChange={e => setEditField('role', e.target.value)} style={styles.input}>
-                              <option value="admin">admin</option>
-                              <option value="operator">operator</option>
-                              <option value="tenant">tenant</option>
-                            </select>
+                            <Select value={editForm.role} onChange={v => setEditField('role', v)} style={styles.input}
+                              options={[{ value: 'admin', label: 'admin' }, { value: 'operator', label: 'operator' }, { value: 'tenant', label: 'tenant' }]} />
                           </label>
                           <label style={styles.label}>
                             {t('users_locale')}
-                            <select value={editForm.locale} onChange={e => setEditField('locale', e.target.value)} style={styles.input}>
-                              <option value="de">{t('locale_de')}</option>
-                              <option value="en">{t('locale_en')}</option>
-                            </select>
+                            <Select value={editForm.locale} onChange={v => setEditField('locale', v)} style={styles.input}
+                              options={[{ value: 'de', label: t('locale_de') }, { value: 'en', label: t('locale_en') }]} />
                           </label>
                         </div>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.875rem', fontWeight: 500, cursor: 'pointer' }}>

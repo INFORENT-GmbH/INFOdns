@@ -7,6 +7,7 @@ import {
   type BulkJob, type BulkJobDomain, type ZoneRenderJob,
 } from '../api/client'
 import { useI18n } from '../i18n/I18nContext'
+import Select from '../components/Select'
 import { useAuth } from '../context/AuthContext'
 
 // ── Types ─────────────────────────────────────────────────────
@@ -139,11 +140,12 @@ function PayloadForm({ operation, matchType, matchName, matchValue, onChange }: 
           </label>
           <label style={styles.label}>
             {t('type')}
-            <select value={newType}
-              onChange={e => { setNewType(e.target.value); emit({ type: e.target.value }) }}
-              style={styles.input}>
-              {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
-            </select>
+            <Select
+              value={newType}
+              onChange={v => { setNewType(v); emit({ type: v }) }}
+              style={styles.input}
+              options={RECORD_TYPES.map(rt => ({ value: rt, label: rt }))}
+            />
           </label>
           <label style={styles.label}>
             {t('value')}
@@ -448,9 +450,12 @@ export default function JobsPage() {
               <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
                 <label style={styles.label}>
                   {t('type')}
-                  <select value={searchType} onChange={e => { setSearchType(e.target.value); setSelectedIds(new Set()) }} style={{ ...styles.input, width: 100 }}>
-                    {RECORD_TYPES.map(rt => <option key={rt}>{rt}</option>)}
-                  </select>
+                  <Select
+                    value={searchType}
+                    onChange={v => { setSearchType(v); setSelectedIds(new Set()) }}
+                    style={{ ...styles.input, width: 100 }}
+                    options={RECORD_TYPES.map(rt => ({ value: rt, label: rt }))}
+                  />
                 </label>
                 <label style={styles.label}>
                   {t('bulk_recordName')}
@@ -507,12 +512,17 @@ export default function JobsPage() {
                 <>
                   <label style={styles.label}>
                     {t('bulk_operation')}
-                    <select value={operation} onChange={e => setOperation(e.target.value as Operation)} style={styles.input}>
-                      <option value="add">{t('bulk_opAdd')}</option>
-                      <option value="replace">{t('bulk_opReplace')}</option>
-                      <option value="delete">{t('bulk_opDelete')}</option>
-                      <option value="change_ttl">{t('bulk_opChangeTtl')}</option>
-                    </select>
+                    <Select
+                      value={operation}
+                      onChange={v => setOperation(v as Operation)}
+                      style={styles.input}
+                      options={[
+                        { value: 'add', label: t('bulk_opAdd') },
+                        { value: 'replace', label: t('bulk_opReplace') },
+                        { value: 'delete', label: t('bulk_opDelete') },
+                        { value: 'change_ttl', label: t('bulk_opChangeTtl') },
+                      ]}
+                    />
                   </label>
 
                   <PayloadForm

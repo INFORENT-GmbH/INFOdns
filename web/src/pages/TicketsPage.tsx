@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTickets, getUsers, createTicket, uploadAttachments, type Ticket } from '../api/client'
+import Select from '../components/Select'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
 
@@ -139,11 +140,12 @@ export default function TicketsPage() {
             )}
           </div>
           <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
-            <select style={styles.select} value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
-              {['low', 'normal', 'high', 'urgent'].map(p => (
-                <option key={p} value={p}>{priorityLabel(p)}</option>
-              ))}
-            </select>
+            <Select
+              style={styles.select}
+              value={form.priority}
+              onChange={v => setForm(f => ({ ...f, priority: v }))}
+              options={['low', 'normal', 'high', 'urgent'].map(p => ({ value: p, label: priorityLabel(p) }))}
+            />
             <button type="submit" disabled={creating} style={styles.btnSubmit}>
               {creating ? t('creating') : t('create')}
             </button>
@@ -154,25 +156,34 @@ export default function TicketsPage() {
       )}
 
       <div style={styles.filters}>
-        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }} style={styles.select}>
-          <option value="">{t('tickets_allStatuses')}</option>
-          {['open', 'in_progress', 'waiting', 'closed'].map(s => (
-            <option key={s} value={s}>{statusLabel(s)}</option>
-          ))}
-        </select>
-        <select value={priorityFilter} onChange={e => { setPriorityFilter(e.target.value); setPage(1) }} style={styles.select}>
-          <option value="">{t('tickets_allPriorities')}</option>
-          {['low', 'normal', 'high', 'urgent'].map(p => (
-            <option key={p} value={p}>{priorityLabel(p)}</option>
-          ))}
-        </select>
+        <Select
+          value={statusFilter}
+          onChange={v => { setStatusFilter(v); setPage(1) }}
+          style={styles.select}
+          options={[
+            { value: '', label: t('tickets_allStatuses') },
+            ...['open', 'in_progress', 'waiting', 'closed'].map(s => ({ value: s, label: statusLabel(s) })),
+          ]}
+        />
+        <Select
+          value={priorityFilter}
+          onChange={v => { setPriorityFilter(v); setPage(1) }}
+          style={styles.select}
+          options={[
+            { value: '', label: t('tickets_allPriorities') },
+            ...['low', 'normal', 'high', 'urgent'].map(p => ({ value: p, label: priorityLabel(p) })),
+          ]}
+        />
         {isStaff && (
-          <select value={assigneeFilter} onChange={e => { setAssigneeFilter(e.target.value); setPage(1) }} style={styles.select}>
-            <option value="">{t('tickets_allAssignees')}</option>
-            {staffUsers.map(u => (
-              <option key={u.id} value={String(u.id)}>{u.full_name || u.email}</option>
-            ))}
-          </select>
+          <Select
+            value={assigneeFilter}
+            onChange={v => { setAssigneeFilter(v); setPage(1) }}
+            style={styles.select}
+            options={[
+              { value: '', label: t('tickets_allAssignees') },
+              ...staffUsers.map(u => ({ value: String(u.id), label: u.full_name || u.email })),
+            ]}
+          />
         )}
       </div>
 
