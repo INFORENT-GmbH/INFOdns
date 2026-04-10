@@ -284,8 +284,8 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                 className={isSelected ? undefined : 'condensed-row'}
                 onClick={() => navigate(`/domains/${d.id}`)}
                 style={{
-                  padding: '.45rem .75rem',
-                  paddingLeft: isSelected ? 'calc(.75rem - 3px)' : '.75rem',
+                  padding: '.3rem .625rem',
+                  paddingLeft: isSelected ? 'calc(.625rem - 3px)' : '.625rem',
                   borderLeft: isSelected ? '3px solid #2563eb' : '3px solid transparent',
                   borderBottom: '1px solid #f3f4f6',
                   cursor: 'pointer',
@@ -296,7 +296,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                   {dirtyDomainIds.has(d.id) && (
                     <span style={{ color: '#f59e0b', fontSize: '.45rem', flexShrink: 0, lineHeight: 1 }} title="Unsaved changes">●</span>
                   )}
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500, fontSize: '.8125rem', color: isSelected ? '#1d4ed8' : '#111827', flexShrink: 1, minWidth: 0 }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500, fontSize: '.75rem', color: isSelected ? '#1d4ed8' : '#111827', flexShrink: 1, minWidth: 0 }}>
                     {d.fqdn}
                     {d.ns_reference && (
                       <span style={{ fontWeight: 400, color: '#9ca3af' }}>
@@ -306,11 +306,11 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                     )}
                   </span>
                   {d.tenant_name && (
-                    <span style={{ fontSize: '.7rem', color: '#9ca3af', whiteSpace: 'nowrap' as const, flexShrink: 0, marginLeft: 'auto' }}>{d.tenant_name}</span>
+                    <span style={{ fontSize: '.65rem', color: '#9ca3af', whiteSpace: 'nowrap' as const, flexShrink: 0, marginLeft: 'auto' }}>{d.tenant_name}</span>
                   )}
                 </div>
                 {!!(d.zone_status || d.ns_ok === 0 || d.dnssec_enabled || suspended || (d.labels && d.labels.length > 0)) && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 2, flexWrap: 'wrap' as const }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 1, flexWrap: 'wrap' as const }}>
                     <ZoneStatusBadge status={d.zone_status} suspended={d.status === 'suspended'} />
                     {d.ns_ok === 0 && (
                       <span className="tip" data-tip={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '1px 4px', borderRadius: 6 }}>⚠ NS</span>
@@ -666,26 +666,26 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  header: { display: 'flex', alignItems: 'center', paddingBottom: '1rem', position: 'sticky' as const, top: 0, zIndex: 2, background: 'rgba(255,255,255,0.92)' },
+  header: { display: 'flex', alignItems: 'center', paddingBottom: '.625rem', position: 'sticky' as const, top: 0, zIndex: 2, background: 'rgba(255,255,255,0.92)' },
   headerRight: { marginLeft: 'auto', display: 'flex', gap: '.5rem', alignItems: 'center' },
-  h2: { margin: 0, fontSize: '1.25rem', fontWeight: 700 },
-  searchInput: { padding: '.375rem .75rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem', width: 240 },
-  createForm: { display: 'flex', gap: '.5rem', marginBottom: '1rem', padding: '1rem', background: '#f9fafb', borderRadius: 6, border: '1px solid #e5e7eb' },
-  input: { padding: '.375rem .75rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem', flex: 1 },
-  btnPrimary: { padding: '.375rem .875rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
-  btnSecondary: { padding: '.375rem .875rem', background: '#fff', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem', cursor: 'pointer' },
-  btnClear: { padding: '.25rem .5rem', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '.875rem', lineHeight: 1 },
+  h2: { margin: 0, fontSize: '1.1rem', fontWeight: 700 },
+  searchInput: { padding: '.25rem .5rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.8125rem', width: 240 },
+  createForm: { display: 'flex', gap: '.5rem', marginBottom: '.75rem', padding: '.625rem .875rem', background: '#f9fafb', borderRadius: 6, border: '1px solid #e5e7eb' },
+  input: { padding: '.25rem .5rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.8125rem', flex: 1 },
+  btnPrimary: { padding: '.25rem .625rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' },
+  btnSecondary: { padding: '.25rem .625rem', background: '#fff', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.8125rem', cursor: 'pointer' },
+  btnClear: { padding: '.2rem .4rem', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '.8125rem', lineHeight: 1 },
   table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', position: 'sticky' as const, top: 52, zIndex: 1 },
-  tr: { borderBottom: '1px solid #e5e7eb' },
-  td: { padding: '.625rem .75rem', fontSize: '.875rem' },
+  th: { textAlign: 'left', padding: '.3rem .5rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.7rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', position: 'sticky' as const, top: 40, zIndex: 1 },
+  tr: { borderBottom: '1px solid #f3f4f6' },
+  td: { padding: '.3rem .5rem', fontSize: '.8125rem' },
   link: { color: '#2563eb', textDecoration: 'none', fontWeight: 500 },
   muted: { color: '#9ca3af' },
   errorText: { color: '#b91c1c' },
   labelDropdown: { position: 'absolute' as const, top: '100%', left: 0, right: 0, marginTop: 2, background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.1)', zIndex: 20, maxHeight: 240, overflowY: 'auto' as const, padding: '4px 0' },
-  labelDropdownItem: { display: 'flex', alignItems: 'center', width: '100%', padding: '.375rem .75rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' as const, fontSize: '.875rem' },
-  colDropdown: { position: 'absolute' as const, top: '100%', right: 0, marginTop: 2, background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.1)', zIndex: 20, padding: '6px 0', minWidth: 160 },
-  colDropdownItem: { display: 'flex', alignItems: 'center', padding: '.3rem .75rem', fontSize: '.8rem', cursor: 'pointer', whiteSpace: 'nowrap' as const },
-  btnTrashActive: { padding: '.375rem .875rem', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: 4, fontSize: '.875rem', cursor: 'pointer', fontWeight: 600 },
-  btnSuccess: { padding: '.375rem .875rem', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
+  labelDropdownItem: { display: 'flex', alignItems: 'center', width: '100%', padding: '.25rem .5rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' as const, fontSize: '.8125rem' },
+  colDropdown: { position: 'absolute' as const, top: '100%', right: 0, marginTop: 2, background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.1)', zIndex: 20, padding: '4px 0', minWidth: 160 },
+  colDropdownItem: { display: 'flex', alignItems: 'center', padding: '.2rem .5rem', fontSize: '.75rem', cursor: 'pointer', whiteSpace: 'nowrap' as const },
+  btnTrashActive: { padding: '.25rem .625rem', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: 4, fontSize: '.8125rem', cursor: 'pointer', fontWeight: 600 },
+  btnSuccess: { padding: '.25rem .625rem', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' },
 }

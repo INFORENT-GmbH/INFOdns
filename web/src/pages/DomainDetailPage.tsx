@@ -651,7 +651,7 @@ export default function DomainDetailPage() {
       </div>
 
       {conflictWarning && (
-        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.6rem 1rem', borderRadius: 6, marginBottom: '.75rem', fontSize: '.875rem', display: 'flex', alignItems: 'center', gap: '.75rem', border: '1px solid #fde68a' }}>
+        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.375rem .75rem', borderRadius: 6, marginBottom: '.5rem', fontSize: '.8125rem', display: 'flex', alignItems: 'center', gap: '.75rem', border: '1px solid #fde68a' }}>
           <span>⚠ {t('domainDetail_conflictWarning')}</span>
           <button onClick={handleForceReload} style={{ flexShrink: 0, padding: '3px 10px', borderRadius: 4, border: '1px solid #f59e0b', background: '#fff', color: '#92400e', fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' }}>
             {t('domainDetail_discardReload')}
@@ -660,13 +660,13 @@ export default function DomainDetailPage() {
       )}
 
       {domain.status === 'suspended' && (
-        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.6rem 1rem', borderRadius: 6, marginBottom: '.75rem', fontSize: '.875rem', display: 'flex', alignItems: 'center', gap: '.5rem', border: '1px solid #fde68a' }}>
+        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.375rem .75rem', borderRadius: 6, marginBottom: '.5rem', fontSize: '.8125rem', display: 'flex', alignItems: 'center', gap: '.5rem', border: '1px solid #fde68a' }}>
           {t('domainDetail_suspendedMsg', t('domainDetail_activate'))}
         </div>
       )}
 
       {domain.ns_ok === 0 && domain.status === 'active' && (
-        <div style={{ background: '#fee2e2', color: '#991b1b', padding: '.6rem 1rem', borderRadius: 6, marginBottom: '.75rem', fontSize: '.875rem', border: '1px solid #fca5a5' }}>
+        <div style={{ background: '#fee2e2', color: '#991b1b', padding: '.375rem .75rem', borderRadius: 6, marginBottom: '.5rem', fontSize: '.8125rem', border: '1px solid #fca5a5' }}>
           <strong>{t('domainDetail_nsMismatch')}</strong> — {t('domainDetail_nsMismatchDesc')}
           {domain.expected_ns?.length > 0 && (
             <div style={{ marginTop: '.375rem' }}>
@@ -702,9 +702,9 @@ export default function DomainDetailPage() {
       )}
 
       {domain.dnssec_enabled && domain.dnssec_ok === 0 && domain.status === 'active' && (
-        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.6rem 1rem', borderRadius: 6, marginBottom: '.75rem', fontSize: '.875rem', border: '1px solid #fde68a' }}>
+        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.375rem .75rem', borderRadius: 6, marginBottom: '.5rem', fontSize: '.8125rem', border: '1px solid #fde68a' }}>
           <strong>{t('domainDetail_dnssecNotVisible')}</strong> — {t('domainDetail_dnssecNotVisibleDesc')}
-          <div style={{ marginTop: '.5rem', fontSize: '.775rem', color: '#a16207' }}>{t('domainDetail_dnssecCheckedEvery')}</div>
+          <div style={{ marginTop: '.25rem', fontSize: '.7rem', color: '#a16207' }}>{t('domainDetail_dnssecCheckedEvery')}</div>
         </div>
       )}
 
@@ -850,7 +850,7 @@ export default function DomainDetailPage() {
       </div>
 
       {nsRefMode && (
-        <div style={{ marginBottom: '.75rem', padding: '.5rem .875rem', background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 6, display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.875rem', color: '#92400e' }}>
+        <div style={{ marginBottom: '.5rem', padding: '.3rem .75rem', background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 6, display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.8125rem', color: '#92400e' }}>
           <span style={{ fontWeight: 600 }}>NS-Ref:</span>
           <span>{t('domainDetail_nsRefBanner')}</span>
           {nsRefDomain
@@ -1076,7 +1076,7 @@ export default function DomainDetailPage() {
       )}
 
       {hasDirty && (
-        <div style={{ position: 'sticky', bottom: 0, marginLeft: '-1.5rem', marginRight: '-1.5rem', background: '#fff', borderTop: '2px solid #2563eb', padding: '.625rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', zIndex: 50, boxShadow: '0 -2px 12px rgba(0,0,0,.08)' }}>
+        <div style={{ position: 'sticky', bottom: 0, marginLeft: '-1rem', marginRight: '-1rem', background: '#fff', borderTop: '2px solid #2563eb', padding: '.4rem 1rem', display: 'flex', alignItems: 'center', gap: '1rem', zIndex: 50, boxShadow: '0 -2px 12px rgba(0,0,0,.08)' }}>
           <span style={styles.dirtyHint}>{changeCount} {changeCount === 1 ? t('domainDetail_unsavedChange') : t('domainDetail_unsavedChanges')}</span>
           {applyError && <span style={{ fontSize: '.8125rem', color: '#b91c1c', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{applyError}</span>}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '.5rem' }}>
@@ -1103,38 +1103,38 @@ export default function DomainDetailPage() {
 
 
 const styles: Record<string, React.CSSProperties> = {
-  header: { display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '.5rem' },
-  back: { color: '#6b7280', textDecoration: 'none', fontSize: '.875rem' },
-  h2: { margin: 0, fontSize: '1.25rem', fontWeight: 700 },
-  h3: { margin: 0, fontSize: '1rem', fontWeight: 600 },
-  errorBanner: { background: '#fee2e2', color: '#b91c1c', padding: '.75rem 1rem', borderRadius: 6, marginBottom: '1rem', fontSize: '.875rem' },
-  meta: { display: 'flex', gap: '1.5rem', marginBottom: '1.25rem', fontSize: '.875rem', color: '#374151', flexWrap: 'wrap' },
-  labelsSection: { marginBottom: '1.25rem', padding: '.625rem .875rem', background: '#f9fafb', borderRadius: 6, border: '1px solid #e5e7eb' },
-  labelsTitle: { fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const },
-  labelInput: { padding: '2px 6px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.8125rem', width: 110 },
-  labelAddBtn: { padding: '2px 8px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.8125rem', cursor: 'pointer' },
-  labelNewBtn: { padding: '1px 8px', background: 'none', border: '1px dashed #d1d5db', borderRadius: 12, fontSize: '.75rem', color: '#6b7280', cursor: 'pointer' },
-  tableHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.75rem' },
-  dirtyHint: { fontSize: '.8125rem', color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 12 },
+  header: { display: 'flex', alignItems: 'center', gap: '.625rem', marginBottom: '.25rem' },
+  back: { color: '#6b7280', textDecoration: 'none', fontSize: '.8125rem' },
+  h2: { margin: 0, fontSize: '1.1rem', fontWeight: 700 },
+  h3: { margin: 0, fontSize: '.875rem', fontWeight: 600 },
+  errorBanner: { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 6, marginBottom: '.625rem', fontSize: '.8125rem' },
+  meta: { display: 'flex', gap: '1rem', marginBottom: '.625rem', fontSize: '.8125rem', color: '#374151', flexWrap: 'wrap' },
+  labelsSection: { marginBottom: '.625rem', padding: '.375rem .75rem', background: '#f9fafb', borderRadius: 6, border: '1px solid #e5e7eb' },
+  labelsTitle: { fontSize: '.7rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const },
+  labelInput: { padding: '1px 5px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.75rem', width: 110 },
+  labelAddBtn: { padding: '1px 6px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
+  labelNewBtn: { padding: '1px 6px', background: 'none', border: '1px dashed #d1d5db', borderRadius: 12, fontSize: '.7rem', color: '#6b7280', cursor: 'pointer' },
+  tableHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.375rem' },
+  dirtyHint: { fontSize: '.75rem', color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 12 },
   table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
+  th: { textAlign: 'left', padding: '.3rem .5rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.7rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
   tr: { borderBottom: '1px solid #f3f4f6' },
-  td: { padding: '.375rem .75rem', fontSize: '.875rem' },
+  td: { padding: '.2rem .5rem', fontSize: '.8125rem' },
   valueCell: { minWidth: 200, position: 'relative' as const },
-  valueCellWrap: { position: 'relative' as const, height: 24 },
-  newBadge: { fontSize: '.7rem', background: '#dcfce7', color: '#16a34a', padding: '1px 6px', borderRadius: 10, fontWeight: 600, marginRight: 4 },
-  inlineInput: { border: '1px solid transparent', borderRadius: 3, padding: '2px 5px', fontSize: '.8125rem', background: 'transparent', outline: 'none', width: '100%', boxSizing: 'border-box' as const },
-  inlineSelect: { border: '1px solid transparent', borderRadius: 3, padding: '2px 4px', fontSize: '.8125rem', background: 'transparent', outline: 'none', cursor: 'pointer' },
-  btnPrimary: { padding: '.375rem .875rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
-  btnSecondary: { padding: '.375rem .875rem', background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem', cursor: 'pointer' },
-  btnIcon:  { background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '.8125rem', padding: '2px 6px' },
-  bulkBtn:  { background: '#ede9fe', color: '#6d28d9', border: 'none', borderRadius: 10, fontSize: '.7rem', fontWeight: 600, padding: '2px 8px', cursor: 'pointer', marginRight: 4, whiteSpace: 'nowrap' as const },
+  valueCellWrap: { position: 'relative' as const, height: 20 },
+  newBadge: { fontSize: '.65rem', background: '#dcfce7', color: '#16a34a', padding: '1px 5px', borderRadius: 10, fontWeight: 600, marginRight: 4 },
+  inlineInput: { border: '1px solid transparent', borderRadius: 3, padding: '1px 4px', fontSize: '.75rem', background: 'transparent', outline: 'none', width: '100%', boxSizing: 'border-box' as const },
+  inlineSelect: { border: '1px solid transparent', borderRadius: 3, padding: '1px 3px', fontSize: '.75rem', background: 'transparent', outline: 'none', cursor: 'pointer' },
+  btnPrimary: { padding: '.25rem .625rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' },
+  btnSecondary: { padding: '.25rem .625rem', background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.8125rem', cursor: 'pointer' },
+  btnIcon:  { background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '.75rem', padding: '1px 5px' },
+  bulkBtn:  { background: '#ede9fe', color: '#6d28d9', border: 'none', borderRadius: 10, fontSize: '.65rem', fontWeight: 600, padding: '1px 6px', cursor: 'pointer', marginRight: 4, whiteSpace: 'nowrap' as const },
   tableOverlay: { position: 'absolute', inset: 0, zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '.5rem' },
-  spinner: { width: 28, height: 28, border: '3px solid #e5e7eb', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.7s linear infinite' },
-  spinnerText: { fontSize: '.8125rem', color: '#6b7280', fontWeight: 500 },
-  btnWarning: { padding: '.375rem .875rem', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
-  btnSuccess: { padding: '.375rem .875rem', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
-  btnDanger: { padding: '.375rem .875rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
+  spinner: { width: 22, height: 22, border: '2px solid #e5e7eb', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.7s linear infinite' },
+  spinnerText: { fontSize: '.75rem', color: '#6b7280', fontWeight: 500 },
+  btnWarning: { padding: '.25rem .625rem', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' },
+  btnSuccess: { padding: '.25rem .625rem', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' },
+  btnDanger: { padding: '.25rem .625rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' },
 }
 
 // ── Zone error with clickable file paths ──────────────────────

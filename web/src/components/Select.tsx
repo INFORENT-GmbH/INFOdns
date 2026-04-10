@@ -65,7 +65,7 @@ const ghostStyles: StylesConfig<SelectOption, false> = {
   ...sharedStyles,
   control: (base, state) => ({
     ...base,
-    minHeight: 30,
+    minHeight: 24,
     minWidth: 110,
     fontSize: 'inherit',
     fontFamily: 'inherit',
@@ -99,7 +99,7 @@ const ghostStyles: StylesConfig<SelectOption, false> = {
   input: base => ({ ...base, fontFamily: 'inherit', margin: 0, padding: 0 }),
   placeholder: base => ({ ...base, color: '#9ca3af', fontWeight: 400 }),
   indicatorSeparator: () => ({ display: 'none' }),
-  dropdownIndicator: base => ({ ...base, padding: '0 4px', color: '#9ca3af' }),
+  dropdownIndicator: base => ({ ...base, padding: '0 3px', color: '#9ca3af' }),
   valueContainer: base => ({ ...base, padding: '0 2px', flexWrap: 'nowrap' }),
 }
 
