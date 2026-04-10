@@ -66,6 +66,7 @@ const ghostStyles: StylesConfig<SelectOption, false> = {
   control: (base, state) => ({
     ...base,
     minHeight: 30,
+    minWidth: 110,
     fontSize: 'inherit',
     fontFamily: 'inherit',
     background: 'transparent',
