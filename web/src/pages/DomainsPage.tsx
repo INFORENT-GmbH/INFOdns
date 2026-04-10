@@ -155,7 +155,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
     return (
       <div>
         <style>{INLINE_STYLES}</style>
-        <div style={{ padding: '.625rem .75rem', borderBottom: '1px solid #e5e7eb' }}>
+        <div style={{ padding: '.625rem .75rem', borderBottom: '1px solid #e5e7eb', position: 'sticky', top: 0, zIndex: 10, background: '#fff' }}>
           <input
             placeholder={t('domains_searchPlaceholder')}
             value={search}
