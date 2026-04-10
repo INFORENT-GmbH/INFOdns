@@ -160,7 +160,8 @@ export async function domainRoutes(app: FastifyInstance) {
     const rows = await query(
       `SELECT d.id, d.fqdn, d.status, d.zone_status, d.last_serial, d.last_rendered_at,
               d.default_ttl, d.tenant_id, c.name AS tenant_name, d.created_at, d.deleted_at,
-              d.dnssec_enabled, d.ns_ok, d.ns_checked_at, d.dnssec_ok, d.dnssec_checked_at
+              d.dnssec_enabled, d.ns_ok, d.ns_checked_at, d.dnssec_ok, d.dnssec_checked_at,
+              d.ns_reference
        FROM domains d JOIN tenants c ON c.id = d.tenant_id${join}
        ${where}
        ORDER BY d.fqdn

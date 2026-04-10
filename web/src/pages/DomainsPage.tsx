@@ -298,6 +298,12 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                   )}
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500, fontSize: '.8125rem', color: isSelected ? '#1d4ed8' : '#111827', flexShrink: 1, minWidth: 0 }}>
                     {d.fqdn}
+                    {d.ns_reference && (
+                      <span style={{ fontWeight: 400, color: '#9ca3af' }}>
+                        <span style={{ margin: '0 3px' }}>→</span>
+                        <span style={{ color: isSelected ? '#6d93e8' : '#6b7280' }}>{d.ns_reference}</span>
+                      </span>
+                    )}
                   </span>
                   {d.tenant_name && (
                     <span style={{ fontSize: '.7rem', color: '#9ca3af', whiteSpace: 'nowrap' as const, flexShrink: 0, marginLeft: 'auto' }}>{d.tenant_name}</span>
@@ -602,6 +608,12 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                 >
                   {show('fqdn') && <td style={styles.td}>
                     <Link to={`/domains/${d.id}`} style={styles.link} onClick={e => e.stopPropagation()}>{d.fqdn}</Link>
+                    {d.ns_reference && (
+                      <span style={{ marginLeft: 6, color: '#9ca3af', fontSize: '.8125rem' }}>
+                        <span style={{ marginRight: 4 }}>→</span>
+                        <span style={{ color: '#6b7280', fontStyle: 'italic' }}>{d.ns_reference}</span>
+                      </span>
+                    )}
                     {!!d.dnssec_enabled && (
                       <span style={{ marginLeft: 6, fontSize: '.7rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '1px 5px', borderRadius: 8, verticalAlign: 'middle' }}>DNSSEC</span>
                     )}
