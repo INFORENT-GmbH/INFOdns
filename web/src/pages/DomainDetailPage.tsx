@@ -651,7 +651,7 @@ export default function DomainDetailPage() {
       )}
 
       {domain.ns_ok === 0 && domain.status === 'active' && (
-        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.6rem 1rem', borderRadius: 6, marginBottom: '.75rem', fontSize: '.875rem', border: '1px solid #fde68a' }}>
+        <div style={{ background: '#fee2e2', color: '#991b1b', padding: '.6rem 1rem', borderRadius: 6, marginBottom: '.75rem', fontSize: '.875rem', border: '1px solid #fca5a5' }}>
           <strong>{t('domainDetail_nsMismatch')}</strong> — {t('domainDetail_nsMismatchDesc')}
           {domain.expected_ns?.length > 0 && (
             <div style={{ marginTop: '.375rem' }}>
