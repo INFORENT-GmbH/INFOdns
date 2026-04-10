@@ -303,7 +303,7 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                     <span style={{ fontSize: '.7rem', color: '#9ca3af', whiteSpace: 'nowrap' as const, flexShrink: 0, marginLeft: 'auto' }}>{d.tenant_name}</span>
                   )}
                 </div>
-                {(d.zone_status || d.ns_ok === 0 || d.dnssec_enabled || suspended || (d.labels && d.labels.length > 0)) && (
+                {!!(d.zone_status || d.ns_ok === 0 || d.dnssec_enabled || suspended || (d.labels && d.labels.length > 0)) && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 2, flexWrap: 'wrap' as const }}>
                     <ZoneStatusBadge status={d.zone_status} suspended={d.status === 'suspended'} />
                     {d.ns_ok === 0 && (
