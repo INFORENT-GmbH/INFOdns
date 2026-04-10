@@ -19,18 +19,18 @@ export default function Layout() {
   const navigate = useNavigate()
   const [copiedNs, setCopiedNs] = useState<string | null>(null)
   const [hoveredNs, setHoveredNs] = useState<string | null>(null)
-  const [showLogs, setShowLogs] = useState(false)
-  const logsTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [showSystem, setShowSystem] = useState(false)
+  const [showAdmin, setShowAdmin] = useState(false)
+  const systemTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const adminTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { pathname } = useLocation()
-  const logsActive = pathname.startsWith('/audit-logs') || pathname.startsWith('/mail-queue')
+  const systemActive = pathname.startsWith('/jobs') || pathname.startsWith('/audit-logs') || pathname.startsWith('/mail-queue')
+  const adminActive = pathname.startsWith('/users') || pathname.startsWith('/tenants') || pathname.startsWith('/tld-pricing') || pathname.startsWith('/registrars') || pathname.startsWith('/import')
 
-  function openLogs() {
-    if (logsTimer.current) clearTimeout(logsTimer.current)
-    setShowLogs(true)
-  }
-  function closeLogs() {
-    logsTimer.current = setTimeout(() => setShowLogs(false), 120)
-  }
+  function openSystem() { if (systemTimer.current) clearTimeout(systemTimer.current); setShowSystem(true) }
+  function closeSystem() { systemTimer.current = setTimeout(() => setShowSystem(false), 120) }
+  function openAdmin() { if (adminTimer.current) clearTimeout(adminTimer.current); setShowAdmin(true) }
+  function closeAdmin() { adminTimer.current = setTimeout(() => setShowAdmin(false), 120) }
   const { data: nsStatus } = useQuery({
     queryKey: ['ns-status'],
     queryFn: () => getNsStatus().then(r => r.data),
@@ -43,8 +43,6 @@ export default function Layout() {
     await logout()
     navigate('/login')
   }
-
-  const isAdminOrOp = user?.role === 'admin' || user?.role === 'operator'
 
   return (
     <div style={styles.shell}>
@@ -68,24 +66,35 @@ export default function Layout() {
         <a href="/domains" style={{ marginRight: 'auto', display: 'flex' }}><img src="/logo-wide.png" alt="INFOdns" style={styles.brand} /></a>
         <div style={styles.links}>
           <NavLink to="/domains" className="nav-link" style={navStyle}>{t('nav_domains')}</NavLink>
-          <NavLink to="/jobs" className="nav-link" style={navStyle}>{t('nav_jobs')}</NavLink>
           <NavLink to="/tickets" className="nav-link" style={navStyle}>{t('nav_support')}</NavLink>
-          {isAdminOrOp && <NavLink to="/tenants" className="nav-link" style={navStyle}>{t('nav_tenants')}</NavLink>}
-          {user?.role === 'admin' && <NavLink to="/users" className="nav-link" style={navStyle}>{t('nav_users')}</NavLink>}
-          {user?.role === 'admin' && <NavLink to="/tld-pricing" className="nav-link" style={navStyle}>TLDs</NavLink>}
-          {user?.role === 'admin' && <NavLink to="/registrars" className="nav-link" style={navStyle}>Registrars</NavLink>}
-          {user?.role === 'admin' && <NavLink to="/import" className="nav-link" style={navStyle}>Import</NavLink>}
-          <div style={{ position: 'relative' }} onMouseEnter={openLogs} onMouseLeave={closeLogs}>
-            <span className="nav-link" style={{ ...navStyle({ isActive: logsActive }), cursor: 'pointer', userSelect: 'none' }}>
-              {t('nav_logs')} ▾
+          <div style={{ position: 'relative' }} onMouseEnter={openSystem} onMouseLeave={closeSystem}>
+            <span className="nav-link" style={{ ...navStyle({ isActive: systemActive }), cursor: 'pointer', userSelect: 'none' }}>
+              System ▾
             </span>
-            {showLogs && (
-              <div className="dropdown-animate" style={styles.dropdown} onMouseEnter={openLogs} onMouseLeave={closeLogs}>
-                <NavLink to="/audit-logs" style={dropdownItemStyle} onClick={() => setShowLogs(false)}>{t('nav_auditLog')}</NavLink>
-                {user?.role === 'admin' && <NavLink to="/mail-queue" style={dropdownItemStyle} onClick={() => setShowLogs(false)}>{t('nav_mailQueue')}</NavLink>}
+            {showSystem && (
+              <div className="dropdown-animate" style={styles.dropdown} onMouseEnter={openSystem} onMouseLeave={closeSystem}>
+                <NavLink to="/jobs" style={dropdownItemStyle} onClick={() => setShowSystem(false)}>{t('nav_jobs')}</NavLink>
+                <NavLink to="/audit-logs" style={dropdownItemStyle} onClick={() => setShowSystem(false)}>{t('nav_auditLog')}</NavLink>
+                <NavLink to="/mail-queue" style={dropdownItemStyle} onClick={() => setShowSystem(false)}>{t('nav_mailQueue')}</NavLink>
               </div>
             )}
           </div>
+          {user?.role === 'admin' && (
+            <div style={{ position: 'relative' }} onMouseEnter={openAdmin} onMouseLeave={closeAdmin}>
+              <span className="nav-link" style={{ ...navStyle({ isActive: adminActive }), cursor: 'pointer', userSelect: 'none' }}>
+                Admin ▾
+              </span>
+              {showAdmin && (
+                <div className="dropdown-animate" style={styles.dropdown} onMouseEnter={openAdmin} onMouseLeave={closeAdmin}>
+                  <NavLink to="/users" style={dropdownItemStyle} onClick={() => setShowAdmin(false)}>{t('nav_users')}</NavLink>
+                  <NavLink to="/tenants" style={dropdownItemStyle} onClick={() => setShowAdmin(false)}>{t('nav_tenants')}</NavLink>
+                  <NavLink to="/tld-pricing" style={dropdownItemStyle} onClick={() => setShowAdmin(false)}>TLDs</NavLink>
+                  <NavLink to="/registrars" style={dropdownItemStyle} onClick={() => setShowAdmin(false)}>Registrars</NavLink>
+                  <NavLink to="/import" style={dropdownItemStyle} onClick={() => setShowAdmin(false)}>INFORENT Import</NavLink>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         <div style={styles.right}>
           <button
