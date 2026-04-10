@@ -98,6 +98,7 @@ export default function DomainDetailPage() {
   const [pendingDeletes, setPendingDeletes] = useState<Set<number>>(new Set())
   // newRows: new records not yet saved
   const [newRows, setNewRows] = useState<NewRow[]>([])
+  const [focusedValue, setFocusedValue] = useState<number | string | null>(null)
   const [showImportModal, setShowImportModal] = useState(false)
   const [zoneModal, setZoneModal] = useState<{ text: string; highlightLine: number } | null>(null)
 
@@ -917,9 +918,17 @@ export default function DomainDetailPage() {
                   </td>
                 )}
                 <td style={{ ...styles.td, ...styles.valueCell }}>
-                  <input value={row.value} onChange={e => setNewField(row._newId, 'value', e.target.value)}
-                    placeholder={t('domainDetail_valuePlaceholder')} className="inline-field"
-                    style={{ ...styles.inlineInput, fontFamily: MONO, width: '100%' }} />
+                  <div style={styles.valueCellWrap}>
+                    <input value={row.value} onChange={e => setNewField(row._newId, 'value', e.target.value)}
+                      placeholder={t('domainDetail_valuePlaceholder')} className="inline-field"
+                      onFocus={() => setFocusedValue(row._newId)}
+                      onBlur={() => setFocusedValue(null)}
+                      style={{ ...styles.inlineInput, fontFamily: MONO, position: 'absolute', left: 0, top: 0,
+                        width: focusedValue === row._newId ? `${Math.max(row.value.length * 7.8 + 24, 200)}px` : '100%',
+                        zIndex: focusedValue === row._newId ? 30 : undefined,
+                        boxShadow: focusedValue === row._newId ? '0 0 0 2px #bfdbfe, 0 2px 8px rgba(0,0,0,.12)' : undefined,
+                      }} />
+                  </div>
                 </td>
                 <td style={{ ...styles.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                   <span style={styles.newBadge}>{t('domainDetail_newBadge')}</span>
@@ -994,9 +1003,17 @@ export default function DomainDetailPage() {
                     </td>
                   )}
                   <td style={{ ...styles.td, ...styles.valueCell }}>
-                    <input value={row.value} onChange={e => setField(rec.id, rec, 'value', e.target.value)}
-                      disabled={isDeleted} className="inline-field"
-                      style={{ ...styles.inlineInput, fontFamily: MONO, width: '100%' }} />
+                    <div style={styles.valueCellWrap}>
+                      <input value={row.value} onChange={e => setField(rec.id, rec, 'value', e.target.value)}
+                        disabled={isDeleted} className="inline-field"
+                        onFocus={() => setFocusedValue(rec.id)}
+                        onBlur={() => setFocusedValue(null)}
+                        style={{ ...styles.inlineInput, fontFamily: MONO, position: 'absolute', left: 0, top: 0,
+                          width: focusedValue === rec.id ? `${Math.max(row.value.length * 7.8 + 24, 200)}px` : '100%',
+                          zIndex: focusedValue === rec.id ? 30 : undefined,
+                          boxShadow: focusedValue === rec.id ? '0 0 0 2px #bfdbfe, 0 2px 8px rgba(0,0,0,.12)' : undefined,
+                        }} />
+                    </div>
                   </td>
                   <td style={{ ...styles.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
                     {!isDeleted && <BulkEditButton rec={rec} />}
@@ -1075,7 +1092,8 @@ const styles: Record<string, React.CSSProperties> = {
   th: { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
   tr: { borderBottom: '1px solid #f3f4f6' },
   td: { padding: '.375rem .75rem', fontSize: '.875rem' },
-  valueCell: { minWidth: 200 },
+  valueCell: { minWidth: 200, position: 'relative' as const },
+  valueCellWrap: { position: 'relative' as const, height: 24 },
   newBadge: { fontSize: '.7rem', background: '#dcfce7', color: '#16a34a', padding: '1px 6px', borderRadius: 10, fontWeight: 600, marginRight: 4 },
   inlineInput: { border: '1px solid transparent', borderRadius: 3, padding: '2px 5px', fontSize: '.8125rem', background: 'transparent', outline: 'none', width: '100%', boxSizing: 'border-box' as const },
   inlineSelect: { border: '1px solid transparent', borderRadius: 3, padding: '2px 4px', fontSize: '.8125rem', background: 'transparent', outline: 'none', cursor: 'pointer' },
