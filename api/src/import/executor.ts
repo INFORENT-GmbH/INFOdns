@@ -144,6 +144,10 @@ export async function importDomains(
 
   for (const row of rows) {
     if (fqdnToId.has(row.fqdn)) {
+      await conn.execute(
+        'UPDATE domains SET ns_reference = ? WHERE id = ?',
+        [row.ns_reference ?? null, fqdnToId.get(row.fqdn)!]
+      )
       skipped++
       continue
     }
