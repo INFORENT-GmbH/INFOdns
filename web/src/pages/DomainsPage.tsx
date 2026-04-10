@@ -292,34 +292,30 @@ export default function DomainsPage({ condensed = false }: { condensed?: boolean
                   background: isSelected ? '#eff6ff' : suspended ? '#fffbeb' : undefined,
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '.25rem', overflow: 'hidden' }}>
                   {dirtyDomainIds.has(d.id) && (
                     <span style={{ color: '#f59e0b', fontSize: '.45rem', flexShrink: 0, lineHeight: 1 }} title="Unsaved changes">●</span>
                   )}
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500, fontSize: '.8125rem', color: isSelected ? '#1d4ed8' : '#111827' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500, fontSize: '.8125rem', color: isSelected ? '#1d4ed8' : '#111827', flexShrink: 1, minWidth: 0 }}>
                     {d.fqdn}
                   </span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 3, flexWrap: 'wrap' as const }}>
-                  <ZoneStatusBadge status={d.zone_status} suspended={d.status === 'suspended'} />
-                  {d.ns_ok === 0 && (
-                    <span className="tip" data-tip={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '1px 4px', borderRadius: 6 }}>⚠ NS</span>
-                  )}
-                  {!!d.dnssec_enabled && (
-                    <span style={{ fontSize: '.6rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '1px 4px', borderRadius: 6 }}>DNSSEC</span>
-                  )}
-                  {suspended && (
-                    <span style={{ fontSize: '.65rem', color: '#92400e' }}>{t('domains_suspended')}</span>
+                  {d.tenant_name && (
+                    <span style={{ fontSize: '.7rem', color: '#9ca3af', whiteSpace: 'nowrap' as const, flexShrink: 0, marginLeft: 'auto' }}>{d.tenant_name}</span>
                   )}
                 </div>
-                {d.tenant_name && (
-                  <div style={{ fontSize: '.7rem', color: '#9ca3af', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
-                    {d.tenant_name}
-                  </div>
-                )}
-                {d.labels && d.labels.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 2, marginTop: 3 }}>
-                    {d.labels.map(l => <LabelChip key={l.id} label={l} />)}
+                {(d.zone_status || d.ns_ok === 0 || d.dnssec_enabled || suspended || (d.labels && d.labels.length > 0)) && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 2, flexWrap: 'wrap' as const }}>
+                    <ZoneStatusBadge status={d.zone_status} suspended={d.status === 'suspended'} />
+                    {d.ns_ok === 0 && (
+                      <span className="tip" data-tip={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '1px 4px', borderRadius: 6 }}>⚠ NS</span>
+                    )}
+                    {!!d.dnssec_enabled && (
+                      <span style={{ fontSize: '.6rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '1px 4px', borderRadius: 6 }}>DNSSEC</span>
+                    )}
+                    {suspended && (
+                      <span style={{ fontSize: '.65rem', color: '#92400e' }}>{t('domains_suspended')}</span>
+                    )}
+                    {d.labels?.map(l => <LabelChip key={l.id} label={l} />)}
                   </div>
                 )}
               </div>
