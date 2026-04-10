@@ -203,7 +203,7 @@ export default function DomainDetailPage() {
 
   const { data: allDomains = [] } = useQuery<Domain[]>({
     queryKey: ['domains'],
-    queryFn: () => getDomains().then(r => r.data),
+    queryFn: () => getDomains({ limit: '9999' }).then(r => r.data),
     staleTime: 60_000,
     enabled: !!domain,
   })
