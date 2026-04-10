@@ -199,6 +199,38 @@ export async function domainRoutes(app: FastifyInstance) {
     return reply.status(201).send(created)
   })
 
+  // GET /domains/stats
+  app.get('/domains/stats', { preHandler: requireAuth }, async (req: any, reply) => {
+    const isAdmin = req.user.role === 'admin'
+    const ownerWhere = isAdmin ? '' : ` AND d.tenant_id IN (SELECT tenant_id FROM user_tenants WHERE user_id = ${Number(req.user.sub)})`
+
+    const [row] = await query(
+      `SELECT
+         COUNT(*)                                                    AS total,
+         SUM(d.status = 'active')                                   AS active,
+         SUM(d.status = 'pending')                                  AS pending,
+         SUM(d.status = 'suspended')                                AS suspended,
+         SUM(d.status = 'deleted')                                  AS deleted,
+         SUM(d.zone_status = 'error'  AND d.status = 'active')     AS zone_error,
+         SUM(d.zone_status = 'dirty'  AND d.status = 'active')     AS zone_dirty,
+         SUM(d.ns_ok = 0              AND d.status = 'active')     AS ns_not_ok,
+         SUM(d.dnssec_enabled = 1     AND d.status = 'active')     AS dnssec_enabled,
+         SUM(d.ns_reference IS NOT NULL AND d.status = 'active')   AS ns_ref
+       FROM domains d WHERE 1=1${ownerWhere}`,
+      []
+    ) as any[]
+
+    const top_tenants = isAdmin ? await query(
+      `SELECT c.name AS tenant_name, COUNT(*) AS domain_count
+       FROM domains d JOIN tenants c ON c.id = d.tenant_id
+       WHERE d.status != 'deleted'
+       GROUP BY d.tenant_id ORDER BY domain_count DESC LIMIT 10`,
+      []
+    ) : []
+
+    return { ...row, top_tenants }
+  })
+
   // GET /domains/:id
   app.get<{ Params: { id: string } }>('/domains/:id', { preHandler: requireAuth }, async (req, reply) => {
     const row = await queryOne(

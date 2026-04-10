@@ -189,6 +189,14 @@ export const stopImpersonation = () =>
   api.post<{ accessToken: string }>('/auth/stop-impersonation')
 
 // Domains
+export interface DomainStats {
+  total: number; active: number; pending: number; suspended: number; deleted: number
+  zone_error: number; zone_dirty: number
+  ns_not_ok: number; dnssec_enabled: number; ns_ref: number
+  top_tenants: { tenant_name: string; domain_count: number }[]
+}
+export const getDomainStats = () => api.get<DomainStats>('/domains/stats')
+
 export const getDomains = (params?: Record<string, string>) =>
   api.get<Domain[]>('/domains', { params })
 

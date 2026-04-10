@@ -124,6 +124,23 @@ export const translations = {
     domainDetail_nsRefBanner:      'DNS records are mirrored from',
     domainDetail_nsRefReadOnly:    'records on this page are read-only',
 
+    // Dashboard
+    dashboard_domainHealth:   'Domain Health',
+    dashboard_technicalHealth: 'Technical Health',
+    dashboard_total:          'Total',
+    dashboard_active:         'Active',
+    dashboard_pending:        'Pending',
+    dashboard_suspended:      'Suspended',
+    dashboard_zoneErrors:     'Zone Errors',
+    dashboard_dirtyZones:     'Dirty Zones',
+    dashboard_nsIssues:       'NS Issues',
+    dashboard_dnssec:         'DNSSEC',
+    dashboard_nsRef:          'NS-Ref',
+    dashboard_topTenants:     'Top Tenants',
+    dashboard_tenant:         'Tenant',
+    dashboard_domains:        'Domains',
+    error_generic:            'An error occurred.',
+
     // Bulk jobs
     bulk_title:             'Bulk Jobs',
     bulk_newJob:            '+ New Bulk Job',
@@ -490,6 +507,23 @@ export const translations = {
     domainDetail_resetDefault:     'Auf Domain-Standard zurücksetzen',
     domainDetail_nsRefBanner:      'DNS-Einträge werden gespiegelt von',
     domainDetail_nsRefReadOnly:    'Einträge auf dieser Seite sind schreibgeschützt',
+
+    // Dashboard
+    dashboard_domainHealth:   'Domain-Gesundheit',
+    dashboard_technicalHealth: 'Technische Gesundheit',
+    dashboard_total:          'Gesamt',
+    dashboard_active:         'Aktiv',
+    dashboard_pending:        'Ausstehend',
+    dashboard_suspended:      'Gesperrt',
+    dashboard_zoneErrors:     'Zonen-Fehler',
+    dashboard_dirtyZones:     'Dirty Zones',
+    dashboard_nsIssues:       'NS-Probleme',
+    dashboard_dnssec:         'DNSSEC',
+    dashboard_nsRef:          'NS-Ref',
+    dashboard_topTenants:     'Top-Mandanten',
+    dashboard_tenant:         'Mandant',
+    dashboard_domains:        'Domains',
+    error_generic:            'Ein Fehler ist aufgetreten.',
 
     // Bulk jobs
     bulk_title:             'Massenaufgaben',
