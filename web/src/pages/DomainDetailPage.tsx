@@ -682,7 +682,7 @@ export default function DomainDetailPage() {
               </div>
             </div>
           )}
-          <div style={{ marginTop: '.5rem', fontSize: '.775rem', color: '#a16207' }}>{t('domainDetail_nsCheckedEvery')}</div>
+
         </div>
       )}
 
