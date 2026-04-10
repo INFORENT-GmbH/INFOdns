@@ -121,6 +121,8 @@ export const translations = {
     domainDetail_importZone:       'Import Zone',
     domainDetail_cnameFlatten:     'CNAME flattening — resolved to A/AAAA at zone render time, allowing a CNAME-like record at the apex.',
     domainDetail_resetDefault:     'Reset to domain default',
+    domainDetail_nsRefBanner:      'DNS records are mirrored from',
+    domainDetail_nsRefReadOnly:    'records on this page are read-only',
 
     // Bulk jobs
     bulk_title:             'Bulk Jobs',
@@ -486,6 +488,8 @@ export const translations = {
     domainDetail_importZone:       'Zone importieren',
     domainDetail_cnameFlatten:     'CNAME-Flattening — wird beim Rendern zu A/AAAA aufgelöst, ermöglicht CNAME-ähnliche Einträge an der Apex.',
     domainDetail_resetDefault:     'Auf Domain-Standard zurücksetzen',
+    domainDetail_nsRefBanner:      'DNS-Einträge werden gespiegelt von',
+    domainDetail_nsRefReadOnly:    'Einträge auf dieser Seite sind schreibgeschützt',
 
     // Bulk jobs
     bulk_title:             'Massenaufgaben',

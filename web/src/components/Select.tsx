@@ -109,7 +109,7 @@ export default function Select({
   const current = options.find(o => o.value === value) ?? null
 
   return (
-    <div style={{ display: 'inline-block', minWidth: variant === 'ghost' ? 160 : undefined, ...style }}>
+    <div style={{ display: 'inline-block', ...style }}>
       <ReactSelect<SelectOption, false>
         value={current}
         onChange={opt => onChange(opt?.value ?? '')}

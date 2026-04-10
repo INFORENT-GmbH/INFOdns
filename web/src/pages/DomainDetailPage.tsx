@@ -137,9 +137,22 @@ export default function DomainDetailPage() {
     queryFn: () => getDomain(domainId).then(r => r.data),
   })
 
+  const nsRef = domain?.ns_reference ?? null
+
+  const { data: nsRefDomain } = useQuery<Domain | null>({
+    queryKey: ['domain-by-fqdn', nsRef],
+    queryFn: () => getDomains({ search: nsRef!, limit: '10' }).then(r => r.data.find(d => d.fqdn === nsRef) ?? null),
+    enabled: !!nsRef,
+    staleTime: 60_000,
+  })
+
+  // When ns_reference is set, wait for nsRefDomain to resolve before fetching records
+  const recordSourceId: number | null = nsRef ? (nsRefDomain?.id ?? null) : domainId
+
   const { data: records = [], isLoading: loadingRecords, dataUpdatedAt } = useQuery({
-    queryKey: ['records', domainId],
-    queryFn: () => getRecords(domainId).then(r => r.data),
+    queryKey: ['records', recordSourceId],
+    queryFn: () => getRecords(recordSourceId!).then(r => r.data),
+    enabled: recordSourceId !== null,
   })
 
   // Refs always holding the latest state values — used in the effect cleanup below.
@@ -588,6 +601,7 @@ export default function DomainDetailPage() {
   )
   if (!domain) return <p>Domain not found</p>
 
+  const nsRefMode = !!nsRef
   const changeCount = dirtyIds.length + pendingDeletes.size + newRows.length
 
   return (
@@ -835,16 +849,30 @@ export default function DomainDetailPage() {
         </div>
       </div>
 
+      {nsRefMode && (
+        <div style={{ marginBottom: '.75rem', padding: '.5rem .875rem', background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 6, display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.875rem', color: '#92400e' }}>
+          <span style={{ fontWeight: 600 }}>NS-Ref:</span>
+          <span>{t('domainDetail_nsRefBanner')}</span>
+          {nsRefDomain
+            ? <button onClick={() => navigate(`/domains/${nsRefDomain.id}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b45309', fontWeight: 600, textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}>{nsRef}</button>
+            : <span style={{ fontWeight: 600 }}>{nsRef}</span>
+          }
+          <span style={{ color: '#a16207' }}>— {t('domainDetail_nsRefReadOnly')}</span>
+        </div>
+      )}
+
       <div style={styles.tableHeader}>
         <h3 style={styles.h3}>{t('domainDetail_dnsRecords')}</h3>
-        <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
-          <button onClick={() => setShowImportModal(true)} style={styles.btnSecondary}>{t('domainDetail_importZone')}</button>
-          <button onClick={addNewRow} style={hasDirty ? styles.btnSecondary : styles.btnPrimary}>{t('domainDetail_addRecord')}</button>
-        </div>
+        {!nsRefMode && (
+          <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+            <button onClick={() => setShowImportModal(true)} style={styles.btnSecondary}>{t('domainDetail_importZone')}</button>
+            <button onClick={addNewRow} style={hasDirty ? styles.btnSecondary : styles.btnPrimary}>{t('domainDetail_addRecord')}</button>
+          </div>
+        )}
       </div>
 
       {loadingRecords ? <p>{t('domainDetail_loadingRecords')}</p> : (
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative', ...(nsRefMode ? { border: '2px solid #f59e0b', borderRadius: 6, overflow: 'hidden' } : {}) }}>
         {(applying || pendingRefresh) && (
           <div style={styles.tableOverlay}>
             <div style={styles.spinner} />
@@ -854,8 +882,8 @@ export default function DomainDetailPage() {
         <table style={{ ...styles.table, opacity: (applying || pendingRefresh) ? 0.45 : 1, transition: 'opacity .2s', pointerEvents: (applying || pendingRefresh) ? 'none' : 'auto' }}>
           <thead>
             <tr>
-              <th style={styles.th}>{t('name')}</th>
-              <th style={styles.th}>{t('type')}</th>
+              <th style={{ ...styles.th, width: '18%' }}>{t('name')}</th>
+              <th style={{ ...styles.th, whiteSpace: 'nowrap', width: 1 }}>{t('type')}</th>
               <th style={styles.th}>{t('ttl')}</th>
               {showPriority   && <th style={{ ...styles.th, width: 70 }}>{t('priority')}</th>}
               {showWeightPort && <th style={{ ...styles.th, width: 58 }}>{t('weight')}</th>}
@@ -952,14 +980,14 @@ export default function DomainDetailPage() {
                 <tr key={rec.id} style={rowStyle}>
                   <td style={styles.td}>
                     <input value={row.name} onChange={e => setField(rec.id, rec, 'name', e.target.value)}
-                      disabled={isDeleted} className="inline-field"
+                      disabled={isDeleted || nsRefMode} className="inline-field"
                       style={{ ...styles.inlineInput, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }} />
                   </td>
                   <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
                     <Select
                       value={row.type === 'ALIAS' ? 'CNAME' : row.type}
                       onChange={v => setField(rec.id, rec, 'type', v)}
-                      disabled={isDeleted}
+                      disabled={isDeleted || nsRefMode}
                       variant="ghost"
                       options={RECORD_TYPES.map(rt => ({ value: rt, label: rt }))}
                       style={{ fontSize: '.8125rem' }}
@@ -971,9 +999,9 @@ export default function DomainDetailPage() {
                   </td>
                   <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
                     <input value={row.ttl} onChange={e => setField(rec.id, rec, 'ttl', e.target.value)}
-                      disabled={isDeleted} placeholder={t('domainDetail_ttlPlaceholder')} className="inline-field"
+                      disabled={isDeleted || nsRefMode} placeholder={t('domainDetail_ttlPlaceholder')} className="inline-field"
                       style={{ ...styles.inlineInput, width: 70 }} />
-                    {row.ttl !== '' && !isDeleted && (
+                    {row.ttl !== '' && !isDeleted && !nsRefMode && (
                       <button onClick={() => setField(rec.id, rec, 'ttl', '')}
                         className="alias-hint" data-tip={t('domainDetail_resetDefault')} style={{ ...styles.btnIcon, color: '#9ca3af', marginLeft: 2 }}>↺</button>
                     )}
@@ -982,7 +1010,7 @@ export default function DomainDetailPage() {
                     <td style={styles.td}>
                       {(row.type === 'MX' || row.type === 'SRV') && (
                         <input value={row.priority} onChange={e => setField(rec.id, rec, 'priority', e.target.value)}
-                          disabled={isDeleted} className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
+                          disabled={isDeleted || nsRefMode} className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
                       )}
                     </td>
                   )}
@@ -990,7 +1018,7 @@ export default function DomainDetailPage() {
                     <td style={styles.td}>
                       {row.type === 'SRV' && (
                         <input value={row.weight} onChange={e => setField(rec.id, rec, 'weight', e.target.value)}
-                          disabled={isDeleted} className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
+                          disabled={isDeleted || nsRefMode} className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
                       )}
                     </td>
                   )}
@@ -998,14 +1026,14 @@ export default function DomainDetailPage() {
                     <td style={styles.td}>
                       {row.type === 'SRV' && (
                         <input value={row.port} onChange={e => setField(rec.id, rec, 'port', e.target.value)}
-                          disabled={isDeleted} className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
+                          disabled={isDeleted || nsRefMode} className="inline-field" style={{ ...styles.inlineInput, width: '100%', fontFamily: MONO }} />
                       )}
                     </td>
                   )}
                   <td style={{ ...styles.td, ...styles.valueCell }}>
                     <div style={styles.valueCellWrap}>
                       <input value={row.value} onChange={e => setField(rec.id, rec, 'value', e.target.value)}
-                        disabled={isDeleted} className="inline-field"
+                        disabled={isDeleted || nsRefMode} className="inline-field"
                         onFocus={() => setFocusedValue(rec.id)}
                         onBlur={() => setFocusedValue(null)}
                         style={{ ...styles.inlineInput, fontFamily: MONO, position: 'absolute', left: 0, top: 0,
@@ -1016,15 +1044,15 @@ export default function DomainDetailPage() {
                     </div>
                   </td>
                   <td style={{ ...styles.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    {!isDeleted && <BulkEditButton rec={rec} />}
-                    {dirty && !isDeleted && (
+                    {!nsRefMode && !isDeleted && <BulkEditButton rec={rec} />}
+                    {!nsRefMode && dirty && !isDeleted && (
                       <button onClick={() => setEdits(prev => { const n = { ...prev }; delete n[rec.id]; return n })}
                         style={{ ...styles.btnIcon, color: '#6b7280' }} title={t('domainDetail_revert')}>↩</button>
                     )}
-                    {isDeleted
+                    {!nsRefMode && (isDeleted
                       ? <button onClick={() => unmarkDelete(rec.id)} style={{ ...styles.btnIcon, color: '#16a34a' }}>{t('domainDetail_restore')}</button>
                       : <button onClick={() => markDelete(rec)} style={{ ...styles.btnIcon, color: '#b91c1c' }}>{t('delete')}</button>
-                    }
+                    )}
                   </td>
                 </tr>
               )
