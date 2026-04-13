@@ -6,7 +6,7 @@ import Layout from './components/Layout'
 import LoginPage from './pages/LoginPage'
 import DomainsLayout from './pages/DomainsLayout'
 import DomainDetailPage from './pages/DomainDetailPage'
-import JobsPage from './pages/JobsPage'
+import BulkJobsPage from './pages/JobsPage'
 import TenantsPage from './pages/TenantsPage'
 import UsersPage from './pages/UsersPage'
 import AuditLogPage from './pages/AuditLogPage'
@@ -51,8 +51,9 @@ export default function App() {
               <Route index element={<Navigate to="/domains" replace />} />
               <Route path="domains" element={<DomainsLayout />}>
                 <Route path=":id" element={<DomainDetailPage />} />
+                <Route path="bulk-jobs" element={<BulkJobsPage />} />
               </Route>
-              <Route path="jobs" element={<JobsPage />} />
+              <Route path="jobs" element={<Navigate to="/domains/bulk-jobs" replace />} />
               <Route path="tenants" element={<TenantsPage />} />
               <Route path="users" element={<UsersPage />} />
               <Route path="audit-logs" element={<AuditLogPage />} />

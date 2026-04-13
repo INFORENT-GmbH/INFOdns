@@ -24,7 +24,7 @@ export default function Layout() {
   const systemTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const adminTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { pathname } = useLocation()
-  const systemActive = pathname.startsWith('/jobs') || pathname.startsWith('/audit-logs') || pathname.startsWith('/mail-queue')
+  const systemActive = pathname.startsWith('/audit-logs') || pathname.startsWith('/mail-queue')
   const adminActive = pathname.startsWith('/users') || pathname.startsWith('/tenants') || pathname.startsWith('/tld-pricing') || pathname.startsWith('/registrars') || pathname.startsWith('/import')
 
   function openSystem() { if (systemTimer.current) clearTimeout(systemTimer.current); setShowSystem(true) }
@@ -73,7 +73,6 @@ export default function Layout() {
             </span>
             {showSystem && (
               <div className="dropdown-animate" style={styles.dropdown} onMouseEnter={openSystem} onMouseLeave={closeSystem}>
-                <NavLink to="/jobs" style={dropdownItemStyle} onClick={() => setShowSystem(false)}>{t('nav_jobs')}</NavLink>
                 <NavLink to="/audit-logs" style={dropdownItemStyle} onClick={() => setShowSystem(false)}>{t('nav_auditLog')}</NavLink>
                 <NavLink to="/mail-queue" style={dropdownItemStyle} onClick={() => setShowSystem(false)}>{t('nav_mailQueue')}</NavLink>
               </div>

@@ -69,7 +69,7 @@ function BulkEditButton({ rec }: { rec: DnsRecord }) {
 
   function handleClick() {
     const params = new URLSearchParams({ type: rec.type, name: rec.name, value: rawValue })
-    navigate(`/jobs?${params.toString()}`)
+    navigate(`/domains/bulk-jobs?${params.toString()}`)
   }
 
   if (count === null) return null
