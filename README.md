@@ -197,8 +197,8 @@ docker compose exec api node -e "
 const bcrypt = require('bcrypt');
 const { query } = require('./dist/db.js');
 bcrypt.hash('yourpassword', 12).then(h =>
-  query('INSERT INTO users (tenant_id,email,password_hash,role,full_name) VALUES (NULL,?,?,?,?)',
-    ['admin@example.com', h, 'admin', 'Admin'])
+  query('INSERT INTO users (tenant_id,email,password_hash,role,first_name,last_name) VALUES (NULL,?,?,?,?,?)',
+    ['admin@example.com', h, 'admin', '', 'Admin'])
 ).then(() => process.exit(0));
 "
 ```

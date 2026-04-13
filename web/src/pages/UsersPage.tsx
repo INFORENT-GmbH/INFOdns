@@ -10,20 +10,20 @@ export default function UsersPage() {
   const { user: currentUser, impersonate } = useAuth()
   const qc = useQueryClient()
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ email: '', password: '', full_name: '', role: 'tenant', locale: 'de' })
+  const [form, setForm] = useState({ email: '', password: '', first_name: '', last_name: '', street: '', zip: '', city: '', country: '', phone: '', mobile: '', role: 'tenant', locale: 'de' })
   const [selectedTenantIds, setSelectedTenantIds] = useState<number[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const [showInviteForm, setShowInviteForm] = useState(false)
-  const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', role: 'tenant', locale: 'de' })
+  const [inviteForm, setInviteForm] = useState({ email: '', first_name: '', last_name: '', role: 'tenant', locale: 'de' })
   const [inviteTenantIds, setInviteTenantIds] = useState<number[]>([])
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
 
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [editForm, setEditForm] = useState({ email: '', full_name: '', role: 'tenant', locale: 'de', is_active: true })
+  const [editForm, setEditForm] = useState({ email: '', first_name: '', last_name: '', street: '', zip: '', city: '', country: '', phone: '', mobile: '', role: 'tenant', locale: 'de', is_active: true })
   const [editTenantIds, setEditTenantIds] = useState<number[]>([])
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
@@ -65,7 +65,7 @@ export default function UsersPage() {
 
   function startEdit(u: User) {
     setEditingId(u.id)
-    setEditForm({ email: u.email, full_name: u.full_name, role: u.role, locale: u.locale, is_active: !!u.is_active })
+    setEditForm({ email: u.email, first_name: u.first_name, last_name: u.last_name, street: u.street ?? '', zip: u.zip ?? '', city: u.city ?? '', country: u.country ?? '', phone: u.phone ?? '', mobile: u.mobile ?? '', role: u.role, locale: u.locale, is_active: !!u.is_active })
     setEditTenantIds(u.tenant_ids ?? [])
     setEditError(null)
   }
@@ -101,7 +101,7 @@ export default function UsersPage() {
       await inviteUser({ ...inviteForm, tenant_ids: inviteTenantIds })
       qc.invalidateQueries({ queryKey: ['invites'] })
       setInviteSuccess(inviteForm.email)
-      setInviteForm({ email: '', full_name: '', role: 'tenant', locale: 'de' })
+      setInviteForm({ email: '', first_name: '', last_name: '', role: 'tenant', locale: 'de' })
       setInviteTenantIds([])
       setShowInviteForm(false)
     } catch (err: any) {
@@ -121,7 +121,7 @@ export default function UsersPage() {
       } as any)
       qc.invalidateQueries({ queryKey: ['users'] })
       setShowForm(false)
-      setForm({ email: '', password: '', full_name: '', role: 'tenant', locale: 'de' })
+      setForm({ email: '', password: '', first_name: '', last_name: '', street: '', zip: '', city: '', country: '', phone: '', mobile: '', role: 'tenant', locale: 'de' })
       setSelectedTenantIds([])
     } catch (err: any) {
       setError(err.response?.data?.message ?? err.message)
@@ -170,7 +170,8 @@ export default function UsersPage() {
           {inviteError && <div style={styles.error}>{inviteError}</div>}
           <div style={styles.grid}>
             <label style={styles.label}>{t('email')} <input type="email" value={inviteForm.email} onChange={e => setInviteField('email', e.target.value)} required style={styles.input} /></label>
-            <label style={styles.label}>{t('users_fullName')} <input value={inviteForm.full_name} onChange={e => setInviteField('full_name', e.target.value)} required style={styles.input} /></label>
+            <label style={styles.label}>{t('users_firstName')} <input value={inviteForm.first_name} onChange={e => setInviteField('first_name', e.target.value)} style={styles.input} /></label>
+            <label style={styles.label}>{t('users_lastName')} <input value={inviteForm.last_name} onChange={e => setInviteField('last_name', e.target.value)} required style={styles.input} /></label>
             <label style={styles.label}>
               {t('role')}
               <Select value={inviteForm.role} onChange={v => setInviteField('role', v)} style={styles.input}
@@ -208,7 +209,8 @@ export default function UsersPage() {
           <div style={styles.grid}>
             <label style={styles.label}>{t('email')} <input type="email" value={form.email} onChange={e => setField('email', e.target.value)} required style={styles.input} /></label>
             <label style={styles.label}>{t('login_password')} <input type="password" value={form.password} onChange={e => setField('password', e.target.value)} required minLength={8} style={styles.input} /></label>
-            <label style={styles.label}>{t('users_fullName')} <input value={form.full_name} onChange={e => setField('full_name', e.target.value)} required style={styles.input} /></label>
+            <label style={styles.label}>{t('users_firstName')} <input value={form.first_name} onChange={e => setField('first_name', e.target.value)} style={styles.input} /></label>
+            <label style={styles.label}>{t('users_lastName')} <input value={form.last_name} onChange={e => setField('last_name', e.target.value)} required style={styles.input} /></label>
             <label style={styles.label}>
               {t('role')}
               <Select value={form.role} onChange={v => setField('role', v)} style={styles.input}
@@ -219,6 +221,18 @@ export default function UsersPage() {
               <Select value={form.locale} onChange={v => setField('locale', v)} style={styles.input}
                 options={[{ value: 'de', label: t('locale_de') }, { value: 'en', label: t('locale_en') }]} />
             </label>
+          </div>
+          <h5 style={{ margin: '.75rem 0 0' }}>{t('users_addressHeading')}</h5>
+          <div style={styles.grid}>
+            <label style={{ ...styles.label, gridColumn: '1 / -1' }}>{t('users_street')} <input value={form.street} onChange={e => setField('street', e.target.value)} style={styles.input} /></label>
+            <label style={styles.label}>{t('users_zip')} <input value={form.zip} onChange={e => setField('zip', e.target.value)} style={styles.input} /></label>
+            <label style={styles.label}>{t('users_city')} <input value={form.city} onChange={e => setField('city', e.target.value)} style={styles.input} /></label>
+            <label style={styles.label}>{t('users_country')} <input value={form.country} onChange={e => setField('country', e.target.value)} style={styles.input} /></label>
+          </div>
+          <h5 style={{ margin: '.75rem 0 0' }}>{t('users_contactHeading')}</h5>
+          <div style={styles.grid}>
+            <label style={styles.label}>{t('users_phone')} <input type="tel" value={form.phone} onChange={e => setField('phone', e.target.value)} style={styles.input} /></label>
+            <label style={styles.label}>{t('users_mobile')} <input type="tel" value={form.mobile} onChange={e => setField('mobile', e.target.value)} style={styles.input} /></label>
           </div>
           <div>
             <div style={{ fontSize: '.875rem', fontWeight: 500, marginBottom: '.25rem' }}>{t('users_tenants')}</div>
@@ -262,7 +276,7 @@ export default function UsersPage() {
               <React.Fragment key={u.id}>
                 <tr style={styles.tr}>
                   <td style={styles.td}>{u.email}</td>
-                  <td style={styles.td}>{u.full_name}</td>
+                  <td style={styles.td}>{[u.first_name, u.last_name].filter(Boolean).join(' ')}</td>
                   <td style={styles.td}>{roleBadge(u.role)}</td>
                   <td style={styles.td}>{tenantNames(u.tenant_ids ?? [])}</td>
                   <td style={styles.td}>{u.is_active ? '✓' : '—'}</td>
@@ -295,7 +309,8 @@ export default function UsersPage() {
                         {editError && <div style={styles.error}>{editError}</div>}
                         <div style={styles.grid}>
                           <label style={styles.label}>{t('email')} <input type="email" value={editForm.email} onChange={e => setEditField('email', e.target.value)} style={styles.input} /></label>
-                          <label style={styles.label}>{t('users_fullName')} <input value={editForm.full_name} onChange={e => setEditField('full_name', e.target.value)} style={styles.input} /></label>
+                          <label style={styles.label}>{t('users_firstName')} <input value={editForm.first_name} onChange={e => setEditField('first_name', e.target.value)} style={styles.input} /></label>
+                          <label style={styles.label}>{t('users_lastName')} <input value={editForm.last_name} onChange={e => setEditField('last_name', e.target.value)} style={styles.input} /></label>
                           <label style={styles.label}>
                             {t('role')}
                             <Select value={editForm.role} onChange={v => setEditField('role', v)} style={styles.input}
@@ -306,6 +321,18 @@ export default function UsersPage() {
                             <Select value={editForm.locale} onChange={v => setEditField('locale', v)} style={styles.input}
                               options={[{ value: 'de', label: t('locale_de') }, { value: 'en', label: t('locale_en') }]} />
                           </label>
+                        </div>
+                        <h5 style={{ margin: '.75rem 0 0' }}>{t('users_addressHeading')}</h5>
+                        <div style={styles.grid}>
+                          <label style={{ ...styles.label, gridColumn: '1 / -1' }}>{t('users_street')} <input value={editForm.street} onChange={e => setEditField('street', e.target.value)} style={styles.input} /></label>
+                          <label style={styles.label}>{t('users_zip')} <input value={editForm.zip} onChange={e => setEditField('zip', e.target.value)} style={styles.input} /></label>
+                          <label style={styles.label}>{t('users_city')} <input value={editForm.city} onChange={e => setEditField('city', e.target.value)} style={styles.input} /></label>
+                          <label style={styles.label}>{t('users_country')} <input value={editForm.country} onChange={e => setEditField('country', e.target.value)} style={styles.input} /></label>
+                        </div>
+                        <h5 style={{ margin: '.75rem 0 0' }}>{t('users_contactHeading')}</h5>
+                        <div style={styles.grid}>
+                          <label style={styles.label}>{t('users_phone')} <input type="tel" value={editForm.phone} onChange={e => setEditField('phone', e.target.value)} style={styles.input} /></label>
+                          <label style={styles.label}>{t('users_mobile')} <input type="tel" value={editForm.mobile} onChange={e => setEditField('mobile', e.target.value)} style={styles.input} /></label>
                         </div>
                         <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.875rem', fontWeight: 500, cursor: 'pointer' }}>
                           <input type="checkbox" checked={editForm.is_active} onChange={e => setEditField('is_active', e.target.checked)} />
@@ -336,7 +363,7 @@ export default function UsersPage() {
             {invites.map((inv: PendingInvite) => (
               <tr key={`invite-${inv.id}`} style={{ ...styles.tr, opacity: 0.7 }}>
                 <td style={styles.td}>{inv.email}</td>
-                <td style={{ ...styles.td, color: '#9ca3af' }}>{inv.full_name || <span style={styles.muted}>—</span>}</td>
+                <td style={{ ...styles.td, color: '#9ca3af' }}>{[inv.first_name, inv.last_name].filter(Boolean).join(' ') || <span style={styles.muted}>—</span>}</td>
                 <td style={styles.td}>{roleBadge(inv.role)}</td>
                 <td style={styles.td}>{tenantNames(inv.tenant_ids ?? [])}</td>
                 <td style={styles.td}>

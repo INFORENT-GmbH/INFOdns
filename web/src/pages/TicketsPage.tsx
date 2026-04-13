@@ -181,7 +181,7 @@ export default function TicketsPage() {
             style={styles.select}
             options={[
               { value: '', label: t('tickets_allAssignees') },
-              ...staffUsers.map(u => ({ value: String(u.id), label: u.full_name || u.email })),
+              ...staffUsers.map(u => ({ value: String(u.id), label: [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email })),
             ]}
           />
         )}

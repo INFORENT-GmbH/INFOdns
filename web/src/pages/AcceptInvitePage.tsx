@@ -24,7 +24,7 @@ export default function AcceptInvitePage() {
     getInvite(token)
       .then(r => {
         setInviteEmail(r.data.email)
-        setInviteFullName(r.data.full_name)
+        setInviteFullName([r.data.first_name, r.data.last_name].filter(Boolean).join(' '))
         setStatus('ready')
       })
       .catch(err => {
