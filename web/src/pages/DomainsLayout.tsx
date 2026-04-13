@@ -16,9 +16,8 @@ export default function DomainsLayout() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [])
 
-  const detailMatch = useMatch('/domains/:id')
-  const bulkMatch = useMatch('/domains/bulk-jobs')
-  const detailOpen = !!(detailMatch || bulkMatch)
+  const match = useMatch('/domains/:id')
+  const detailOpen = !!match
 
   return (
     <div style={{ position: 'fixed', top: 94, left: 0, right: 0, bottom: 0, display: 'flex', zIndex: 10, background: '#f3f4f6' }}>

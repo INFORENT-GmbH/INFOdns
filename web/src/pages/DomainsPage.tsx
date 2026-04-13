@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate, useMatch, NavLink } from 'react-router-dom'
+import { useNavigate, useMatch } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getDomains, getTenants, getLabelSuggestions, type Domain } from '../api/client'
 import LabelChip from '../components/LabelChip'
@@ -179,24 +179,6 @@ export default function DomainsPage() {
             )}
           </div>
         )}
-        <NavLink
-          to="/domains/bulk-jobs"
-          style={({ isActive }) => ({
-            display: 'block',
-            marginTop: '.375rem',
-            padding: '.3rem .5rem',
-            borderRadius: 4,
-            fontSize: '.8125rem',
-            fontWeight: isActive ? 600 : 400,
-            color: isActive ? '#1d4ed8' : '#374151',
-            background: isActive ? '#eff6ff' : 'transparent',
-            border: `1px solid ${isActive ? '#bfdbfe' : '#e5e7eb'}`,
-            textDecoration: 'none',
-            textAlign: 'center' as const,
-          })}
-        >
-          {t('nav_jobs')}
-        </NavLink>
         {!isLoading && (
           <div style={{ fontSize: '.7rem', color: '#9ca3af', marginTop: '.375rem' }}>
             {domains.length} domain{domains.length !== 1 ? 's' : ''}
