@@ -212,7 +212,7 @@ async function processJob(job: QueueRow): Promise<void> {
   const rendered = await queryOne<{ last_rendered_at: string }>('SELECT last_rendered_at FROM domains WHERE id = ?', [domainId])
   broadcastEvent({ type: 'domain_status', domainId, fqdn: domain.fqdn, zone_status: 'clean', last_serial: serial, last_rendered_at: rendered?.last_rendered_at ?? null, zone_error: null })
   if (MAIL_ADMIN_TO) {
-    queueMail(MAIL_ADMIN_TO, 'zone_deploy_success', { fqdn: domain.fqdn, jobId: job.id, serial, renderedAt: rendered?.last_rendered_at ?? 'unknown' })
+    await queueMail(MAIL_ADMIN_TO, 'zone_deploy_success', { fqdn: domain.fqdn, jobId: job.id, serial, renderedAt: rendered?.last_rendered_at ?? 'unknown' })
   }
 
   console.log(`[worker] Job ${job.id} done — ${domain.fqdn} serial ${serial}`)
@@ -257,7 +257,7 @@ async function poll(): Promise<void> {
         if (failedDomain) {
           broadcastEvent({ type: 'domain_status', domainId: job.domain_id, fqdn: failedDomain.fqdn, zone_status: 'error', zone_error: err.message })
           if (MAIL_ADMIN_TO) {
-            queueMail(MAIL_ADMIN_TO, 'zone_deploy_failed', { fqdn: failedDomain.fqdn, jobId: job.id, retries: newRetries, error: err.message })
+            await queueMail(MAIL_ADMIN_TO, 'zone_deploy_failed', { fqdn: failedDomain.fqdn, jobId: job.id, retries: newRetries, error: err.message })
           }
         }
       } else {
@@ -328,7 +328,7 @@ async function processDomainLifecycle(): Promise<void> {
         const dueAfterDays = 30 - threshold
         if (daysElapsed >= dueAfterDays && !(newFlags & bit)) {
           for (const admin of admins) {
-            queueMail(admin.email, 'domain_purge_reminder', { fqdn: domain.fqdn, daysRemaining, deletedAt, purgeDate })
+            await queueMail(admin.email, 'domain_purge_reminder', { fqdn: domain.fqdn, daysRemaining, deletedAt, purgeDate })
           }
           newFlags |= bit
         }

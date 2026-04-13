@@ -200,7 +200,6 @@ export default function DomainDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataUpdatedAt])
 
-
   const { data: labelSuggestions = [] } = useQuery({
     queryKey: ['label-suggestions', domain?.tenant_id],
     queryFn: () => getLabelSuggestions(domain?.tenant_id).then(r => r.data),
@@ -285,7 +284,7 @@ export default function DomainDetailPage() {
 
   const dirtyIds = Object.keys(edits).map(Number)
   const hasDirty = dirtyIds.length > 0 || pendingDeletes.size > 0 || newRows.length > 0
-  setLiveDirty(domainId, hasDirty)
+  useEffect(() => { setLiveDirty(domainId, hasDirty) }, [domainId, hasDirty])
   const conflictWarning = hasDirty
     && loadedFromCacheSerial !== null
     && loadedFromCacheSerial > 0

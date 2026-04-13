@@ -20,25 +20,26 @@ async function applyToDomain(
 ): Promise<void> {
   const { match, replace_with, records, new_ttl } = payload
 
-  async function findMatches(): Promise<any[]> {
-    let sql = 'SELECT * FROM dns_records WHERE domain_id = ? AND is_deleted = 0'
-    const p: unknown[] = [domainId]
-    if (match?.name)  { sql += ' AND name = ?';      p.push(match.name) }
-    if (match?.type)  { sql += ' AND type = ?';      p.push(match.type) }
-    if (match?.value) { sql += ' AND value LIKE ?';  p.push(`%${match.value}%`) }
-    return query<any>(sql, p)
-  }
+  await transaction(async (conn) => {
+    async function findMatches(): Promise<any[]> {
+      let sql = 'SELECT * FROM dns_records WHERE domain_id = ? AND is_deleted = 0'
+      const p: any[] = [domainId]
+      if (match?.name)  { sql += ' AND name = ?';      p.push(match.name) }
+      if (match?.type)  { sql += ' AND type = ?';      p.push(match.type) }
+      if (match?.value) { sql += ' AND value LIKE ?';  p.push(`%${match.value}%`) }
+      const [rows] = await conn.execute<any[]>(sql, p)
+      return rows
+    }
 
-  await transaction(async (conn: any) => {
     switch (operation) {
       case 'add':
         for (const rec of records ?? []) {
-          const existing = await queryOne<any>(
+          const [rows] = await conn.execute<any[]>(
             'SELECT id FROM dns_records WHERE domain_id=? AND name=? AND type=? AND value=? AND is_deleted=0',
             [domainId, rec.name, rec.type, rec.value]
           )
-          if (!existing) {
-            await execute(
+          if (!rows[0]) {
+            await conn.execute(
               `INSERT INTO dns_records (domain_id, name, type, ttl, priority, weight, port, value)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
               [domainId, rec.name, rec.type, rec.ttl ?? null, rec.priority ?? null,
@@ -50,11 +51,11 @@ async function applyToDomain(
 
       case 'replace':
         for (const existing of await findMatches()) {
-          await execute(
+          await conn.execute(
             "UPDATE dns_records SET is_deleted=1, updated_at=NOW() WHERE id=?",
             [existing.id]
           )
-          await execute(
+          await conn.execute(
             `INSERT INTO dns_records (domain_id, name, type, ttl, priority, weight, port, value)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [domainId, replace_with.name, replace_with.type, replace_with.ttl ?? null,
@@ -66,7 +67,7 @@ async function applyToDomain(
 
       case 'delete':
         for (const existing of await findMatches()) {
-          await execute(
+          await conn.execute(
             "UPDATE dns_records SET is_deleted=1, updated_at=NOW() WHERE id=?",
             [existing.id]
           )
@@ -75,7 +76,7 @@ async function applyToDomain(
 
       case 'change_ttl':
         for (const existing of await findMatches()) {
-          await execute(
+          await conn.execute(
             "UPDATE dns_records SET ttl=?, updated_at=NOW() WHERE id=?",
             [new_ttl, existing.id]
           )

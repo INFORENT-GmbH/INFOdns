@@ -117,7 +117,7 @@ async function handleParsedEmail(parsed: Awaited<ReturnType<typeof simpleParser>
     broadcastEvent({ type: 'ticket_created', ticketId: newTicketId })
 
     if (fromAddr) {
-      queueMail(fromAddr, 'ticket_created', {
+      await queueMail(fromAddr, 'ticket_created', {
         ticketId: newTicketId,
         subject,
         requesterName: fromName,
@@ -127,7 +127,7 @@ async function handleParsedEmail(parsed: Awaited<ReturnType<typeof simpleParser>
 
     const admins = await query<{ email: string }>(`SELECT email FROM users WHERE role = 'admin'`)
     for (const admin of admins) {
-      queueMail(admin.email, 'ticket_new_admin', {
+      await queueMail(admin.email, 'ticket_new_admin', {
         ticketId: newTicketId,
         subject,
         requesterName: fromName,

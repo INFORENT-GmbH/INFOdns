@@ -72,7 +72,7 @@ export async function checkNsDelegation(
         "SELECT email FROM users WHERE role = 'admin' AND is_active = 1"
       )
       for (const admin of admins) {
-        queueMail(admin.email, template, { fqdn: domain.fqdn })
+        await queueMail(admin.email, template, { fqdn: domain.fqdn })
       }
     }
   }

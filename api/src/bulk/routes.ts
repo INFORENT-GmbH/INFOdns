@@ -106,8 +106,10 @@ export async function bulkRoutes(app: FastifyInstance) {
 
   // GET /bulk-jobs
   app.get('/bulk-jobs', { preHandler: requireAuth }, async (req: any) => {
-    const owner = req.user.role === 'tenant' ? ` WHERE created_by = ${req.user.sub}` : ''
-    return query(`SELECT * FROM bulk_jobs${owner} ORDER BY created_at DESC LIMIT 100`)
+    if (req.user.role === 'tenant') {
+      return query('SELECT * FROM bulk_jobs WHERE created_by = ? ORDER BY created_at DESC LIMIT 100', [req.user.sub])
+    }
+    return query('SELECT * FROM bulk_jobs ORDER BY created_at DESC LIMIT 100')
   })
 
   // POST /bulk-jobs
@@ -127,13 +129,21 @@ export async function bulkRoutes(app: FastifyInstance) {
 
   // GET /bulk-jobs/:id
   app.get<{ Params: { id: string } }>('/bulk-jobs/:id', { preHandler: requireAuth }, async (req, reply) => {
-    const job = await queryOne('SELECT * FROM bulk_jobs WHERE id = ?', [req.params.id])
+    const job = await queryOne<any>('SELECT * FROM bulk_jobs WHERE id = ?', [req.params.id])
     if (!job) return reply.status(404).send({ code: 'NOT_FOUND' })
+    if ((req as any).user.role === 'tenant' && job.created_by !== Number((req as any).user.sub)) {
+      return reply.status(403).send({ code: 'FORBIDDEN' })
+    }
     return job
   })
 
   // GET /bulk-jobs/:id/domains  — per-domain status
   app.get<{ Params: { id: string } }>('/bulk-jobs/:id/domains', { preHandler: requireAuth }, async (req, reply) => {
+    const job = await queryOne<any>('SELECT id, created_by FROM bulk_jobs WHERE id = ?', [req.params.id])
+    if (!job) return reply.status(404).send({ code: 'NOT_FOUND' })
+    if ((req as any).user.role === 'tenant' && job.created_by !== Number((req as any).user.sub)) {
+      return reply.status(403).send({ code: 'FORBIDDEN' })
+    }
     const rows = await query(
       `SELECT bjd.*, d.fqdn FROM bulk_job_domains bjd
        JOIN domains d ON d.id = bjd.domain_id
@@ -148,6 +158,9 @@ export async function bulkRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string } }>('/bulk-jobs/:id/preview', { preHandler: requireAuth }, async (req, reply) => {
     const job = await queryOne<any>('SELECT * FROM bulk_jobs WHERE id = ?', [req.params.id])
     if (!job) return reply.status(404).send({ code: 'NOT_FOUND' })
+    if ((req as any).user.role === 'tenant' && job.created_by !== Number((req as any).user.sub)) {
+      return reply.status(403).send({ code: 'FORBIDDEN' })
+    }
     if (!['draft', 'approved'].includes(job.status)) {
       return reply.status(409).send({ code: 'INVALID_STATE', message: `Job is ${job.status}` })
     }
@@ -205,6 +218,9 @@ export async function bulkRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string } }>('/bulk-jobs/:id/approve', { preHandler: requireAuth }, async (req, reply) => {
     const job = await queryOne<any>('SELECT * FROM bulk_jobs WHERE id = ?', [req.params.id])
     if (!job) return reply.status(404).send({ code: 'NOT_FOUND' })
+    if ((req as any).user.role === 'tenant' && job.created_by !== Number((req as any).user.sub)) {
+      return reply.status(403).send({ code: 'FORBIDDEN' })
+    }
     if (job.status !== 'approved') {
       return reply.status(409).send({ code: 'INVALID_STATE', message: 'Job must be in approved state' })
     }
