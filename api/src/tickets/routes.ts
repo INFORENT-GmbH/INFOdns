@@ -64,7 +64,7 @@ export async function ticketRoutes(app: FastifyInstance) {
     const [rows, countRow] = await Promise.all([
       query(
         `SELECT t.id, t.subject, t.status, t.priority, t.requester_email, t.requester_name,
-                t.tenant_id, t.assigned_to, u.full_name AS assigned_to_name,
+                t.tenant_id, t.assigned_to, CONCAT_WS(' ', u.first_name, u.last_name) AS assigned_to_name,
                 t.source, t.created_at, t.updated_at,
                 (SELECT COUNT(*) FROM ticket_messages tm WHERE tm.ticket_id = t.id) AS message_count
          FROM support_tickets t
@@ -106,12 +106,12 @@ export async function ticketRoutes(app: FastifyInstance) {
     const data = parsed.data
 
     // Resolve requester info
-    const userRow = await queryOne<{ email: string; full_name: string; tenant_id: number | null }>(
-      'SELECT email, full_name, tenant_id FROM users WHERE id = ?',
+    const userRow = await queryOne<{ email: string; first_name: string; last_name: string; tenant_id: number | null }>(
+      'SELECT email, first_name, last_name, tenant_id FROM users WHERE id = ?',
       [req.user.sub]
     )
     const requesterEmail = data.requester_email ?? userRow?.email ?? ''
-    const requesterName  = data.requester_name  ?? userRow?.full_name ?? ''
+    const requesterName  = data.requester_name  ?? [userRow?.first_name, userRow?.last_name].filter(Boolean).join(' ') ?? ''
 
     // Resolve tenant_id: use from user unless admin override provided
     let tenantId: number | null = userRow?.tenant_id ?? null
@@ -169,7 +169,7 @@ export async function ticketRoutes(app: FastifyInstance) {
     const id = Number(req.params.id)
 
     const ticket = await queryOne<any>(
-      `SELECT t.*, u.full_name AS assigned_to_name
+      `SELECT t.*, CONCAT_WS(' ', u.first_name, u.last_name) AS assigned_to_name
        FROM support_tickets t
        LEFT JOIN users u ON u.id = t.assigned_to
        WHERE t.id = ?`,
@@ -253,8 +253,8 @@ export async function ticketRoutes(app: FastifyInstance) {
 
     // Notify newly assigned staff member
     if ('assigned_to' in data && data.assigned_to && data.assigned_to !== ticket.assigned_to) {
-      const assignee = await queryOne<{ email: string; full_name: string }>(
-        'SELECT email, full_name FROM users WHERE id = ?', [data.assigned_to]
+      const assignee = await queryOne<{ email: string; first_name: string; last_name: string }>(
+        'SELECT email, first_name, last_name FROM users WHERE id = ?', [data.assigned_to]
       )
       if (assignee) {
         await queueMail(assignee.email, 'ticket_assigned', {
@@ -308,14 +308,15 @@ export async function ticketRoutes(app: FastifyInstance) {
       if (!isOwned) return reply.status(403).send({ code: 'FORBIDDEN' })
     }
 
-    const userRow = await queryOne<{ email: string; full_name: string }>(
-      'SELECT email, full_name FROM users WHERE id = ?', [req.user.sub]
+    const userRow = await queryOne<{ email: string; first_name: string; last_name: string }>(
+      'SELECT email, first_name, last_name FROM users WHERE id = ?', [req.user.sub]
     )
+    const authorName = [userRow?.first_name, userRow?.last_name].filter(Boolean).join(' ')
 
     const result = await execute(
       `INSERT INTO ticket_messages (ticket_id, author_user_id, author_name, author_email, body, is_internal, source)
        VALUES (?, ?, ?, ?, ?, ?, 'web')`,
-      [id, req.user.sub, userRow?.full_name ?? '', userRow?.email ?? '', data.body, data.is_internal ? 1 : 0]
+      [id, req.user.sub, authorName, userRow?.email ?? '', data.body, data.is_internal ? 1 : 0]
     )
 
     await execute('UPDATE support_tickets SET updated_at = NOW() WHERE id = ?', [id])
@@ -326,7 +327,7 @@ export async function ticketRoutes(app: FastifyInstance) {
       await queueMail(ticket.requester_email, 'ticket_reply', {
         ticketId: id,
         subject: ticket.subject,
-        staffName: userRow?.full_name ?? 'Support',
+        staffName: authorName || 'Support',
         messageBody: data.body,
         portalUrl: process.env.APP_PUBLIC_URL ?? '',
       })

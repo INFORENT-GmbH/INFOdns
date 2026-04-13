@@ -120,7 +120,14 @@ export interface Tenant {
 export interface User {
   id: number
   email: string
-  full_name: string
+  first_name: string
+  last_name: string
+  street: string | null
+  zip: string | null
+  city: string | null
+  country: string | null
+  phone: string | null
+  mobile: string | null
   role: 'admin' | 'operator' | 'tenant'
   tenant_id: number | null
   tenant_ids: number[]
@@ -289,7 +296,8 @@ export const updateUser = (id: number, data: Partial<User>) => api.put<User>(`/u
 export interface PendingInvite {
   id: number
   email: string
-  full_name: string
+  first_name: string
+  last_name: string
   role: 'admin' | 'operator' | 'tenant'
   locale: 'en' | 'de'
   tenant_ids: number[]
@@ -299,10 +307,10 @@ export interface PendingInvite {
 
 export const getInvites = () => api.get<PendingInvite[]>('/auth/invites')
 export const revokeInvite = (id: number) => api.delete(`/auth/invites/${id}`)
-export const inviteUser = (data: { email: string; full_name: string; role: string; locale: string; tenant_ids: number[] }) =>
+export const inviteUser = (data: { email: string; first_name: string; last_name: string; role: string; locale: string; tenant_ids: number[] }) =>
   api.post('/auth/invite', data)
 export const getInvite = (token: string) =>
-  api.get<{ email: string; full_name: string; role: string; locale: string }>(`/auth/invite/${token}`)
+  api.get<{ email: string; first_name: string; last_name: string; role: string; locale: string }>(`/auth/invite/${token}`)
 export const acceptInvite = (data: { token: string; password: string }) =>
   api.post('/auth/accept-invite', data)
 

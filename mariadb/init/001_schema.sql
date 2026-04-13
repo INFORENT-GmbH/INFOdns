@@ -20,7 +20,14 @@ CREATE TABLE users (
   email         VARCHAR(255) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,                     -- bcrypt
   role          ENUM('admin','operator','tenant') NOT NULL DEFAULT 'tenant',
-  full_name     VARCHAR(255) NOT NULL,
+  first_name    VARCHAR(255) NOT NULL DEFAULT '',
+  last_name     VARCHAR(255) NOT NULL DEFAULT '',
+  street        VARCHAR(255) NULL,
+  zip           VARCHAR(20)  NULL,
+  city          VARCHAR(100) NULL,
+  country       VARCHAR(100) NULL,
+  phone         VARCHAR(50)  NULL,
+  mobile        VARCHAR(50)  NULL,
   is_active     TINYINT(1)   NOT NULL DEFAULT 1,
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -207,5 +214,5 @@ INSERT INTO soa_templates (tenant_id, mname, rname, refresh, retry, expire, mini
 VALUES (NULL, 'ns1.example.com.', 'hostmaster.example.com.', 3600, 900, 604800, 300);
 
 -- ── seed: default admin user ─────────────────────────────────
-INSERT INTO users (email, password_hash, role, full_name, is_active)
-VALUES ('admin@inforent.net', '$2b$12$WJ62HF0Q76PynWSQ2dAFWeugrox72KDrp1nh.FvUrFW9bk3P05YXq', 'admin', 'Admin', 1);
+INSERT INTO users (email, password_hash, role, first_name, last_name, is_active)
+VALUES ('admin@inforent.net', '$2b$12$WJ62HF0Q76PynWSQ2dAFWeugrox72KDrp1nh.FvUrFW9bk3P05YXq', 'admin', '', 'Admin', 1);
