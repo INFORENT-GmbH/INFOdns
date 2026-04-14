@@ -248,7 +248,7 @@ export async function domainRoutes(app: FastifyInstance) {
        LEFT JOIN zone_render_queue q ON q.domain_id = d.id AND q.id = (
          SELECT MAX(id) FROM zone_render_queue WHERE domain_id = d.id
        )
-       WHERE d.id = ? AND d.status != 'deleted'${ownerFilter(req)}`,
+       WHERE d.fqdn = ? AND d.status != 'deleted'${ownerFilter(req)}`,
       [req.params.id]
     ) as any
     if (!row) return reply.status(404).send({ code: 'NOT_FOUND' })

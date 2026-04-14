@@ -8,10 +8,10 @@ export interface PerDomainEdits {
   newRows: ({ _newId: string; name: string; type: string; ttl: string; value: string; priority: string; weight: string; port: string })[]
 }
 
-const cache = new Map<number, PerDomainEdits>()
+const cache = new Map<string, PerDomainEdits>()
 
 // Live dirty state for the currently open domain — updated on every render by DomainDetailPage
-const liveDirty = new Set<number>()
+const liveDirty = new Set<string>()
 
 type Listener = () => void
 const listeners = new Set<Listener>()
@@ -26,36 +26,36 @@ export function subscribe(fn: Listener): () => void {
   return () => listeners.delete(fn)
 }
 
-/** All domain IDs that currently have unsaved changes (cached or live). */
-export function getDirtyDomainIds(): Set<number> {
-  const result = new Set<number>()
-  for (const [id] of cache) result.add(id)
-  for (const id of liveDirty) result.add(id)
+/** All domain fqdns that currently have unsaved changes (cached or live). */
+export function getDirtyDomainFqdns(): Set<string> {
+  const result = new Set<string>()
+  for (const [fqdn] of cache) result.add(fqdn)
+  for (const fqdn of liveDirty) result.add(fqdn)
   return result
 }
 
 /** Called by DomainDetailPage on every render to track live dirty state. */
-export function setLiveDirty(domainId: number, dirty: boolean) {
-  const changed = dirty ? !liveDirty.has(domainId) : liveDirty.has(domainId)
-  if (dirty) liveDirty.add(domainId)
-  else liveDirty.delete(domainId)
+export function setLiveDirty(fqdn: string, dirty: boolean) {
+  const changed = dirty ? !liveDirty.has(fqdn) : liveDirty.has(fqdn)
+  if (dirty) liveDirty.add(fqdn)
+  else liveDirty.delete(fqdn)
   if (changed) notify()
 }
 
-export function saveDomainEdits(id: number, state: PerDomainEdits) {
+export function saveDomainEdits(fqdn: string, state: PerDomainEdits) {
   if (!Object.keys(state.edits).length && !state.pendingDeletes.length && !state.newRows.length) {
-    cache.delete(id)
+    cache.delete(fqdn)
   } else {
-    cache.set(id, state)
+    cache.set(fqdn, state)
   }
   notify()
 }
 
-export function loadDomainEdits(id: number): PerDomainEdits | undefined {
-  return cache.get(id)
+export function loadDomainEdits(fqdn: string): PerDomainEdits | undefined {
+  return cache.get(fqdn)
 }
 
-export function clearDomainEdits(id: number) {
-  cache.delete(id)
+export function clearDomainEdits(fqdn: string) {
+  cache.delete(fqdn)
   notify()
 }

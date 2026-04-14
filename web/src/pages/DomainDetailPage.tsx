@@ -83,8 +83,7 @@ function BulkEditButton({ rec }: { rec: DnsRecord }) {
 // ── Main page ─────────────────────────────────────────────────
 
 export default function DomainDetailPage() {
-  const { id } = useParams<{ id: string }>()
-  const domainId = Number(id)
+  const { name } = useParams<{ name: string }>()
   const qc = useQueryClient()
   const navigate = useNavigate()
   const { t } = useI18n()
@@ -133,8 +132,8 @@ export default function DomainDetailPage() {
   const [showEditKeyDrop, setShowEditKeyDrop] = useState(false)
 
   const { data: domain, isLoading: loadingDomain } = useQuery<Domain>({
-    queryKey: ['domain', domainId],
-    queryFn: () => getDomain(domainId).then(r => r.data),
+    queryKey: ['domain', name],
+    queryFn: () => getDomain(name!).then(r => r.data),
   })
 
   const nsRef = domain?.ns_reference ?? null
@@ -147,7 +146,7 @@ export default function DomainDetailPage() {
   })
 
   // When ns_reference is set, wait for nsRefDomain to resolve before fetching records
-  const recordSourceId: number | null = nsRef ? (nsRefDomain?.id ?? null) : domainId
+  const recordSourceId: number | null = nsRef ? (nsRefDomain?.id ?? null) : (domain?.id ?? null)
 
   const { data: records = [], isLoading: loadingRecords, dataUpdatedAt } = useQuery({
     queryKey: ['records', recordSourceId],
@@ -173,15 +172,15 @@ export default function DomainDetailPage() {
 
   // Save/restore per-domain edit state when switching between domains
   useEffect(() => {
-    const saved = loadDomainEdits(domainId)
+    const saved = loadDomainEdits(name!)
     setEdits(saved?.edits ?? {})
     setPendingDeletes(new Set(saved?.pendingDeletes ?? []))
     setNewRows(saved?.newRows ?? [])
     setApplyError(null)
     setLoadedFromCacheSerial(saved?.serial ?? null)
     return () => {
-      setLiveDirty(domainId, false)
-      saveDomainEdits(domainId, {
+      setLiveDirty(name!, false)
+      saveDomainEdits(name!, {
         serial: lastKnownSerialRef.current,
         edits: latestEdits.current,
         pendingDeletes: [...latestPendingDeletes.current],
@@ -189,7 +188,7 @@ export default function DomainDetailPage() {
       })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [domainId])
+  }, [name])
 
   // Clear pendingRefresh when records data actually updates (WS-triggered refetch completed)
   useEffect(() => {
@@ -284,7 +283,7 @@ export default function DomainDetailPage() {
 
   const dirtyIds = Object.keys(edits).map(Number)
   const hasDirty = dirtyIds.length > 0 || pendingDeletes.size > 0 || newRows.length > 0
-  useEffect(() => { setLiveDirty(domainId, hasDirty) }, [domainId, hasDirty])
+  useEffect(() => { setLiveDirty(name!, hasDirty) }, [name, hasDirty])
   const conflictWarning = hasDirty
     && loadedFromCacheSerial !== null
     && loadedFromCacheSerial > 0
@@ -293,8 +292,8 @@ export default function DomainDetailPage() {
 
   function handleForceReload() {
     handleDiscard()
-    qc.invalidateQueries({ queryKey: ['records', domainId] })
-    qc.invalidateQueries({ queryKey: ['domain', domainId] })
+    qc.invalidateQueries({ queryKey: ['records', recordSourceId] })
+    qc.invalidateQueries({ queryKey: ['domain', name] })
   }
 
   const showPriority = (records as DnsRecord[]).some(rec => {
@@ -325,12 +324,12 @@ export default function DomainDetailPage() {
           body.weight = Number(row.weight)
           body.port = Number(row.port)
         }
-        await createRecord(domainId, body)
+        await createRecord(domain!.id, body)
       }
 
       // 2. Delete pending deletes directly
       for (const recId of pendingDeletes) {
-        await deleteRecord(domainId, recId)
+        await deleteRecord(domain!.id, recId)
       }
 
       // 3. Update edited records via bulk job (replace)
@@ -353,7 +352,7 @@ export default function DomainDetailPage() {
         }
         const job = await createBulkJob({
           operation: 'replace',
-          filter_json: { mode: 'explicit', domain_ids: [domainId] },
+          filter_json: { mode: 'explicit', domain_ids: [domain!.id] },
           payload_json: {
             match: { name: rec.name, type: rec.type, value_contains: rec.value },
             replace_with: {
@@ -373,9 +372,9 @@ export default function DomainDetailPage() {
       setEdits({})
       setPendingDeletes(new Set())
       setNewRows(prev => prev.filter(r => !submittedIds.has(r._newId)))
-      clearDomainEdits(domainId)
-      qc.invalidateQueries({ queryKey: ['records', domainId] })
-      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      clearDomainEdits(name!)
+      qc.invalidateQueries({ queryKey: ['records', recordSourceId] })
+      qc.invalidateQueries({ queryKey: ['domain', name] })
       if (hadEdits) {
         setPendingRefresh(true)
         pendingRefreshTimer.current = setTimeout(() => setPendingRefresh(false), 8_000)
@@ -403,7 +402,7 @@ export default function DomainDetailPage() {
     setPendingDeletes(new Set())
     setNewRows([])
     setApplyError(null)
-    clearDomainEdits(domainId)
+    clearDomainEdits(name!)
   }
 
   function handleImportStage(importedNewRows: NewRow[], importedEdits: Record<number, EditRow>) {
@@ -416,7 +415,7 @@ export default function DomainDetailPage() {
   const labels: Label[] = domain?.labels ?? []
 
   function patchLabelsCache(next: Label[]) {
-    qc.setQueryData<Domain>(['domain', domainId], old => old ? { ...old, labels: next } : old)
+    qc.setQueryData<Domain>(['domain', name], old => old ? { ...old, labels: next } : old)
   }
 
   async function handleAddLabel(e: React.FormEvent) {
@@ -429,11 +428,11 @@ export default function DomainDetailPage() {
     setAddAdminOnly(false)
     setSavingLabels(true)
     const invalidate = () => {
-      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      qc.invalidateQueries({ queryKey: ['domain', name] })
       qc.invalidateQueries({ queryKey: ['label-suggestions', domain?.tenant_id] })
     }
     try {
-      await updateDomainLabels(domainId, next)
+      await updateDomainLabels(domain!.id, next)
       invalidate()
     } catch {
       invalidate()
@@ -451,11 +450,11 @@ export default function DomainDetailPage() {
     setEditingLabelId(null)
     setSavingLabels(true)
     const invalidate = () => {
-      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      qc.invalidateQueries({ queryKey: ['domain', name] })
       qc.invalidateQueries({ queryKey: ['label-suggestions', domain?.tenant_id] })
     }
     try {
-      await updateDomainLabels(domainId, next)
+      await updateDomainLabels(domain!.id, next)
       invalidate()
     } catch {
       invalidate()
@@ -470,9 +469,9 @@ export default function DomainDetailPage() {
     patchLabelsCache(next)
     setSavingLabels(true)
     try {
-      await updateDomainLabels(domainId, next)
+      await updateDomainLabels(domain!.id, next)
     } catch {
-      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      qc.invalidateQueries({ queryKey: ['domain', name] })
       qc.invalidateQueries({ queryKey: ['label-suggestions', domain?.tenant_id] })
     } finally {
       setSavingLabels(false)
@@ -508,8 +507,8 @@ export default function DomainDetailPage() {
     const newStatus = domain.status === 'active' ? 'suspended' : 'active'
     setTogglingStatus(true)
     try {
-      await updateDomain(domainId, { status: newStatus } as any)
-      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      await updateDomain(domain!.id, { status: newStatus } as any)
+      qc.invalidateQueries({ queryKey: ['domain', name] })
       qc.invalidateQueries({ queryKey: ['domains'] })
     } catch (err: any) {
       alert(err.response?.data?.message ?? err.message)
@@ -522,8 +521,8 @@ export default function DomainDetailPage() {
     if (!domain || movingTenant || newTenantId === domain.tenant_id) return
     setMovingTenant(true)
     try {
-      await updateDomain(domainId, { tenant_id: newTenantId } as any)
-      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      await updateDomain(domain!.id, { tenant_id: newTenantId } as any)
+      qc.invalidateQueries({ queryKey: ['domain', name] })
       qc.invalidateQueries({ queryKey: ['domains'] })
     } catch (err: any) {
       alert(err.response?.data?.message ?? err.message)
@@ -539,8 +538,8 @@ export default function DomainDetailPage() {
     if (val === domain.default_ttl) { setEditingTtl(false); return }
     setSavingTtl(true)
     try {
-      await updateDomain(domainId, { default_ttl: val } as any)
-      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      await updateDomain(domain!.id, { default_ttl: val } as any)
+      qc.invalidateQueries({ queryKey: ['domain', name] })
     } catch (err: any) {
       alert(err.response?.data?.message ?? err.message)
     } finally {
@@ -554,8 +553,8 @@ export default function DomainDetailPage() {
     if (!domain || v === domain.ns_reference) return
     setSavingNsRef(true)
     try {
-      await updateDomain(domainId, { ns_reference: v } as any)
-      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      await updateDomain(domain!.id, { ns_reference: v } as any)
+      qc.invalidateQueries({ queryKey: ['domain', name] })
     } catch (err: any) {
       alert(err.response?.data?.message ?? err.message)
     } finally {
@@ -567,8 +566,8 @@ export default function DomainDetailPage() {
     if (!domain || togglingDnssec) return
     setTogglingDnssec(true)
     try {
-      await updateDomain(domainId, { dnssec_enabled: !domain.dnssec_enabled } as any)
-      qc.invalidateQueries({ queryKey: ['domain', domainId] })
+      await updateDomain(domain!.id, { dnssec_enabled: !domain.dnssec_enabled } as any)
+      qc.invalidateQueries({ queryKey: ['domain', name] })
       qc.invalidateQueries({ queryKey: ['domains'] })
     } catch (err: any) {
       alert(err.response?.data?.message ?? err.message)
@@ -581,7 +580,7 @@ export default function DomainDetailPage() {
     if (!domain || !window.confirm(`Delete ${domain.fqdn}? It will be permanently purged after 30 days.`)) return
     setDeletingDomain(true)
     try {
-      await deleteDomain(domainId)
+      await deleteDomain(domain!.id)
       navigate('/domains')
     } catch (err: any) {
       alert(err.response?.data?.message ?? err.message)
@@ -712,7 +711,7 @@ export default function DomainDetailPage() {
           <strong>{t('domainDetail_zoneFailed')}</strong>
           {domain.zone_error && (
             <pre style={{ margin: '.5rem 0 0', fontFamily: MONO, fontSize: '.8125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-              {renderZoneError(domain.zone_error, domainId, setZoneModal)}
+              {renderZoneError(domain.zone_error, domain.id, setZoneModal)}
             </pre>
           )}
         </div>
@@ -765,7 +764,7 @@ export default function DomainDetailPage() {
               style={{ fontFamily: MONO }}
               options={[
                 { value: '', label: '— none —' },
-                ...allDomains.filter(d => d.id !== domainId).map(d => ({ value: d.fqdn, label: d.fqdn })),
+                ...allDomains.filter(d => d.fqdn !== name).map(d => ({ value: d.fqdn, label: d.fqdn })),
               ]}
             />
             {savingNsRef && <span style={{ color: '#9ca3af' }}>…</span>}
@@ -1067,7 +1066,7 @@ export default function DomainDetailPage() {
 
       {showImportModal && (
         <ImportZoneModal
-          domainId={domainId}
+          domainId={domain!.id}
           existingRecords={records as DnsRecord[]}
           onStage={handleImportStage}
           onClose={() => setShowImportModal(false)}

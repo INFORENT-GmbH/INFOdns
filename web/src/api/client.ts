@@ -200,8 +200,8 @@ export const getDomainStats = () => api.get<DomainStats>('/domains/stats')
 export const getDomains = (params?: Record<string, string>) =>
   api.get<Domain[]>('/domains', { params })
 
-export const getDomain = (id: number) =>
-  api.get<Domain>(`/domains/${id}`)
+export const getDomain = (name: string) =>
+  api.get<Domain>(`/domains/${name}`)
 
 export const createDomain = (data: Partial<Domain>) =>
   api.post<Domain>('/domains', data)

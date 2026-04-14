@@ -6,7 +6,7 @@ import LabelChip from '../components/LabelChip'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
-import { getDirtyDomainIds, subscribe } from '../hooks/domainEditCache'
+import { getDirtyDomainFqdns, subscribe } from '../hooks/domainEditCache'
 
 const INLINE_STYLES = `
   .condensed-row { transition: background 0.08s; }
@@ -65,8 +65,8 @@ export default function DomainsPage() {
     return `${tenantFilter.length} ${t('domains_tenantsSelected')}`
   }
 
-  const [dirtyDomainIds, setDirtyDomainIds] = useState(() => getDirtyDomainIds())
-  useEffect(() => subscribe(() => setDirtyDomainIds(getDirtyDomainIds())), [])
+  const [dirtyDomainIds, setDirtyDomainIds] = useState(() => getDirtyDomainFqdns())
+  useEffect(() => subscribe(() => setDirtyDomainIds(getDirtyDomainFqdns())), [])
 
   return (
     <div>
@@ -198,7 +198,7 @@ export default function DomainsPage() {
             <div
               key={d.id}
               className={isSelected ? undefined : 'condensed-row'}
-              onClick={() => navigate(`/domains/${d.id}`)}
+              onClick={() => navigate(`/domains/${d.fqdn}`)}
               style={{
                 padding: '.3rem .625rem',
                 paddingLeft: isSelected ? 'calc(.625rem - 3px)' : '.625rem',
@@ -209,7 +209,7 @@ export default function DomainsPage() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'baseline', gap: '.25rem', overflow: 'hidden' }}>
-                {dirtyDomainIds.has(d.id) && (
+                {dirtyDomainIds.has(d.fqdn) && (
                   <span style={{ color: '#f59e0b', fontSize: '.45rem', flexShrink: 0, lineHeight: 1 }} title="Unsaved changes">●</span>
                 )}
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500, fontSize: '.75rem', color: isSelected ? '#1d4ed8' : '#111827', flexShrink: 1, minWidth: 0 }}>

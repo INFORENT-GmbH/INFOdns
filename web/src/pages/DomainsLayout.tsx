@@ -2,12 +2,12 @@ import { useEffect } from 'react'
 import { Outlet, useMatch } from 'react-router-dom'
 import DomainsPage from './DomainsPage'
 import DomainsDashboard from './DomainsDashboard'
-import { getDirtyDomainIds } from '../hooks/domainEditCache'
+import { getDirtyDomainFqdns } from '../hooks/domainEditCache'
 
 export default function DomainsLayout() {
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
-      if (getDirtyDomainIds().size > 0) {
+      if (getDirtyDomainFqdns().size > 0) {
         e.preventDefault()
         e.returnValue = ''
       }
@@ -16,7 +16,7 @@ export default function DomainsLayout() {
     return () => window.removeEventListener('beforeunload', handler)
   }, [])
 
-  const match = useMatch('/domains/:id')
+  const match = useMatch('/domains/:name')
   const detailOpen = !!match
 
   return (

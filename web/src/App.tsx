@@ -50,7 +50,7 @@ export default function App() {
             >
               <Route index element={<Navigate to="/domains" replace />} />
               <Route path="domains" element={<DomainsLayout />}>
-                <Route path=":id" element={<DomainDetailPage />} />
+                <Route path=":name" element={<DomainDetailPage />} />
               </Route>
               <Route path="jobs" element={<JobsPage />} />
               <Route path="tenants" element={<TenantsPage />} />
