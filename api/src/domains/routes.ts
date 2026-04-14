@@ -239,8 +239,10 @@ export async function domainRoutes(app: FastifyInstance) {
     return { ...row, top_tenants }
   })
 
-  // GET /domains/:id
+  // GET /domains/:id  — accepts either FQDN or numeric ID
   app.get<{ Params: { id: string } }>('/domains/:id', { preHandler: requireAuth }, async (req, reply) => {
+    const isNumeric = /^\d+$/.test(req.params.id)
+    const whereCol = isNumeric ? 'd.id' : 'd.fqdn'
     const row = await queryOne(
       `SELECT d.*, c.name AS tenant_name,
               q.error AS zone_error, q.retries AS zone_retries,
@@ -251,7 +253,7 @@ export async function domainRoutes(app: FastifyInstance) {
          SELECT MAX(id) FROM zone_render_queue WHERE domain_id = d.id
        )
        LEFT JOIN dns_templates t ON t.id = d.template_id
-       WHERE d.fqdn = ? AND d.status != 'deleted'${ownerFilter(req)}`,
+       WHERE ${whereCol} = ? AND d.status != 'deleted'${ownerFilter(req)}`,
       [req.params.id]
     ) as any
     if (!row) return reply.status(404).send({ code: 'NOT_FOUND' })

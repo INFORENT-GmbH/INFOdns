@@ -147,6 +147,13 @@ export default function DomainDetailPage() {
     queryFn: () => getDomain(name!).then(r => r.data),
   })
 
+  // Redirect numeric-ID URLs to canonical FQDN URL
+  useEffect(() => {
+    if (domain && name !== domain.fqdn) {
+      navigate(`/domains/${domain.fqdn}`, { replace: true })
+    }
+  }, [domain, name, navigate])
+
   const nsRef = domain?.ns_reference ?? null
 
   const { data: nsRefDomain } = useQuery<Domain | null>({
