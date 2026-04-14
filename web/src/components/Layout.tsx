@@ -63,6 +63,7 @@ export default function Layout() {
         @keyframes modal-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
       `}</style>
       <nav style={styles.nav}>
+        <div style={styles.navInner}>
         <a href="/domains" style={{ marginRight: 'auto', display: 'flex' }}><img src="/logo-wide.png" alt="INFOdns" style={styles.brand} /></a>
         <div style={styles.links}>
           <NavLink to="/domains" className="nav-link" style={navStyle}>{t('nav_domains')}</NavLink>
@@ -106,8 +107,10 @@ export default function Layout() {
           </button>
           <button onClick={handleLogout} style={styles.logoutBtn}>{t('nav_signOut')}</button>
         </div>
+        </div>
       </nav>
       <div style={styles.nsBar}>
+        <div style={styles.nsBarInner}>
         {visibleNs.map(name => {
           const s = nsStatus?.[name]
           const label = nsLabels[name] ?? { display: name.toUpperCase() }
@@ -138,6 +141,7 @@ export default function Layout() {
             </span>
           )
         })}
+        </div>
       </div>
       {wsStatus === 'reconnecting' && (
         <div style={styles.wsToast}>
@@ -187,14 +191,16 @@ function dropdownItemStyle({ isActive }: { isActive: boolean }): React.CSSProper
 
 const styles: Record<string, React.CSSProperties> = {
   shell:     { display: 'flex', flexDirection: 'column', height: '100%', maxWidth: 1920 },
-  nav:       { display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '.75rem 1.5rem', background: 'linear-gradient(rgba(255,255,255,0.85), rgba(255,255,255,0.65)), url(/header-skyline.png) no-repeat bottom center', backgroundSize: 'auto, 800px 123px', maxWidth: 1920, borderBottom: '1px solid #e5e7eb', position: 'sticky' as const, top: 0, zIndex: 40 },
+  nav:       { background: 'linear-gradient(rgba(255,255,255,0.85), rgba(255,255,255,0.65)), url(/header-skyline.png) no-repeat bottom center', backgroundSize: 'auto, 800px 123px', borderBottom: '1px solid #e5e7eb', position: 'sticky' as const, top: 0, zIndex: 40 },
+  navInner:  { display: 'flex', alignItems: 'center', gap: '1.5rem', padding: '.75rem 1.5rem', maxWidth: 1440, margin: '0 auto' },
   brand:     { height: 42, display: 'block' },
   links:     { display: 'flex', gap: '1.25rem' },
   right:     { display: 'flex', gap: '.5rem', alignItems: 'center' },
   langBtn:   { background: 'none', border: '1px solid #d1d5db', borderRadius: 4, padding: '.25rem .6rem', cursor: 'pointer', fontSize: '.8rem' },
   logoutBtn: { background: 'none', border: '1px solid #d1d5db', borderRadius: 4, padding: '.25rem .75rem', cursor: 'pointer', fontSize: '.875rem' },
   main:      { padding: '1.5rem', maxWidth: 1200, margin: '0 auto', width: '100%', background: 'rgba(255,255,255,0.92)', borderRadius: 8, marginTop: '1rem', marginBottom: '1rem', flex: 1, overflowY: 'auto', minHeight: 0 },
-  nsBar:     { display: 'flex', gap: '1.5rem', padding: '.25rem 1.5rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', color: '#6b7280' },
+  nsBar:     { background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', color: '#6b7280' },
+  nsBarInner:{ display: 'flex', gap: '1.5rem', padding: '.25rem 1.5rem', maxWidth: 1440, margin: '0 auto' },
   nsEntry:   { display: 'flex', alignItems: 'center', gap: '.25rem' },
   nsLatency: { color: '#9ca3af', marginLeft: '.25rem' },
   nsCopied:  { color: '#16a34a', marginLeft: '.25rem', fontSize: '.7rem' },
