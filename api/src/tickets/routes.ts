@@ -393,7 +393,7 @@ export async function ticketRoutes(app: FastifyInstance) {
         }
       } catch (err: any) {
         if (err.code === 'FST_REQ_FILE_TOO_LARGE') {
-          return reply.status(400).send({ code: 'FILE_TOO_LARGE', message: 'Max file size is 20 MB' })
+          return reply.status(413).send({ code: 'FILE_TOO_LARGE', message: 'Max file size is 20 MB' })
         }
         throw err
       }

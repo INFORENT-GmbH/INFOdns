@@ -82,7 +82,17 @@ export default function TicketsPage() {
     try {
       const resp = await createTicket(form)
       if (createFiles.length > 0) {
-        await uploadAttachments(resp.data.id, resp.data.messageId, createFiles)
+        try {
+          await uploadAttachments(resp.data.id, resp.data.messageId, createFiles)
+        } catch {
+          // Ticket was created — refresh the list and clear the main form so the
+          // user doesn't re-submit, but keep the modal open so the error is visible.
+          qc.invalidateQueries({ queryKey: ['tickets'] })
+          setForm({ subject: '', body: '', priority: 'normal' })
+          setCreateFiles([])
+          setCreateError('Ticket created, but attachments could not be uploaded')
+          return
+        }
       }
       qc.invalidateQueries({ queryKey: ['tickets'] })
       setForm({ subject: '', body: '', priority: 'normal' })
