@@ -989,7 +989,7 @@ export default function DomainDetailPage() {
           {/* Step 2: mode — only shown once a template is picked */}
           {applyTplId !== '' && (
             <label style={{ ...styles.applyLabel, marginTop: '.5rem' }}>
-              {t('templates_modeLabel') ?? 'Apply mode'}
+              Apply mode
               <div style={{ display: 'flex', gap: '.75rem', marginTop: 4 }}>
                 {(['add_missing', 'overwrite_matching', 'replace_all'] as ApplyMode[]).map(m => (
                   <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '.8125rem', fontWeight: 400, cursor: 'pointer' }}>
