@@ -223,6 +223,18 @@ export default function DomainDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataUpdatedAt])
 
+  // Auto-preview whenever template or mode changes
+  useEffect(() => {
+    if (!domain || !applyTplId || !showApplyPanel) { setApplyDiff(null); return }
+    let cancelled = false
+    setPreviewing(true); setApplyTplError(null); setApplyDiff(null)
+    previewApplyTemplate(domain.id, Number(applyTplId), applyMode)
+      .then(res => { if (!cancelled) setApplyDiff(res.data) })
+      .catch(err => { if (!cancelled) setApplyTplError(err.response?.data?.message ?? err.message) })
+      .finally(() => { if (!cancelled) setPreviewing(false) })
+    return () => { cancelled = true }
+  }, [applyTplId, applyMode, showApplyPanel, domain?.id])
+
   const { data: labelSuggestions = [] } = useQuery({
     queryKey: ['label-suggestions', domain?.tenant_id],
     queryFn: () => getLabelSuggestions(domain?.tenant_id).then(r => r.data),
@@ -445,19 +457,6 @@ export default function DomainDetailPage() {
       alert(err.response?.data?.message ?? err.message)
     } finally {
       setSavingTpl(false)
-    }
-  }
-
-  async function handleTplPreview() {
-    if (!domain || !applyTplId) return
-    setPreviewing(true); setApplyTplError(null); setApplyDiff(null)
-    try {
-      const res = await previewApplyTemplate(domain.id, Number(applyTplId), applyMode)
-      setApplyDiff(res.data)
-    } catch (err: any) {
-      setApplyTplError(err.response?.data?.message ?? err.message)
-    } finally {
-      setPreviewing(false)
     }
   }
 
@@ -956,59 +955,74 @@ export default function DomainDetailPage() {
 
       {showApplyPanel && !nsRefMode && (
         <div style={styles.applyPanel}>
-          <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <label style={styles.applyLabel}>
-              {t('templates_applyTemplate')}
-              <select
-                value={applyTplId}
-                onChange={e => { setApplyTplId(e.target.value === '' ? '' : Number(e.target.value) as any); setApplyDiff(null) }}
-                style={styles.applySelect}
-              >
-                <option value="">{t('templates_selectTemplate')}</option>
-                {tplList.filter((tpl: any) => tpl.tenant_id === null).length > 0 && (
-                  <optgroup label={t('templates_optGlobal')}>
-                    {tplList.filter((tpl: any) => tpl.tenant_id === null).map((tpl: any) => (
-                      <option key={tpl.id} value={tpl.id}>{tpl.name} ({tpl.record_count})</option>
-                    ))}
-                  </optgroup>
-                )}
-                {tplList.filter((tpl: any) => tpl.tenant_id !== null).length > 0 && (
-                  <optgroup label={t('templates_optTenant')}>
-                    {tplList.filter((tpl: any) => tpl.tenant_id !== null).map((tpl: any) => (
-                      <option key={tpl.id} value={tpl.id}>{tpl.name} ({tpl.record_count})</option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-            </label>
-            <label style={styles.applyLabel}>
-              Mode
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.5rem' }}>
+            <span style={{ fontSize: '.8125rem', fontWeight: 700, color: '#1e293b' }}>{t('templates_applyTemplate')}</span>
+            <button onClick={() => { setShowApplyPanel(false); setApplyDiff(null); setApplyTplError(null); setApplyTplId(''); setApplyMode('add_missing') }} style={styles.btnIcon}>✕</button>
+          </div>
+
+          {/* Step 1: template */}
+          <label style={styles.applyLabel}>
+            {t('templates_selectTemplate')}
+            <select
+              value={applyTplId}
+              onChange={e => setApplyTplId(e.target.value === '' ? '' : Number(e.target.value) as any)}
+              style={styles.applySelect}
+            >
+              <option value="">— {t('templates_selectTemplate')} —</option>
+              {tplList.filter((tpl: any) => tpl.tenant_id === null).length > 0 && (
+                <optgroup label={t('templates_optGlobal')}>
+                  {tplList.filter((tpl: any) => tpl.tenant_id === null).map((tpl: any) => (
+                    <option key={tpl.id} value={tpl.id}>{tpl.name} ({tpl.record_count})</option>
+                  ))}
+                </optgroup>
+              )}
+              {tplList.filter((tpl: any) => tpl.tenant_id !== null).length > 0 && (
+                <optgroup label={t('templates_optTenant')}>
+                  {tplList.filter((tpl: any) => tpl.tenant_id !== null).map((tpl: any) => (
+                    <option key={tpl.id} value={tpl.id}>{tpl.name} ({tpl.record_count})</option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </label>
+
+          {/* Step 2: mode — only shown once a template is picked */}
+          {applyTplId !== '' && (
+            <label style={{ ...styles.applyLabel, marginTop: '.5rem' }}>
+              {t('templates_modeLabel') ?? 'Apply mode'}
               <div style={{ display: 'flex', gap: '.75rem', marginTop: 4 }}>
                 {(['add_missing', 'overwrite_matching', 'replace_all'] as ApplyMode[]).map(m => (
                   <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '.8125rem', fontWeight: 400, cursor: 'pointer' }}>
-                    <input type="radio" name="applyMode" value={m} checked={applyMode === m} onChange={() => { setApplyMode(m); setApplyDiff(null) }} />
+                    <input type="radio" name="applyMode" value={m} checked={applyMode === m} onChange={() => setApplyMode(m)} />
                     {t(m === 'add_missing' ? 'templates_modeAddMissing' : m === 'overwrite_matching' ? 'templates_modeOverwrite' : 'templates_modeReplaceAll')}
                   </label>
                 ))}
               </div>
             </label>
-            <button onClick={handleTplPreview} disabled={!applyTplId || previewing} style={styles.btnSecondary}>{previewing ? t('loading') : t('templates_preview')}</button>
-            <button onClick={() => { setShowApplyPanel(false); setApplyDiff(null); setApplyTplError(null) }} style={styles.btnSecondary}>{t('cancel')}</button>
-          </div>
-          {applyTplError && <div style={styles.applyError}>{applyTplError}</div>}
-          {applyDiff && (
-            <div style={styles.applyPreview}>
-              {applyDiff.toAdd.length === 0 && applyDiff.toDelete.length > 0 && (
-                <div style={styles.applyWarn}>{t('templates_warnEmpty')}</div>
-              )}
-              <div style={{ display: 'flex', gap: '1.25rem', fontSize: '.8125rem' }}>
-                <span style={{ color: '#15803d' }}>+ {applyDiff.toAdd.length} {t('templates_toAdd')}</span>
-                <span style={{ color: '#2563eb' }}>↻ {applyDiff.toUpdate.length} {t('templates_toUpdate')}</span>
-                <span style={{ color: '#b91c1c' }}>− {applyDiff.toDelete.length} {t('templates_toDelete')}</span>
-              </div>
-              <button onClick={handleTplApply} disabled={applyingTpl} style={{ ...styles.btnPrimary, marginTop: '.5rem' }}>
-                {applyingTpl ? t('saving') : t('templates_applyAndRender')}
-              </button>
+          )}
+
+          {/* Step 3: preview (auto-loaded) */}
+          {applyTplId !== '' && (
+            <div style={{ ...styles.applyPreview, marginTop: '.5rem' }}>
+              {previewing ? (
+                <span style={{ fontSize: '.8125rem', color: '#64748b' }}>{t('loading')}</span>
+              ) : applyTplError ? (
+                <div style={styles.applyError}>{applyTplError}</div>
+              ) : applyDiff ? (
+                <>
+                  {applyDiff.toAdd.length === 0 && applyDiff.toDelete.length > 0 && (
+                    <div style={styles.applyWarn}>{t('templates_warnEmpty')}</div>
+                  )}
+                  <div style={{ display: 'flex', gap: '1.25rem', fontSize: '.8125rem' }}>
+                    <span style={{ color: '#15803d' }}>+ {applyDiff.toAdd.length} {t('templates_toAdd')}</span>
+                    <span style={{ color: '#2563eb' }}>↻ {applyDiff.toUpdate.length} {t('templates_toUpdate')}</span>
+                    <span style={{ color: '#b91c1c' }}>− {applyDiff.toDelete.length} {t('templates_toDelete')}</span>
+                  </div>
+                  <button onClick={handleTplApply} disabled={applyingTpl} style={{ ...styles.btnPrimary, marginTop: '.5rem', alignSelf: 'flex-start' }}>
+                    {applyingTpl ? t('saving') : t('templates_applyAndRender')}
+                  </button>
+                </>
+              ) : null}
             </div>
           )}
         </div>
