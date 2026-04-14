@@ -126,7 +126,6 @@ export default function DomainDetailPage() {
   const [savingTtl, setSavingTtl] = useState(false)
   const [savingNsRef, setSavingNsRef] = useState(false)
   const [showDnssecModal, setShowDnssecModal] = useState(false)
-  const [savingTpl, setSavingTpl] = useState(false)
   const [copiedNs, setCopiedNs] = useState<string | null>(null)
   const [hoveredNsItem, setHoveredNsItem] = useState<string | null>(null)
   const [deletingDomain, setDeletingDomain] = useState(false)
@@ -136,7 +135,7 @@ export default function DomainDetailPage() {
   // Apply Template panel
   const [showApplyPanel, setShowApplyPanel] = useState(false)
   const [applyTplId, setApplyTplId] = useState<number | ''>('')
-  const [applyMode, setApplyMode] = useState<ApplyMode>('add_missing')
+  const [applyMode, setApplyMode] = useState<ApplyMode | 'assign_permanent'>('add_missing')
   const [applyDiff, setApplyDiff] = useState<ApplyTemplateDiff | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [applyingTpl, setApplyingTpl] = useState(false)
@@ -223,12 +222,14 @@ export default function DomainDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataUpdatedAt])
 
-  // Auto-preview whenever template or mode changes
+  // Auto-preview whenever template or mode changes (only for one-time apply modes)
   useEffect(() => {
-    if (!domain || !applyTplId || !showApplyPanel) { setApplyDiff(null); return }
+    if (!domain || !applyTplId || !showApplyPanel || applyMode === 'assign_permanent') {
+      setApplyDiff(null); return
+    }
     let cancelled = false
     setPreviewing(true); setApplyTplError(null); setApplyDiff(null)
-    previewApplyTemplate(domain.id, Number(applyTplId), applyMode)
+    previewApplyTemplate(domain.id, Number(applyTplId), applyMode as ApplyMode)
       .then(res => { if (!cancelled) setApplyDiff(res.data) })
       .catch(err => { if (!cancelled) setApplyTplError(err.response?.data?.message ?? err.message) })
       .finally(() => { if (!cancelled) setPreviewing(false) })
@@ -446,27 +447,20 @@ export default function DomainDetailPage() {
     setEdits(prev => ({ ...prev, ...importedEdits }))
   }
 
-  async function handleAssignTemplate(value: string) {
-    if (!domain) return
-    setSavingTpl(true)
-    try {
-      await updateDomain(domain.id, { template_id: value ? Number(value) : null })
-      qc.invalidateQueries({ queryKey: ['domain', name] })
-      qc.invalidateQueries({ queryKey: ['records', domain.id] })
-    } catch (err: any) {
-      alert(err.response?.data?.message ?? err.message)
-    } finally {
-      setSavingTpl(false)
-    }
-  }
 
   async function handleTplApply() {
     if (!domain || !applyTplId) return
     setApplyingTpl(true); setApplyTplError(null)
     try {
-      await applyTemplate(domain.id, Number(applyTplId), applyMode)
-      qc.invalidateQueries({ queryKey: ['records', domain.id] })
-      qc.invalidateQueries({ queryKey: ['domain', name] })
+      if (applyMode === 'assign_permanent') {
+        await updateDomain(domain.id, { template_id: Number(applyTplId) })
+        qc.invalidateQueries({ queryKey: ['domain', name] })
+        qc.invalidateQueries({ queryKey: ['records', domain.id] })
+      } else {
+        await applyTemplate(domain.id, Number(applyTplId), applyMode as ApplyMode)
+        qc.invalidateQueries({ queryKey: ['records', domain.id] })
+        qc.invalidateQueries({ queryKey: ['domain', name] })
+      }
       setShowApplyPanel(false)
       setApplyTplId(''); setApplyMode('add_missing'); setApplyDiff(null)
     } catch (err: any) {
@@ -835,23 +829,12 @@ export default function DomainDetailPage() {
             />
             {savingNsRef && <span style={{ color: '#9ca3af' }}>…</span>}
           </span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
-          Template:
-          <Select
-            value={domain.template_id != null ? String(domain.template_id) : ''}
-            onChange={handleAssignTemplate}
-            disabled={savingTpl}
-            variant="ghost"
-            options={[
-              { value: '', label: '— none —' },
-              ...tplList.map((tpl: any) => ({ value: String(tpl.id), label: tpl.tenant_id === null ? `${tpl.name} (global)` : tpl.name })),
-            ]}
-          />
-          {savingTpl && <span style={{ color: '#9ca3af' }}>…</span>}
-          {domain.template_id && domain.template_name && (
-            <span style={{ fontSize: '.75rem', color: '#2563eb', fontWeight: 500 }}>{domain.template_name}</span>
-          )}
-        </span>
+        {domain.template_id && domain.template_name && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', fontSize: '.8125rem' }}>
+            Template: <span style={{ color: '#2563eb', fontWeight: 500 }}>{domain.template_name}</span>
+            <button onClick={() => setShowApplyPanel(true)} style={{ ...styles.btnIcon, fontSize: '.75rem' }}>change</button>
+          </span>
+        )}
       </div>
 
       {showDnssecModal && (
@@ -990,21 +973,36 @@ export default function DomainDetailPage() {
           {applyTplId !== '' && (
             <label style={{ ...styles.applyLabel, marginTop: '.5rem' }}>
               Apply mode
-              <div style={{ display: 'flex', gap: '.75rem', marginTop: 4 }}>
-                {(['add_missing', 'overwrite_matching', 'replace_all'] as ApplyMode[]).map(m => (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.75rem', marginTop: 4 }}>
+                {([
+                  ['add_missing',       t('templates_modeAddMissing')],
+                  ['overwrite_matching',t('templates_modeOverwrite')],
+                  ['replace_all',       t('templates_modeReplaceAll')],
+                  ['assign_permanent',  'Assign permanently'],
+                ] as [string, string][]).map(([m, label]) => (
                   <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '.8125rem', fontWeight: 400, cursor: 'pointer' }}>
-                    <input type="radio" name="applyMode" value={m} checked={applyMode === m} onChange={() => setApplyMode(m)} />
-                    {t(m === 'add_missing' ? 'templates_modeAddMissing' : m === 'overwrite_matching' ? 'templates_modeOverwrite' : 'templates_modeReplaceAll')}
+                    <input type="radio" name="applyMode" value={m} checked={applyMode === m} onChange={() => setApplyMode(m as any)} />
+                    {label}
                   </label>
                 ))}
               </div>
             </label>
           )}
 
-          {/* Step 3: preview (auto-loaded) */}
+          {/* Step 3: preview / confirm */}
           {applyTplId !== '' && (
             <div style={{ ...styles.applyPreview, marginTop: '.5rem' }}>
-              {previewing ? (
+              {applyMode === 'assign_permanent' ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '.375rem' }}>
+                  <span style={{ fontSize: '.8125rem', color: '#374151' }}>
+                    Template records will always render into the zone and stay in sync with the template. They appear as read-only <strong>TPL</strong> rows.
+                  </span>
+                  {applyTplError && <div style={styles.applyError}>{applyTplError}</div>}
+                  <button onClick={handleTplApply} disabled={applyingTpl} style={{ ...styles.btnPrimary, alignSelf: 'flex-start' }}>
+                    {applyingTpl ? t('saving') : 'Assign template'}
+                  </button>
+                </div>
+              ) : previewing ? (
                 <span style={{ fontSize: '.8125rem', color: '#64748b' }}>{t('loading')}</span>
               ) : applyTplError ? (
                 <div style={styles.applyError}>{applyTplError}</div>
@@ -1023,6 +1021,29 @@ export default function DomainDetailPage() {
                   </button>
                 </>
               ) : null}
+            </div>
+          )}
+
+          {/* Unassign current permanent template */}
+          {domain?.template_id && (
+            <div style={{ marginTop: '.5rem', paddingTop: '.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.8125rem' }}>
+              <span style={{ color: '#64748b' }}>Currently assigned: <strong>{domain.template_name}</strong></span>
+              <button
+                onClick={async () => {
+                  setApplyingTpl(true); setApplyTplError(null)
+                  try {
+                    await updateDomain(domain.id, { template_id: null })
+                    qc.invalidateQueries({ queryKey: ['domain', name] })
+                    qc.invalidateQueries({ queryKey: ['records', domain.id] })
+                    setShowApplyPanel(false)
+                  } catch (err: any) { setApplyTplError(err.response?.data?.message ?? err.message) }
+                  finally { setApplyingTpl(false) }
+                }}
+                disabled={applyingTpl}
+                style={{ ...styles.btnIcon, color: '#b91c1c' }}
+              >
+                Unassign
+              </button>
             </div>
           )}
         </div>
