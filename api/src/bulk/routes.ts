@@ -46,6 +46,7 @@ async function computeDomainDiff(
 
   // Helper: find matching records in a domain
   async function findMatches() {
+    if (!match) return []
     let sql = 'SELECT * FROM dns_records WHERE domain_id = ? AND is_deleted = 0'
     const p: unknown[] = [domainId]
     if (match.name)  { sql += ' AND name = ?';  p.push(match.name) }

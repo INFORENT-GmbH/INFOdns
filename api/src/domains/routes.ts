@@ -91,6 +91,13 @@ export async function domainRoutes(app: FastifyInstance) {
       where = 'WHERE l.tenant_id IN (SELECT tenant_id FROM user_tenants WHERE user_id = ?) AND l.admin_only = 0'
       params.push(req.user.sub)
     } else if (tenant_id) {
+      if (!isAdmin) {
+        const owned = await queryOne(
+          'SELECT 1 FROM user_tenants WHERE user_id = ? AND tenant_id = ?',
+          [req.user.sub, Number(tenant_id)]
+        )
+        if (!owned) return reply.status(403).send({ code: 'FORBIDDEN' })
+      }
       where = isAdmin
         ? 'WHERE (l.tenant_id = ? AND l.admin_only = 0) OR (l.admin_only = 1 AND l.tenant_id IS NULL)'
         : 'WHERE l.tenant_id = ? AND l.admin_only = 0'

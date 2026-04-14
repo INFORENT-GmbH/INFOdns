@@ -164,7 +164,7 @@ export async function processBulkJob(job: BulkJob): Promise<void> {
       "SELECT COUNT(*) AS cnt FROM bulk_job_domains WHERE bulk_job_id = ? AND status = 'failed'",
       [job.id]
     )
-    const finalStatus = 'done'
+    const finalStatus = (failed?.cnt ?? 0) > 0 ? 'failed' : 'done'
     await execute(
       `UPDATE bulk_jobs SET status = ?, updated_at = NOW() WHERE id = ?`,
       [finalStatus, job.id]
@@ -172,7 +172,7 @@ export async function processBulkJob(job: BulkJob): Promise<void> {
     const done = await queryOne<{ processed_domains: number; affected_domains: number }>(
       'SELECT processed_domains, affected_domains FROM bulk_jobs WHERE id = ?', [job.id]
     )
-    if (done) broadcastEvent({ type: 'bulk_job_progress', jobId: job.id, status: 'done', processed_domains: done.processed_domains, affected_domains: done.affected_domains, createdBy: job.created_by })
+    if (done) broadcastEvent({ type: 'bulk_job_progress', jobId: job.id, status: finalStatus, processed_domains: done.processed_domains, affected_domains: done.affected_domains, createdBy: job.created_by })
     console.log(`[worker] Bulk job ${job.id} finished (${failed?.cnt ?? 0} domain failures)`)
   }
 }
