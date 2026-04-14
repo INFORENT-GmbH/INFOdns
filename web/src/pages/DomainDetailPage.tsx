@@ -929,7 +929,7 @@ export default function DomainDetailPage() {
           <span style={{ fontWeight: 600 }}>NS-Ref:</span>
           <span>{t('domainDetail_nsRefBanner')}</span>
           {nsRefDomain
-            ? <button onClick={() => navigate(`/domains/${nsRefDomain.id}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b45309', fontWeight: 600, textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}>{nsRef}</button>
+            ? <button onClick={() => navigate(`/domains/${nsRefDomain.fqdn}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b45309', fontWeight: 600, textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}>{nsRef}</button>
             : <span style={{ fontWeight: 600 }}>{nsRef}</span>
           }
           <span style={{ color: '#a16207' }}>— {t('domainDetail_nsRefReadOnly')}</span>
