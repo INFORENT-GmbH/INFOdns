@@ -1008,17 +1008,77 @@ export default function DomainDetailPage() {
                 <div style={styles.applyError}>{applyTplError}</div>
               ) : applyDiff ? (
                 <>
+                  {applyDiff.toAdd.length === 0 && applyDiff.toUpdate.length === 0 && applyDiff.toDelete.length === 0 && (
+                    <div style={{ fontSize: '.8125rem', color: '#64748b' }}>No changes — domain already matches this template.</div>
+                  )}
                   {applyDiff.toAdd.length === 0 && applyDiff.toDelete.length > 0 && (
                     <div style={styles.applyWarn}>{t('templates_warnEmpty')}</div>
                   )}
-                  <div style={{ display: 'flex', gap: '1.25rem', fontSize: '.8125rem' }}>
-                    <span style={{ color: '#15803d' }}>+ {applyDiff.toAdd.length} {t('templates_toAdd')}</span>
-                    <span style={{ color: '#2563eb' }}>↻ {applyDiff.toUpdate.length} {t('templates_toUpdate')}</span>
-                    <span style={{ color: '#b91c1c' }}>− {applyDiff.toDelete.length} {t('templates_toDelete')}</span>
-                  </div>
-                  <button onClick={handleTplApply} disabled={applyingTpl} style={{ ...styles.btnPrimary, marginTop: '.5rem', alignSelf: 'flex-start' }}>
-                    {applyingTpl ? t('saving') : t('templates_applyAndRender')}
-                  </button>
+
+                  {applyDiff.toAdd.length > 0 && (
+                    <div style={styles.diffSection}>
+                      <div style={{ ...styles.diffSectionHead, color: '#15803d', background: '#f0fdf4', borderColor: '#bbf7d0' }}>
+                        + {applyDiff.toAdd.length} to add
+                      </div>
+                      <table style={styles.diffTable}>
+                        <tbody>
+                          {applyDiff.toAdd.map((r, i) => (
+                            <tr key={i} style={styles.diffRow}>
+                              <td style={{ ...styles.diffTd, fontFamily: MONO }}>{r.name}</td>
+                              <td style={styles.diffTd}><span style={styles.diffTypeBadge}>{r.type}</span></td>
+                              <td style={{ ...styles.diffTd, fontFamily: MONO, color: '#374151', wordBreak: 'break-all' }}>{r.value}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {applyDiff.toUpdate.length > 0 && (
+                    <div style={styles.diffSection}>
+                      <div style={{ ...styles.diffSectionHead, color: '#1d4ed8', background: '#eff6ff', borderColor: '#bfdbfe' }}>
+                        ↻ {applyDiff.toUpdate.length} to update
+                      </div>
+                      <table style={styles.diffTable}>
+                        <tbody>
+                          {applyDiff.toUpdate.map((u, i) => (
+                            <tr key={i} style={styles.diffRow}>
+                              <td style={{ ...styles.diffTd, fontFamily: MONO }}>{u.existing.name}</td>
+                              <td style={styles.diffTd}><span style={styles.diffTypeBadge}>{u.existing.type}</span></td>
+                              <td style={{ ...styles.diffTd, fontFamily: MONO, color: '#b91c1c', wordBreak: 'break-all', textDecoration: 'line-through', opacity: 0.7 }}>{u.existing.value}</td>
+                              <td style={{ ...styles.diffTd, color: '#9ca3af' }}>→</td>
+                              <td style={{ ...styles.diffTd, fontFamily: MONO, color: '#15803d', wordBreak: 'break-all' }}>{u.incoming.value}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {applyDiff.toDelete.length > 0 && (
+                    <div style={styles.diffSection}>
+                      <div style={{ ...styles.diffSectionHead, color: '#b91c1c', background: '#fef2f2', borderColor: '#fecaca' }}>
+                        − {applyDiff.toDelete.length} to delete
+                      </div>
+                      <table style={styles.diffTable}>
+                        <tbody>
+                          {applyDiff.toDelete.map((r, i) => (
+                            <tr key={i} style={styles.diffRow}>
+                              <td style={{ ...styles.diffTd, fontFamily: MONO }}>{r.name}</td>
+                              <td style={styles.diffTd}><span style={styles.diffTypeBadge}>{r.type}</span></td>
+                              <td style={{ ...styles.diffTd, fontFamily: MONO, color: '#374151', wordBreak: 'break-all' }}>{r.value}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {(applyDiff.toAdd.length > 0 || applyDiff.toUpdate.length > 0 || applyDiff.toDelete.length > 0) && (
+                    <button onClick={handleTplApply} disabled={applyingTpl} style={{ ...styles.btnPrimary, marginTop: '.25rem', alignSelf: 'flex-start' }}>
+                      {applyingTpl ? t('saving') : t('templates_applyAndRender')}
+                    </button>
+                  )}
                 </>
               ) : null}
             </div>
@@ -1342,6 +1402,12 @@ const styles: Record<string, React.CSSProperties> = {
   btnWarning: { padding: '.25rem .625rem', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' },
   btnSuccess: { padding: '.25rem .625rem', background: '#16a34a', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' },
   btnDanger: { padding: '.25rem .625rem', background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' },
+  diffSection: { display: 'flex', flexDirection: 'column' as const, gap: 0, border: '1px solid #e2e8f0', borderRadius: 4, overflow: 'hidden', marginBottom: '.375rem' },
+  diffSectionHead: { padding: '.25rem .625rem', fontSize: '.75rem', fontWeight: 700, borderBottom: '1px solid' },
+  diffTable: { width: '100%', borderCollapse: 'collapse' },
+  diffRow: { borderBottom: '1px solid #f1f5f9' },
+  diffTd: { padding: '.25rem .625rem', fontSize: '.75rem', color: '#1e293b', verticalAlign: 'middle' },
+  diffTypeBadge: { display: 'inline-block', background: '#eff6ff', color: '#1d4ed8', borderRadius: 3, padding: '0 4px', fontSize: '.7rem', fontWeight: 600 },
 }
 
 // ── Zone error with clickable file paths ──────────────────────
