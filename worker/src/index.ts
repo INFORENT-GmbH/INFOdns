@@ -210,7 +210,7 @@ async function processJob(job: QueueRow): Promise<void> {
   )
 
   const rendered = await queryOne<{ last_rendered_at: string }>('SELECT last_rendered_at FROM domains WHERE id = ?', [domainId])
-  broadcastEvent({ type: 'domain_status', domainId, fqdn: domain.fqdn, zone_status: 'clean', last_serial: serial, last_rendered_at: rendered?.last_rendered_at ?? null, zone_error: null })
+  broadcastEvent({ type: 'domain_status', domainId, fqdn: domain.fqdn, zone_status: 'clean', tenantId: domain.tenant_id, last_serial: serial, last_rendered_at: rendered?.last_rendered_at ?? null, zone_error: null })
   if (MAIL_ADMIN_TO) {
     await queueMail(MAIL_ADMIN_TO, 'zone_deploy_success', { fqdn: domain.fqdn, jobId: job.id, serial, renderedAt: rendered?.last_rendered_at ?? 'unknown' })
   }
@@ -253,9 +253,9 @@ async function poll(): Promise<void> {
           [newRetries, err.message, job.id]
         )
         await execute("UPDATE domains SET zone_status = 'error' WHERE id = ?", [job.domain_id])
-        const failedDomain = await queryOne<{ fqdn: string }>('SELECT fqdn FROM domains WHERE id = ?', [job.domain_id])
+        const failedDomain = await queryOne<{ fqdn: string; tenant_id: number }>('SELECT fqdn, tenant_id FROM domains WHERE id = ?', [job.domain_id])
         if (failedDomain) {
-          broadcastEvent({ type: 'domain_status', domainId: job.domain_id, fqdn: failedDomain.fqdn, zone_status: 'error', zone_error: err.message })
+          broadcastEvent({ type: 'domain_status', domainId: job.domain_id, fqdn: failedDomain.fqdn, zone_status: 'error', tenantId: failedDomain.tenant_id, zone_error: err.message })
           if (MAIL_ADMIN_TO) {
             await queueMail(MAIL_ADMIN_TO, 'zone_deploy_failed', { fqdn: failedDomain.fqdn, jobId: job.id, retries: newRetries, error: err.message })
           }

@@ -9,6 +9,7 @@ const execFileAsync = promisify(execFile)
 interface DomainRow {
   id: number
   fqdn: string
+  tenant_id: number
   dnssec_ok: number | null
   zone_status: string
 }
@@ -33,7 +34,7 @@ async function isDnskeyVisible(fqdn: string): Promise<boolean> {
 
 export async function checkDnssec(filter: 'all' | 'pending' | 'ok' = 'all'): Promise<void> {
   const domains = await query<DomainRow>(
-    `SELECT id, fqdn, dnssec_ok, zone_status FROM domains WHERE ${FILTER_SQL[filter]}`
+    `SELECT id, fqdn, tenant_id, dnssec_ok, zone_status FROM domains WHERE ${FILTER_SQL[filter]}`
   )
 
   for (const domain of domains) {
@@ -57,6 +58,7 @@ export async function checkDnssec(filter: 'all' | 'pending' | 'ok' = 'all'): Pro
         domainId: domain.id,
         fqdn: domain.fqdn,
         zone_status: domain.zone_status,
+        tenantId: domain.tenant_id,
         dnssec_ok: newOk,
       })
 

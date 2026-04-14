@@ -11,6 +11,7 @@ const resolveNs = promisify(resolver.resolveNs.bind(resolver))
 interface DomainRow {
   id: number
   fqdn: string
+  tenant_id: number
   ns_ok: number | null
   zone_status: string
 }
@@ -31,7 +32,7 @@ export async function checkNsDelegation(
   if (expected.size === 0) return
 
   const domains = await query<DomainRow>(
-    `SELECT id, fqdn, ns_ok, zone_status FROM domains WHERE ${FILTER_SQL[filter]}`
+    `SELECT id, fqdn, tenant_id, ns_ok, zone_status FROM domains WHERE ${FILTER_SQL[filter]}`
   )
 
   for (const domain of domains) {
@@ -64,6 +65,7 @@ export async function checkNsDelegation(
         domainId: domain.id,
         fqdn: domain.fqdn,
         zone_status: domain.zone_status,
+        tenantId: domain.tenant_id,
         ns_ok: newOk,
       })
 

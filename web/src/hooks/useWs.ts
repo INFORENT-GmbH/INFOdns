@@ -65,7 +65,7 @@ export function useWs(token: string | null): WsStatus {
                 zone_status: event.zone_status,
                 last_serial: event.last_serial ?? old.last_serial,
                 last_rendered_at: event.last_rendered_at ?? old.last_rendered_at,
-                zone_error: event.zone_error ?? null,
+                zone_error: event.zone_error ?? old.zone_error,
                 ...(event.ns_ok !== undefined && { ns_ok: event.ns_ok }),
                 ...(event.dnssec_ok !== undefined && { dnssec_ok: event.dnssec_ok }),
               }

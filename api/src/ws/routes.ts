@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { addClient } from './hub.js'
+import type { JwtPayload } from '../auth/jwt.js'
 
 export async function wsRoutes(app: FastifyInstance) {
   app.get('/ws', { websocket: true }, (socket, req) => {
@@ -11,14 +12,15 @@ export async function wsRoutes(app: FastifyInstance) {
       return
     }
 
+    let payload: JwtPayload
     try {
-      app.jwt.verify(token)
+      payload = app.jwt.verify<JwtPayload>(token)
     } catch {
       socket.close(4001, 'Unauthorized')
       return
     }
 
-    addClient(socket)
+    addClient(socket, { role: payload.role, sub: payload.sub, tenantId: payload.tenantId })
 
     // Send a ping every 30s to keep the connection alive through proxies
     const ping = setInterval(() => {

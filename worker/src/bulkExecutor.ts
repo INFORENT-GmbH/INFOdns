@@ -5,6 +5,7 @@ const BULK_BATCH_SIZE = Number(process.env.BULK_BATCH_SIZE ?? 50)
 
 interface BulkJob {
   id: number
+  created_by: number
   operation: string
   filter_json: string | object
   payload_json: string | object
@@ -103,9 +104,13 @@ export async function processBulkJob(job: BulkJob): Promise<void> {
   const payload = typeof job.payload_json === 'string'
     ? JSON.parse(job.payload_json) : job.payload_json
 
-  // Get all pending domain rows for this job
-  const domainRows = await query<{ id: number; domain_id: number }>(
-    "SELECT id, domain_id FROM bulk_job_domains WHERE bulk_job_id = ? AND status = 'pending' LIMIT ?",
+  // Get all pending domain rows for this job (join tenant_id for WS filtering)
+  const domainRows = await query<{ id: number; domain_id: number; tenant_id: number }>(
+    `SELECT bjd.id, bjd.domain_id, d.tenant_id
+     FROM bulk_job_domains bjd
+     JOIN domains d ON d.id = bjd.domain_id
+     WHERE bjd.bulk_job_id = ? AND bjd.status = 'pending'
+     LIMIT ?`,
     [job.id, BULK_BATCH_SIZE]
   )
 
@@ -127,7 +132,7 @@ export async function processBulkJob(job: BulkJob): Promise<void> {
         "UPDATE bulk_job_domains SET status = 'done' WHERE id = ?",
         [row.id]
       )
-      broadcastEvent({ type: 'record_changed', domainId: row.domain_id })
+      broadcastEvent({ type: 'record_changed', domainId: row.domain_id, tenantId: row.tenant_id })
     } catch (err: any) {
       console.error(`[worker] Bulk job ${job.id} domain ${row.domain_id} failed:`, err.message)
       await execute(
@@ -146,7 +151,7 @@ export async function processBulkJob(job: BulkJob): Promise<void> {
     const progress = await queryOne<{ processed_domains: number; affected_domains: number }>(
       'SELECT processed_domains, affected_domains FROM bulk_jobs WHERE id = ?', [job.id]
     )
-    if (progress) broadcastEvent({ type: 'bulk_job_progress', jobId: job.id, status: 'running', processed_domains: progress.processed_domains, affected_domains: progress.affected_domains })
+    if (progress) broadcastEvent({ type: 'bulk_job_progress', jobId: job.id, status: 'running', processed_domains: progress.processed_domains, affected_domains: progress.affected_domains, createdBy: job.created_by })
   }
 
   // Check if all domains are processed now
@@ -167,7 +172,7 @@ export async function processBulkJob(job: BulkJob): Promise<void> {
     const done = await queryOne<{ processed_domains: number; affected_domains: number }>(
       'SELECT processed_domains, affected_domains FROM bulk_jobs WHERE id = ?', [job.id]
     )
-    if (done) broadcastEvent({ type: 'bulk_job_progress', jobId: job.id, status: 'done', processed_domains: done.processed_domains, affected_domains: done.affected_domains })
+    if (done) broadcastEvent({ type: 'bulk_job_progress', jobId: job.id, status: 'done', processed_domains: done.processed_domains, affected_domains: done.affected_domains, createdBy: job.created_by })
     console.log(`[worker] Bulk job ${job.id} finished (${failed?.cnt ?? 0} domain failures)`)
   }
 }
@@ -176,7 +181,7 @@ export async function processBulkJob(job: BulkJob): Promise<void> {
 
 export async function pollBulkJobs(): Promise<void> {
   const jobs = await query<BulkJob>(
-    "SELECT id, operation, filter_json, payload_json FROM bulk_jobs WHERE status = 'running' LIMIT 5"
+    "SELECT id, created_by, operation, filter_json, payload_json FROM bulk_jobs WHERE status = 'running' LIMIT 5"
   )
   for (const job of jobs) {
     try {

@@ -271,7 +271,7 @@ export async function recordRoutes(app: FastifyInstance) {
         }
       } catch (err: any) {
         if (err.code === 'FST_REQ_FILE_TOO_LARGE') {
-          return reply.status(400).send({ code: 'PARSE_ERROR', message: 'File too large (max 20 MB)' })
+          return reply.status(413).send({ code: 'PARSE_ERROR', message: 'File too large (max 20 MB)' })
         }
         throw err
       }

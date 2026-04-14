@@ -7,9 +7,9 @@ const API_URL        = process.env.API_INTERNAL_URL ?? 'http://api:3000'
 const INTERNAL_SECRET = process.env.INTERNAL_SECRET ?? ''
 
 export type WsEvent =
-  | { type: 'domain_status'; domainId: number; fqdn: string; zone_status: string; last_serial?: number; last_rendered_at?: string | null; zone_error?: string | null; ns_ok?: number | null; dnssec_ok?: number | null }
-  | { type: 'bulk_job_progress'; jobId: number; status: string; processed_domains: number; affected_domains: number }
-  | { type: 'record_changed'; domainId: number }
+  | { type: 'domain_status'; domainId: number; fqdn: string; zone_status: string; tenantId?: number | null; last_serial?: number; last_rendered_at?: string | null; zone_error?: string | null; ns_ok?: number | null; dnssec_ok?: number | null }
+  | { type: 'bulk_job_progress'; jobId: number; status: string; processed_domains: number; affected_domains: number; createdBy?: number }
+  | { type: 'record_changed'; domainId: number; tenantId?: number | null }
   | { type: 'mail_queue_update'; mailId: number; status: string; retries?: number; error?: string | null }
   | { type: 'ticket_created'; ticketId: number }
   | { type: 'ticket_updated'; ticketId: number }
