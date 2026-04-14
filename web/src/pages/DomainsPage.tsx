@@ -72,6 +72,7 @@ export default function DomainsPage() {
     <div>
       <style>{INLINE_STYLES}</style>
       <div style={{ padding: '.625rem .75rem', borderBottom: '1px solid #e5e7eb', position: 'sticky', top: 0, zIndex: 10, background: '#fff' }}>
+        <h2 style={{ margin: '0 0 .5rem', fontSize: '1.25rem', fontWeight: 700 }}>{t('domains_title')}</h2>
         <input
           placeholder={t('domains_searchPlaceholder')}
           value={search}
