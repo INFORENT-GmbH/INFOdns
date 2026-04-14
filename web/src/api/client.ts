@@ -94,6 +94,8 @@ export interface Domain {
   dnssec_ok: number | null
   dnssec_checked_at: string | null
   ns_reference: string | null
+  template_id: number | null
+  template_name: string | null
 }
 
 export interface DnsRecord {
@@ -108,6 +110,7 @@ export interface DnsRecord {
   value: string
   created_at: string
   updated_at: string
+  _from_template?: boolean
 }
 
 export interface Tenant {
@@ -561,6 +564,75 @@ export const getImportPreview = () =>
 
 export const runImport = (selection: ImportSelection) =>
   api.post<ImportRunResult>('/import/run', selection)
+
+// ── DNS Templates ─────────────────────────────────────────────
+
+export interface DnsTemplate {
+  id: number
+  tenant_id: number | null
+  name: string
+  description: string | null
+  record_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface DnsTemplateRecord {
+  id: number
+  template_id: number
+  name: string
+  type: string
+  ttl: number | null
+  priority: number | null
+  weight: number | null
+  port: number | null
+  value: string
+}
+
+export interface DnsTemplateDetail extends DnsTemplate {
+  records: DnsTemplateRecord[]
+}
+
+export type ApplyMode = 'add_missing' | 'overwrite_matching' | 'replace_all'
+
+export interface ApplyTemplateDiff {
+  toAdd: DnsTemplateRecord[]
+  toUpdate: { existing: DnsRecord; incoming: DnsTemplateRecord }[]
+  toDelete: DnsRecord[]
+}
+
+export const getTemplates = () =>
+  api.get<DnsTemplate[]>('/templates')
+
+export const getTemplate = (id: number) =>
+  api.get<DnsTemplateDetail>(`/templates/${id}`)
+
+export const createTemplate = (data: { name: string; description?: string | null; tenant_id?: number | null }) =>
+  api.post<DnsTemplate>('/templates', data)
+
+export const updateTemplate = (id: number, data: { name?: string; description?: string | null }) =>
+  api.put<DnsTemplate>(`/templates/${id}`, data)
+
+export const deleteTemplate = (id: number) =>
+  api.delete(`/templates/${id}`)
+
+export const createTemplateRecord = (templateId: number, data: Partial<DnsTemplateRecord>) =>
+  api.post<DnsTemplateRecord>(`/templates/${templateId}/records`, data)
+
+export const updateTemplateRecord = (templateId: number, recordId: number, data: Partial<DnsTemplateRecord>) =>
+  api.put<DnsTemplateRecord>(`/templates/${templateId}/records/${recordId}`, data)
+
+export const deleteTemplateRecord = (templateId: number, recordId: number) =>
+  api.delete(`/templates/${templateId}/records/${recordId}`)
+
+export const previewApplyTemplate = (domainId: number, templateId: number, mode: ApplyMode) =>
+  api.post<ApplyTemplateDiff>(`/domains/${domainId}/apply-template/preview`, { templateId, mode })
+
+export const applyTemplate = (domainId: number, templateId: number, mode: ApplyMode) =>
+  api.post<{ ok: boolean; added: number; updated: number; deleted: number }>(
+    `/domains/${domainId}/apply-template`,
+    { templateId, mode }
+  )
 
 export const downloadAttachment = async (ticketId: number, fileId: number, originalName: string) => {
   const resp = await api.get(`/tickets/${ticketId}/attachments/${fileId}`, { responseType: 'blob' })

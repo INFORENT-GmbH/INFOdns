@@ -1,0 +1,23 @@
+CREATE TABLE dns_templates (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  tenant_id   INT UNSIGNED NULL,
+  name        VARCHAR(255) NOT NULL,
+  description TEXT NULL,
+  created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE dns_template_records (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  template_id INT UNSIGNED NOT NULL,
+  name        VARCHAR(253) NOT NULL,
+  type        ENUM('A','AAAA','CNAME','MX','NS','TXT','SRV','CAA','PTR','NAPTR','TLSA','SSHFP','DNSKEY','DS','ALIAS') NOT NULL,
+  ttl         INT UNSIGNED NULL,
+  priority    SMALLINT UNSIGNED NULL,
+  weight      SMALLINT UNSIGNED NULL,
+  port        SMALLINT UNSIGNED NULL,
+  value       TEXT NOT NULL,
+  FOREIGN KEY (template_id) REFERENCES dns_templates(id) ON DELETE CASCADE,
+  INDEX idx_template (template_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4

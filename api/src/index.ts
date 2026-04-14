@@ -21,6 +21,7 @@ import { ticketRoutes } from './tickets/routes.js'
 import { importRoutes } from './import/routes.js'
 import { tldPricingRoutes } from './tld-pricing/routes.js'
 import { registrarRoutes } from './registrars/routes.js'
+import { templateRoutes } from './templates/routes.js'
 
 const app = Fastify({ logger: true, trustProxy: true })
 
@@ -77,6 +78,7 @@ await app.register(async (v1) => {
   await v1.register(importRoutes)
   await v1.register(tldPricingRoutes)
   await v1.register(registrarRoutes)
+  await v1.register(templateRoutes)
 }, { prefix: '/api/v1' })
 
 // ── Start ────────────────────────────────────────────────────

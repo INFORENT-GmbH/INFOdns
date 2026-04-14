@@ -126,12 +126,27 @@ export async function recordRoutes(app: FastifyInstance) {
       const domain = await resolveDomain(req.params.domainId, req, reply)
       if (!domain) return
 
-      const records = await (await import('../db.js')).query(
+      const ownRecords = await query(
         `SELECT id, name, type, ttl, priority, weight, port, value, created_at, updated_at
          FROM dns_records WHERE domain_id = ? AND is_deleted = 0 ORDER BY type, name`,
         [domain.id]
       )
-      return records
+
+      // If a template is permanently assigned, append its records with a marker
+      const domainRow = await queryOne<{ template_id: number | null }>(
+        'SELECT template_id FROM domains WHERE id = ?',
+        [domain.id]
+      )
+      if (domainRow?.template_id) {
+        const templateRecords = await query(
+          `SELECT id, name, type, ttl, priority, weight, port, value, NULL AS created_at, NULL AS updated_at
+           FROM dns_template_records WHERE template_id = ? ORDER BY type, name`,
+          [domainRow.template_id]
+        )
+        return [...ownRecords, ...templateRecords.map((r: any) => ({ ...r, _from_template: true }))]
+      }
+
+      return ownRecords
     }
   )
 

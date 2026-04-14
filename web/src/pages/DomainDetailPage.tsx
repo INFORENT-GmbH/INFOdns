@@ -6,8 +6,9 @@ import {
   getDomain, getDomains, getRecords, createRecord, deleteRecord,
   createBulkJob, previewBulkJob, approveBulkJob, searchByRecord,
   updateDomainLabels, getLabelSuggestions, updateDomain, deleteDomain, getZoneText,
-  getTenants,
+  getTenants, getTemplates, previewApplyTemplate, applyTemplate,
   type DnsRecord, type Label, type Domain, type LabelSuggestion, type Tenant,
+  type ApplyMode, type ApplyTemplateDiff,
 } from '../api/client'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import Select from '../components/Select'
@@ -125,11 +126,21 @@ export default function DomainDetailPage() {
   const [savingTtl, setSavingTtl] = useState(false)
   const [savingNsRef, setSavingNsRef] = useState(false)
   const [showDnssecModal, setShowDnssecModal] = useState(false)
+  const [savingTpl, setSavingTpl] = useState(false)
   const [copiedNs, setCopiedNs] = useState<string | null>(null)
   const [hoveredNsItem, setHoveredNsItem] = useState<string | null>(null)
   const [deletingDomain, setDeletingDomain] = useState(false)
   const [showAddKeyDrop, setShowAddKeyDrop] = useState(false)
   const [showEditKeyDrop, setShowEditKeyDrop] = useState(false)
+
+  // Apply Template panel
+  const [showApplyPanel, setShowApplyPanel] = useState(false)
+  const [applyTplId, setApplyTplId] = useState<number | ''>('')
+  const [applyMode, setApplyMode] = useState<ApplyMode>('add_missing')
+  const [applyDiff, setApplyDiff] = useState<ApplyTemplateDiff | null>(null)
+  const [previewing, setPreviewing] = useState(false)
+  const [applyingTpl, setApplyingTpl] = useState(false)
+  const [applyTplError, setApplyTplError] = useState<string | null>(null)
 
   const { data: domain, isLoading: loadingDomain } = useQuery<Domain>({
     queryKey: ['domain', name],
@@ -152,6 +163,12 @@ export default function DomainDetailPage() {
     queryKey: ['records', recordSourceId],
     queryFn: () => getRecords(recordSourceId!).then(r => r.data),
     enabled: recordSourceId !== null,
+  })
+
+  const { data: tplList = [] } = useQuery({
+    queryKey: ['templates'],
+    queryFn: () => getTemplates().then(r => r.data),
+    staleTime: 30_000,
   })
 
   // Refs always holding the latest state values — used in the effect cleanup below.
@@ -408,6 +425,49 @@ export default function DomainDetailPage() {
   function handleImportStage(importedNewRows: NewRow[], importedEdits: Record<number, EditRow>) {
     setNewRows(prev => [...importedNewRows, ...prev])
     setEdits(prev => ({ ...prev, ...importedEdits }))
+  }
+
+  async function handleAssignTemplate(value: string) {
+    if (!domain) return
+    setSavingTpl(true)
+    try {
+      await updateDomain(domain.id, { template_id: value ? Number(value) : null })
+      qc.invalidateQueries({ queryKey: ['domain', name] })
+      qc.invalidateQueries({ queryKey: ['records', domain.id] })
+    } catch (err: any) {
+      alert(err.response?.data?.message ?? err.message)
+    } finally {
+      setSavingTpl(false)
+    }
+  }
+
+  async function handleTplPreview() {
+    if (!domain || !applyTplId) return
+    setPreviewing(true); setApplyTplError(null); setApplyDiff(null)
+    try {
+      const res = await previewApplyTemplate(domain.id, Number(applyTplId), applyMode)
+      setApplyDiff(res.data)
+    } catch (err: any) {
+      setApplyTplError(err.response?.data?.message ?? err.message)
+    } finally {
+      setPreviewing(false)
+    }
+  }
+
+  async function handleTplApply() {
+    if (!domain || !applyTplId) return
+    setApplyingTpl(true); setApplyTplError(null)
+    try {
+      await applyTemplate(domain.id, Number(applyTplId), applyMode)
+      qc.invalidateQueries({ queryKey: ['records', domain.id] })
+      qc.invalidateQueries({ queryKey: ['domain', name] })
+      setShowApplyPanel(false)
+      setApplyTplId(''); setApplyMode('add_missing'); setApplyDiff(null)
+    } catch (err: any) {
+      setApplyTplError(err.response?.data?.message ?? err.message)
+    } finally {
+      setApplyingTpl(false)
+    }
   }
 
   // ── label helpers ─────────────────────────────────────────────────────────
@@ -769,6 +829,23 @@ export default function DomainDetailPage() {
             />
             {savingNsRef && <span style={{ color: '#9ca3af' }}>…</span>}
           </span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
+          Template:
+          <Select
+            value={domain.template_id != null ? String(domain.template_id) : ''}
+            onChange={handleAssignTemplate}
+            disabled={savingTpl}
+            variant="ghost"
+            options={[
+              { value: '', label: '— none —' },
+              ...tplList.map((tpl: any) => ({ value: String(tpl.id), label: tpl.tenant_id === null ? `${tpl.name} (global)` : tpl.name })),
+            ]}
+          />
+          {savingTpl && <span style={{ color: '#9ca3af' }}>…</span>}
+          {domain.template_id && domain.template_name && (
+            <span style={{ fontSize: '.75rem', color: '#2563eb', fontWeight: 500 }}>{domain.template_name}</span>
+          )}
+        </span>
       </div>
 
       {showDnssecModal && (
@@ -864,10 +941,71 @@ export default function DomainDetailPage() {
         {!nsRefMode && (
           <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
             <button onClick={() => setShowImportModal(true)} style={styles.btnSecondary}>{t('domainDetail_importZone')}</button>
+            <button onClick={() => { setShowApplyPanel(p => !p); setApplyDiff(null); setApplyTplError(null) }} style={styles.btnSecondary}>{t('templates_applyTemplate')}</button>
             <button onClick={addNewRow} style={hasDirty ? styles.btnSecondary : styles.btnPrimary}>{t('domainDetail_addRecord')}</button>
           </div>
         )}
       </div>
+
+      {showApplyPanel && !nsRefMode && (
+        <div style={styles.applyPanel}>
+          <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <label style={styles.applyLabel}>
+              {t('templates_applyTemplate')}
+              <select
+                value={applyTplId}
+                onChange={e => { setApplyTplId(e.target.value === '' ? '' : Number(e.target.value) as any); setApplyDiff(null) }}
+                style={styles.applySelect}
+              >
+                <option value="">{t('templates_selectTemplate')}</option>
+                {tplList.filter((tpl: any) => tpl.tenant_id === null).length > 0 && (
+                  <optgroup label={t('templates_optGlobal')}>
+                    {tplList.filter((tpl: any) => tpl.tenant_id === null).map((tpl: any) => (
+                      <option key={tpl.id} value={tpl.id}>{tpl.name} ({tpl.record_count})</option>
+                    ))}
+                  </optgroup>
+                )}
+                {tplList.filter((tpl: any) => tpl.tenant_id !== null).length > 0 && (
+                  <optgroup label={t('templates_optTenant')}>
+                    {tplList.filter((tpl: any) => tpl.tenant_id !== null).map((tpl: any) => (
+                      <option key={tpl.id} value={tpl.id}>{tpl.name} ({tpl.record_count})</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </label>
+            <label style={styles.applyLabel}>
+              Mode
+              <div style={{ display: 'flex', gap: '.75rem', marginTop: 4 }}>
+                {(['add_missing', 'overwrite_matching', 'replace_all'] as ApplyMode[]).map(m => (
+                  <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '.8125rem', fontWeight: 400, cursor: 'pointer' }}>
+                    <input type="radio" name="applyMode" value={m} checked={applyMode === m} onChange={() => { setApplyMode(m); setApplyDiff(null) }} />
+                    {t(m === 'add_missing' ? 'templates_modeAddMissing' : m === 'overwrite_matching' ? 'templates_modeOverwrite' : 'templates_modeReplaceAll')}
+                  </label>
+                ))}
+              </div>
+            </label>
+            <button onClick={handleTplPreview} disabled={!applyTplId || previewing} style={styles.btnSecondary}>{previewing ? t('loading') : t('templates_preview')}</button>
+            <button onClick={() => { setShowApplyPanel(false); setApplyDiff(null); setApplyTplError(null) }} style={styles.btnSecondary}>{t('cancel')}</button>
+          </div>
+          {applyTplError && <div style={styles.applyError}>{applyTplError}</div>}
+          {applyDiff && (
+            <div style={styles.applyPreview}>
+              {applyDiff.toAdd.length === 0 && applyDiff.toDelete.length > 0 && (
+                <div style={styles.applyWarn}>{t('templates_warnEmpty')}</div>
+              )}
+              <div style={{ display: 'flex', gap: '1.25rem', fontSize: '.8125rem' }}>
+                <span style={{ color: '#15803d' }}>+ {applyDiff.toAdd.length} {t('templates_toAdd')}</span>
+                <span style={{ color: '#2563eb' }}>↻ {applyDiff.toUpdate.length} {t('templates_toUpdate')}</span>
+                <span style={{ color: '#b91c1c' }}>− {applyDiff.toDelete.length} {t('templates_toDelete')}</span>
+              </div>
+              <button onClick={handleTplApply} disabled={applyingTpl} style={{ ...styles.btnPrimary, marginTop: '.5rem' }}>
+                {applyingTpl ? t('saving') : t('templates_applyAndRender')}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {loadingRecords ? <p>{t('domainDetail_loadingRecords')}</p> : (
         <div style={{ overflowX: 'auto', position: 'relative', ...(nsRefMode ? { border: '2px solid #f59e0b', borderRadius: 6, overflow: 'hidden' } : {}) }}>
@@ -965,6 +1103,28 @@ export default function DomainDetailPage() {
 
             {/* Existing records */}
             {(records as DnsRecord[]).map(rec => {
+              // ── Template records: read-only display ──
+              if (rec._from_template) {
+                return (
+                  <tr key={`tpl-${rec.id}`} style={{ ...styles.tr, background: '#f0f9ff' }}>
+                    <td style={{ ...styles.td, fontFamily: MONO, color: '#374151' }}>{rec.name}</td>
+                    <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <span style={styles.tplBadge}>TPL</span>
+                        <span style={{ fontSize: '.8125rem', color: '#374151', fontFamily: MONO }}>{rec.type}</span>
+                      </span>
+                    </td>
+                    <td style={{ ...styles.td, color: '#64748b' }}>{rec.ttl ?? '—'}</td>
+                    {showPriority && <td style={{ ...styles.td, color: '#64748b' }}>{(rec.type === 'MX' || rec.type === 'SRV') ? rec.priority : ''}</td>}
+                    {showWeightPort && <td style={{ ...styles.td, color: '#64748b' }}>{rec.type === 'SRV' ? rec.weight : ''}</td>}
+                    {showWeightPort && <td style={{ ...styles.td, color: '#64748b' }}>{rec.type === 'SRV' ? rec.port : ''}</td>}
+                    <td style={{ ...styles.td, fontFamily: MONO, color: '#374151', wordBreak: 'break-all' }}>{rec.value}</td>
+                    <td style={{ ...styles.td, textAlign: 'right', whiteSpace: 'nowrap' }} />
+                  </tr>
+                )
+              }
+
+              // ── Own domain records: editable ──
               const isDeleted = pendingDeletes.has(rec.id)
               const row = getRow(rec)
               const dirty = !!edits[rec.id]
@@ -1056,7 +1216,7 @@ export default function DomainDetailPage() {
               )
             })}
 
-            {records.length === 0 && newRows.length === 0 && (
+            {(records as DnsRecord[]).filter(r => !r._from_template).length === 0 && newRows.length === 0 && (
               <tr><td colSpan={5 + (showPriority ? 1 : 0) + (showWeightPort ? 2 : 0)} style={{ ...styles.td, textAlign: 'center', color: '#9ca3af' }}>{t('domainDetail_noRecords')}</td></tr>
             )}
           </tbody>
@@ -1113,6 +1273,13 @@ const styles: Record<string, React.CSSProperties> = {
   labelAddBtn: { padding: '1px 6px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
   labelNewBtn: { padding: '1px 6px', background: 'none', border: '1px dashed #cbd5e1', borderRadius: 12, fontSize: '.7rem', color: '#64748b', cursor: 'pointer' },
   tableHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.5rem .75rem', borderBottom: '1px solid #e2e8f0' },
+  tplBadge: { display: 'inline-block', background: '#e0f2fe', color: '#0369a1', borderRadius: 4, padding: '0 4px', fontSize: '.7rem', fontWeight: 700, letterSpacing: '.03em', flexShrink: 0 },
+  applyPanel: { margin: '0 0 .5rem', padding: '.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, display: 'flex', flexDirection: 'column' as const, gap: '.5rem' },
+  applyLabel: { display: 'flex', flexDirection: 'column' as const, gap: 2, fontSize: '.8125rem', fontWeight: 600, color: '#374151' },
+  applySelect: { marginTop: 4, padding: '.3125rem .625rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8125rem', minWidth: 200 },
+  applyPreview: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, padding: '.625rem .75rem', display: 'flex', flexDirection: 'column' as const, gap: '.375rem' },
+  applyError: { background: '#fee2e2', color: '#b91c1c', padding: '.375rem .625rem', borderRadius: 4, fontSize: '.8125rem' },
+  applyWarn: { background: '#fef3c7', color: '#92400e', padding: '.375rem .625rem', borderRadius: 4, fontSize: '.8125rem' },
   dirtyHint: { fontSize: '.75rem', color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 12 },
   table: { width: '100%', borderCollapse: 'collapse' },
   th: { textAlign: 'left', padding: '.4375rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', whiteSpace: 'nowrap', letterSpacing: '.04em' },

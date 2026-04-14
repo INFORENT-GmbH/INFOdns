@@ -39,6 +39,7 @@ const UpdateDomainBody = z.object({
   dnssec_enabled: z.boolean().optional(),
   tenant_id: z.number().int().positive().optional(),
   ns_reference: z.string().max(253).nullable().optional(),
+  template_id: z.number().int().positive().nullable().optional(),
 })
 
 const LabelSchema = z.object({
@@ -242,12 +243,14 @@ export async function domainRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>('/domains/:id', { preHandler: requireAuth }, async (req, reply) => {
     const row = await queryOne(
       `SELECT d.*, c.name AS tenant_name,
-              q.error AS zone_error, q.retries AS zone_retries
+              q.error AS zone_error, q.retries AS zone_retries,
+              t.name AS template_name
        FROM domains d
        JOIN tenants c ON c.id = d.tenant_id
        LEFT JOIN zone_render_queue q ON q.domain_id = d.id AND q.id = (
          SELECT MAX(id) FROM zone_render_queue WHERE domain_id = d.id
        )
+       LEFT JOIN dns_templates t ON t.id = d.template_id
        WHERE d.fqdn = ? AND d.status != 'deleted'${ownerFilter(req)}`,
       [req.params.id]
     ) as any
@@ -286,36 +289,44 @@ export async function domainRoutes(app: FastifyInstance) {
       if (!targetTenant) return reply.status(422).send({ code: 'TENANT_NOT_FOUND' })
     }
 
-    const dnssecVal = body.data.dnssec_enabled != null ? (body.data.dnssec_enabled ? 1 : 0) : null
-    // ns_reference: undefined = don't touch; null = clear; string = set
-    const nsRefProvided = body.data.ns_reference !== undefined
-    if (nsRefProvided) {
-      await execute(
-        `UPDATE domains SET
-           status         = COALESCE(?, status),
-           default_ttl    = COALESCE(?, default_ttl),
-           notes          = COALESCE(?, notes),
-           dnssec_enabled = COALESCE(?, dnssec_enabled),
-           tenant_id      = COALESCE(?, tenant_id),
-           ns_reference   = ?
-         WHERE id = ?`,
-        [body.data.status ?? null, body.data.default_ttl ?? null, body.data.notes ?? null, dnssecVal, body.data.tenant_id ?? null, body.data.ns_reference, req.params.id]
-      )
-    } else {
-      await execute(
-        `UPDATE domains SET
-           status         = COALESCE(?, status),
-           default_ttl    = COALESCE(?, default_ttl),
-           notes          = COALESCE(?, notes),
-           dnssec_enabled = COALESCE(?, dnssec_enabled),
-           tenant_id      = COALESCE(?, tenant_id)
-         WHERE id = ?`,
-        [body.data.status ?? null, body.data.default_ttl ?? null, body.data.notes ?? null, dnssecVal, body.data.tenant_id ?? null, req.params.id]
-      )
+    // Validate template visibility if provided
+    if (body.data.template_id !== undefined && body.data.template_id !== null) {
+      const visClause = req.user.role === 'admin'
+        ? ''
+        : ` AND (tenant_id IS NULL OR tenant_id IN (SELECT tenant_id FROM user_tenants WHERE user_id = ${Number(req.user.sub)}))`
+      const tpl = await queryOne(`SELECT id FROM dns_templates WHERE id = ?${visClause}`, [body.data.template_id])
+      if (!tpl) return reply.status(404).send({ code: 'NOT_FOUND', message: 'Template not found' })
     }
+
+    const dnssecVal = body.data.dnssec_enabled != null ? (body.data.dnssec_enabled ? 1 : 0) : null
+    // ns_reference / template_id: undefined = don't touch; null = clear; value = set
+    const nsRefProvided = body.data.ns_reference !== undefined
+    const tplProvided = body.data.template_id !== undefined
+
+    const setParts: string[] = [
+      'status         = COALESCE(?, status)',
+      'default_ttl    = COALESCE(?, default_ttl)',
+      'notes          = COALESCE(?, notes)',
+      'dnssec_enabled = COALESCE(?, dnssec_enabled)',
+      'tenant_id      = COALESCE(?, tenant_id)',
+    ]
+    const setParams: unknown[] = [
+      body.data.status ?? null,
+      body.data.default_ttl ?? null,
+      body.data.notes ?? null,
+      dnssecVal,
+      body.data.tenant_id ?? null,
+    ]
+
+    if (nsRefProvided) { setParts.push('ns_reference = ?'); setParams.push(body.data.ns_reference) }
+    if (tplProvided)   { setParts.push('template_id = ?');  setParams.push(body.data.template_id) }
+
+    setParams.push(req.params.id)
+    await execute(`UPDATE domains SET ${setParts.join(', ')} WHERE id = ?`, setParams)
+
     const updated = await queryOne('SELECT * FROM domains WHERE id = ?', [req.params.id])
     await writeAuditLog({ req, entityType: 'domain', entityId: Number(req.params.id), domainId: Number(req.params.id), action: 'update', oldValue: old, newValue: updated })
-    const zoneRelevant = body.data.status !== undefined || body.data.default_ttl !== undefined || body.data.dnssec_enabled !== undefined || nsRefProvided
+    const zoneRelevant = body.data.status !== undefined || body.data.default_ttl !== undefined || body.data.dnssec_enabled !== undefined || nsRefProvided || tplProvided
     if (zoneRelevant) await enqueueRender(Number(req.params.id))
     return updated
   })

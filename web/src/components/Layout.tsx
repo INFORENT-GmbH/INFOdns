@@ -85,6 +85,9 @@ export default function Layout() {
       <NavLink to="/mail-queue" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
         {t('nav_mailQueue')}
       </NavLink>
+      <NavLink to="/templates" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
+        {t('nav_templates')}
+      </NavLink>
 
       {user?.role === 'admin' && (<>
         <div style={styles.sectionHeader}>Admin</div>
