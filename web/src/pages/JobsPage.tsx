@@ -219,10 +219,10 @@ function JobDetail({ job }: { job: BulkJob }) {
       {(domains as BulkJobDomain[]).length > 0 && (
         <div>
           <div style={styles.detailLabel}>{t('jobs_perDomainStatus')}</div>
-          <div style={{ border: '1px solid #e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
+          <div style={{ border: '1px solid #e2e8f0', borderRadius: 4, overflow: 'hidden', overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.8125rem' }}>
               <thead>
-                <tr style={{ background: '#f9fafb' }}>
+                <tr style={{ background: '#f8fafc' }}>
                   <th style={styles.th}>{t('domain')}</th>
                   <th style={styles.th}>{t('jobs_status')}</th>
                   <th style={styles.th}>{t('jobs_changes')}</th>
@@ -660,6 +660,7 @@ export default function JobsPage() {
       ) : (jobs as BulkJob[]).length === 0 ? (
         <p style={styles.muted}>{t('jobs_noJobs')}</p>
       ) : (
+        <div style={{ overflowX: 'auto' }}>
         <table style={styles.table}>
           <thead>
             <tr>
@@ -719,13 +720,14 @@ export default function JobsPage() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {/* ── Zone Render Queue ── */}
       {isStaff && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginTop: '2rem', marginBottom: '1rem' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700 }}>{t('jobs_renderQueue')}</h3>
+            <h3 style={{ margin: 0, fontSize: '.9375rem', fontWeight: 700, color: '#1e293b' }}>{t('jobs_renderQueue')}</h3>
             {renderQueue.filter(j => j.status === 'pending' || j.status === 'processing').length > 0 && (
               <span style={styles.activeBadge}>
                 {renderQueue.filter(j => j.status === 'pending' || j.status === 'processing').length} active
@@ -735,6 +737,7 @@ export default function JobsPage() {
           {renderQueue.length === 0 ? (
             <p style={styles.muted}>{t('jobs_renderQueueEmpty')}</p>
           ) : (
+            <div style={{ overflowX: 'auto' }}>
             <table style={styles.table}>
               <thead>
                 <tr>
@@ -765,6 +768,7 @@ export default function JobsPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </>
       )}
@@ -773,41 +777,41 @@ export default function JobsPage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  header:       { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' },
-  h2:           { margin: 0, fontSize: '1.25rem', fontWeight: 700 },
-  activeBadge:  { background: '#ede9fe', color: '#6d28d9', padding: '2px 10px', borderRadius: 12, fontSize: '.75rem', fontWeight: 600 },
-  muted:        { color: '#9ca3af', margin: 0 },
-  wizardCard:   { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '1.5rem', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: 760 },
+  header:       { display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1rem', flexWrap: 'wrap' },
+  h2:           { margin: 0, fontSize: '.9375rem', fontWeight: 700, color: '#1e293b' },
+  activeBadge:  { background: '#ede9fe', color: '#6d28d9', padding: '1px 7px', borderRadius: 4, fontSize: '.75rem', fontWeight: 600 },
+  muted:        { color: '#94a3b8', margin: 0 },
+  wizardCard:   { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '1.25rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: 760 },
   wizardTitle:  { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  closeBtn:     { background: 'none', border: 'none', fontSize: '1rem', cursor: 'pointer', color: '#6b7280' },
+  closeBtn:     { background: 'none', border: 'none', fontSize: '1rem', cursor: 'pointer', color: '#64748b' },
   errorBox:     { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 4, fontSize: '.875rem' },
   label:        { display: 'flex', flexDirection: 'column', gap: '.25rem', fontSize: '.875rem', fontWeight: 500 },
-  input:        { padding: '.375rem .75rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem' },
+  input:        { padding: '.375rem .75rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.875rem' },
   actions:      { display: 'flex', gap: '.5rem', justifyContent: 'flex-end', paddingTop: '.5rem' },
-  btnPrimary:   { padding: '.375rem .875rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.875rem', fontWeight: 600, cursor: 'pointer' },
-  btnSecondary: { padding: '.375rem .875rem', background: '#fff', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem', cursor: 'pointer' },
-  btnMini:      { padding: '.2rem .5rem', background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
-  domainList:   { display: 'flex', flexDirection: 'column', gap: '.25rem', maxHeight: 300, overflow: 'auto', border: '1px solid #e5e7eb', borderRadius: 4, padding: '.5rem' },
+  btnPrimary:   { padding: '.3125rem .75rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.8125rem', fontWeight: 500, cursor: 'pointer' },
+  btnSecondary: { padding: '.3125rem .75rem', background: '#fff', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.8125rem', cursor: 'pointer', color: '#374151' },
+  btnMini:      { padding: '.2rem .5rem', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
+  domainList:   { display: 'flex', flexDirection: 'column', gap: '.25rem', maxHeight: 300, overflow: 'auto', border: '1px solid #e2e8f0', borderRadius: 4, padding: '.5rem' },
   domainRow:    { display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.375rem .5rem', borderRadius: 4, cursor: 'pointer', fontSize: '.875rem', userSelect: 'none' },
-  recordPill:   { marginLeft: 'auto', background: '#f3f4f6', borderRadius: 4, padding: '2px 6px', fontSize: '.75rem', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" },
+  recordPill:   { marginLeft: 'auto', background: '#f1f5f9', borderRadius: 4, padding: '2px 6px', fontSize: '.75rem', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" },
   summaryRow:   { display: 'flex', gap: '1rem' },
-  summaryBox:   { flex: 1, background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '.75rem', textAlign: 'center' as const },
-  summaryNum:   { fontSize: '1.5rem', fontWeight: 700 },
-  summaryLbl:   { fontSize: '.75rem', color: '#6b7280', marginTop: '.25rem' },
+  summaryBox:   { flex: 1, background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '.75rem', textAlign: 'center' as const },
+  summaryNum:   { fontSize: '1.5rem', fontWeight: 700, color: '#1e293b' },
+  summaryLbl:   { fontSize: '.75rem', color: '#64748b', marginTop: '.25rem' },
   changePill:   { display: 'inline-block', padding: '1px 6px', borderRadius: 4, fontSize: '.75rem', marginRight: '.25rem', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", maxWidth: 320, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   table:        { width: '100%', borderCollapse: 'collapse' },
-  th:           { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
-  tr:           { borderBottom: '1px solid #e5e7eb' },
-  td:           { padding: '.625rem .75rem', fontSize: '.875rem', verticalAlign: 'middle' },
-  tdMono:       { padding: '.625rem .75rem', fontSize: '.8125rem', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", verticalAlign: 'middle' },
-  code:         { background: '#f3f4f6', padding: '1px 5px', borderRadius: 3, fontSize: '.8125rem' },
+  th:           { textAlign: 'left', padding: '.5rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', whiteSpace: 'nowrap', letterSpacing: '.04em' },
+  tr:           { borderBottom: '1px solid #f1f5f9' },
+  td:           { padding: '.4375rem .75rem', fontSize: '.8125rem', verticalAlign: 'middle', color: '#1e293b' },
+  tdMono:       { padding: '.4375rem .75rem', fontSize: '.8125rem', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", verticalAlign: 'middle', color: '#1e293b' },
+  code:         { background: '#f1f5f9', padding: '1px 5px', borderRadius: 3, fontSize: '.8125rem' },
   detailBtn:    { background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '.8125rem', padding: 0, textDecoration: 'underline' },
-  progressTrack:{ height: 6, background: '#e5e7eb', borderRadius: 3, width: 80, overflow: 'hidden' },
+  progressTrack:{ height: 6, background: '#e2e8f0', borderRadius: 3, width: 80, overflow: 'hidden' },
   progressBar:  { height: '100%', borderRadius: 3, transition: 'width .3s' },
-  detailPanel:  { padding: '1rem 1.25rem', background: '#fafafa', borderTop: '1px solid #f0f0f0' },
-  detailLabel:  { fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' as const, marginBottom: '.5rem' },
+  detailPanel:  { padding: '1rem 1.25rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0' },
+  detailLabel:  { fontSize: '.75rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '.04em', marginBottom: '.5rem' },
   detailSummaryRow: { display: 'flex', gap: '.75rem', flexWrap: 'wrap' as const },
-  detailSummaryBox: { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: '.625rem 1rem', textAlign: 'center' as const, minWidth: 90 },
-  detailSummaryNum: { fontSize: '1.25rem', fontWeight: 700 },
-  detailSummaryLbl: { fontSize: '.7rem', color: '#6b7280', marginTop: '.2rem' },
+  detailSummaryBox: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '.625rem 1rem', textAlign: 'center' as const, minWidth: 90 },
+  detailSummaryNum: { fontSize: '1.25rem', fontWeight: 700, color: '#1e293b' },
+  detailSummaryLbl: { fontSize: '.7rem', color: '#64748b', marginTop: '.2rem' },
 }

@@ -80,7 +80,7 @@ export default function MailQueuePage() {
       {isLoading ? <p>{t('loading')}</p> : items.length === 0 ? (
         <p style={styles.muted}>{t('mailQueue_noEntries')}</p>
       ) : (
-        <table style={styles.table}>
+        <div style={{ overflowX: 'auto' }}><table style={styles.table}>
           <thead>
             <tr>
               <th style={styles.th}>ID</th>
@@ -121,7 +121,7 @@ export default function MailQueuePage() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       )}
 
       {totalPages > 1 && (
@@ -136,21 +136,21 @@ export default function MailQueuePage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  header: { display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1rem' },
-  h2: { margin: 0, fontSize: '1.25rem', fontWeight: 700 },
-  totalBadge: { fontSize: '.75rem', color: '#6b7280', background: '#f3f4f6', padding: '2px 8px', borderRadius: 10 },
-  filters: { display: 'flex', gap: '.5rem', marginBottom: '1rem' },
-  select: { padding: '.375rem .75rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem' },
-  muted: { color: '#9ca3af', fontSize: '.875rem' },
+  header: { display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1rem', flexWrap: 'wrap' },
+  h2: { margin: 0, fontSize: '.9375rem', fontWeight: 700, color: '#1e293b' },
+  totalBadge: { fontSize: '.75rem', color: '#475569', background: '#e2e8f0', padding: '1px 7px', borderRadius: 4, fontWeight: 600 },
+  filters: { display: 'flex', gap: '.5rem', marginBottom: '1rem', flexWrap: 'wrap', padding: '.5rem .75rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6 },
+  select: { padding: '.3rem .6rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8125rem', background: '#fff' },
+  muted: { color: '#94a3b8', fontSize: '.875rem' },
   table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' as const },
-  tr: { borderBottom: '1px solid #e5e7eb' },
-  td: { padding: '.625rem .75rem', fontSize: '.875rem', verticalAlign: 'top' },
-  code: { background: '#f3f4f6', padding: '1px 6px', borderRadius: 3, fontSize: '.8rem', fontFamily: 'monospace' },
+  th: { textAlign: 'left', padding: '.5rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, whiteSpace: 'nowrap', letterSpacing: '.04em' },
+  tr: { borderBottom: '1px solid #f1f5f9' },
+  td: { padding: '.4375rem .75rem', fontSize: '.8125rem', verticalAlign: 'top', color: '#1e293b' },
+  code: { background: '#f1f5f9', padding: '1px 6px', borderRadius: 3, fontSize: '.8rem', fontFamily: 'monospace' },
   errorText: { color: '#b91c1c', fontSize: '.8rem' },
   actions: { display: 'flex', gap: '.35rem' },
   btnRetry: { padding: '.25rem .5rem', background: '#fbbf24', color: '#78350f', border: 'none', borderRadius: 4, fontSize: '.75rem', fontWeight: 600, cursor: 'pointer' },
   pagination: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.75rem', marginTop: '1rem' },
-  pageBtn: { padding: '.25rem .5rem', background: '#fff', border: '1px solid #d1d5db', borderRadius: 4, cursor: 'pointer' },
-  pageInfo: { fontSize: '.875rem', color: '#6b7280' },
+  pageBtn: { padding: '.25rem .5rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, cursor: 'pointer', fontSize: '.8125rem', color: '#374151' },
+  pageInfo: { fontSize: '.8125rem', color: '#64748b' },
 }

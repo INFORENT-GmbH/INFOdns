@@ -3,8 +3,11 @@ import { Outlet, useMatch } from 'react-router-dom'
 import DomainsPage from './DomainsPage'
 import DomainsDashboard from './DomainsDashboard'
 import { getDirtyDomainFqdns } from '../hooks/domainEditCache'
+import { useIsMobile } from '../hooks/useIsMobile'
 
 export default function DomainsLayout() {
+  const isMobile = useIsMobile()
+
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (getDirtyDomainFqdns().size > 0) {
@@ -20,11 +23,34 @@ export default function DomainsLayout() {
   const detailOpen = !!match
 
   return (
-    <div style={{ position: 'fixed', top: 'calc(94px + 1rem)', left: '50%', transform: 'translateX(-50%)', width: 'calc(100% - 3rem)', maxWidth: 1200, bottom: '1rem', display: 'flex', zIndex: 10, background: 'rgba(255,255,255,0.92)', borderRadius: 8, overflow: 'hidden' }}>
-      <div style={{ width: 300, overflowY: 'auto', borderRight: '1px solid #e5e7eb', flexShrink: 0, background: '#fff' }}>
+    <div style={{
+      position: 'fixed',
+      top: 48,
+      left: isMobile ? 0 : 220,
+      right: 0,
+      bottom: 0,
+      display: 'flex',
+      zIndex: 10,
+      background: '#fff',
+    }}>
+      <div style={{
+        width: isMobile ? '100%' : 300,
+        display: isMobile && detailOpen ? 'none' : 'flex',
+        flexDirection: 'column',
+        overflowY: 'auto',
+        borderRight: '1px solid #e2e8f0',
+        flexShrink: 0,
+        background: '#fafafa',
+      }}>
         <DomainsPage />
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', background: '#fff', padding: '1rem' }}>
+      <div style={{
+        flex: 1,
+        display: isMobile && !detailOpen ? 'none' : 'flex',
+        flexDirection: 'column',
+        overflowY: 'auto',
+        background: '#fff',
+      }}>
         {detailOpen ? <Outlet /> : <DomainsDashboard />}
       </div>
     </div>

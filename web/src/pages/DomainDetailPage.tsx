@@ -870,7 +870,7 @@ export default function DomainDetailPage() {
       </div>
 
       {loadingRecords ? <p>{t('domainDetail_loadingRecords')}</p> : (
-        <div style={{ position: 'relative', ...(nsRefMode ? { border: '2px solid #f59e0b', borderRadius: 6, overflow: 'hidden' } : {}) }}>
+        <div style={{ overflowX: 'auto', position: 'relative', ...(nsRefMode ? { border: '2px solid #f59e0b', borderRadius: 6, overflow: 'hidden' } : {}) }}>
         {(applying || pendingRefresh) && (
           <div style={styles.tableOverlay}>
             <div style={styles.spinner} />
@@ -1101,23 +1101,23 @@ export default function DomainDetailPage() {
 
 
 const styles: Record<string, React.CSSProperties> = {
-  header: { display: 'flex', alignItems: 'center', gap: '.625rem', marginBottom: '.25rem' },
-  back: { color: '#6b7280', textDecoration: 'none', fontSize: '.8125rem' },
-  h2: { margin: 0, fontSize: '1.1rem', fontWeight: 700 },
-  h3: { margin: 0, fontSize: '.875rem', fontWeight: 600 },
+  header: { display: 'flex', alignItems: 'center', gap: '.625rem', padding: '.625rem .75rem', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', flexWrap: 'wrap' },
+  back: { color: '#64748b', textDecoration: 'none', fontSize: '.8125rem' },
+  h2: { margin: 0, fontSize: '1rem', fontWeight: 700, color: '#1e293b' },
+  h3: { margin: 0, fontSize: '.875rem', fontWeight: 600, color: '#1e293b' },
   errorBanner: { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 6, marginBottom: '.625rem', fontSize: '.8125rem' },
-  meta: { display: 'flex', gap: '1rem', marginBottom: '.625rem', fontSize: '.8125rem', color: '#374151', flexWrap: 'wrap' },
-  labelsSection: { marginBottom: '.625rem', padding: '.375rem .75rem', background: '#f9fafb', borderRadius: 6, border: '1px solid #e5e7eb' },
-  labelsTitle: { fontSize: '.7rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const },
-  labelInput: { padding: '1px 5px', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.75rem', width: 110 },
-  labelAddBtn: { padding: '1px 6px', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
-  labelNewBtn: { padding: '1px 6px', background: 'none', border: '1px dashed #d1d5db', borderRadius: 12, fontSize: '.7rem', color: '#6b7280', cursor: 'pointer' },
-  tableHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.375rem' },
+  meta: { display: 'flex', gap: '1rem', padding: '.375rem .75rem', fontSize: '.8125rem', color: '#374151', flexWrap: 'wrap', borderBottom: '1px solid #f1f5f9' },
+  labelsSection: { padding: '.375rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
+  labelsTitle: { fontSize: '.7rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const },
+  labelInput: { padding: '1px 5px', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.75rem', width: 110 },
+  labelAddBtn: { padding: '1px 6px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
+  labelNewBtn: { padding: '1px 6px', background: 'none', border: '1px dashed #cbd5e1', borderRadius: 12, fontSize: '.7rem', color: '#64748b', cursor: 'pointer' },
+  tableHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.5rem .75rem', borderBottom: '1px solid #e2e8f0' },
   dirtyHint: { fontSize: '.75rem', color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 12 },
   table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '.3rem .5rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.7rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
-  tr: { borderBottom: '1px solid #f3f4f6' },
-  td: { padding: '.2rem .5rem', fontSize: '.8125rem' },
+  th: { textAlign: 'left', padding: '.4375rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', whiteSpace: 'nowrap', letterSpacing: '.04em' },
+  tr: { borderBottom: '1px solid #f1f5f9' },
+  td: { padding: '.3rem .75rem', fontSize: '.8125rem', color: '#1e293b' },
   valueCell: { minWidth: 200, position: 'relative' as const },
   valueCellWrap: { position: 'relative' as const, height: 20 },
   newBadge: { fontSize: '.65rem', background: '#dcfce7', color: '#16a34a', padding: '1px 5px', borderRadius: 10, fontWeight: 600, marginRight: 4 },

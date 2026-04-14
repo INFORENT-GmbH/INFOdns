@@ -101,7 +101,7 @@ export default function RegistrarsPage() {
       {error && <p style={styles.errorText}>{error}</p>}
 
       {isLoading ? <p style={styles.muted}>Loading…</p> : (
-        <table style={styles.table}>
+        <div style={{ overflowX: 'auto' }}><table style={styles.table}>
           <thead>
             <tr>
               <th style={styles.th}>Code</th>
@@ -141,31 +141,31 @@ export default function RegistrarsPage() {
               <tr><td colSpan={5} style={{ ...styles.td, ...styles.muted, textAlign: 'center' }}>No registrars</td></tr>
             )}
           </tbody>
-        </table>
+        </table></div>
       )}
     </div>
   )
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  header:    { display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: '1rem' },
-  h2:        { margin: 0, fontSize: '1.25rem', fontWeight: 700 },
-  count:     { fontSize: '.75rem', color: '#6b7280', background: '#f3f4f6', padding: '2px 8px', borderRadius: 10 },
-  btnAdd:    { marginLeft: 'auto', padding: '.35rem .8rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 5, fontSize: '.8rem', fontWeight: 600, cursor: 'pointer' },
+  header:    { display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: '1rem', flexWrap: 'wrap' },
+  h2:        { margin: 0, fontSize: '.9375rem', fontWeight: 700, color: '#1e293b' },
+  count:     { fontSize: '.75rem', color: '#475569', background: '#e2e8f0', padding: '1px 7px', borderRadius: 4, fontWeight: 600 },
+  btnAdd:    { marginLeft: 'auto', padding: '.3125rem .75rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.8125rem', fontWeight: 500, cursor: 'pointer' },
   errorText: { color: '#b91c1c', fontSize: '.875rem', marginBottom: '.5rem' },
-  muted:     { color: '#9ca3af', fontSize: '.8rem' },
+  muted:     { color: '#94a3b8', fontSize: '.8rem' },
   table:     { width: '100%', borderCollapse: 'collapse' },
-  th:        { textAlign: 'left', padding: '.45rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' as const },
-  tr:        { borderBottom: '1px solid #f3f4f6' },
-  editRow:   { borderBottom: '1px solid #e5e7eb', background: '#fffbeb' },
-  td:        { padding: '.5rem .75rem', fontSize: '.875rem', verticalAlign: 'middle' },
-  tdActions: { padding: '.5rem .75rem', verticalAlign: 'middle', whiteSpace: 'nowrap' as const },
-  code:      { background: '#f3f4f6', padding: '1px 5px', borderRadius: 3, fontSize: '.8rem', fontFamily: 'monospace' },
+  th:        { textAlign: 'left', padding: '.5rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, whiteSpace: 'nowrap', letterSpacing: '.04em' },
+  tr:        { borderBottom: '1px solid #f1f5f9' },
+  editRow:   { borderBottom: '1px solid #e2e8f0', background: '#fffbeb' },
+  td:        { padding: '.4375rem .75rem', fontSize: '.8125rem', verticalAlign: 'middle', color: '#1e293b' },
+  tdActions: { padding: '.4375rem .75rem', verticalAlign: 'middle', whiteSpace: 'nowrap' as const },
+  code:      { background: '#f1f5f9', padding: '1px 5px', borderRadius: 3, fontSize: '.8rem', fontFamily: 'monospace' },
   codeBadge: { background: '#ede9fe', color: '#5b21b6', padding: '2px 8px', borderRadius: 4, fontSize: '.8rem', fontWeight: 700, fontFamily: 'monospace' },
   link:      { color: '#2563eb', fontSize: '.8rem', textDecoration: 'none' },
-  input:     { padding: '.2rem .4rem', border: '1px solid #d1d5db', borderRadius: 3, fontSize: '.8rem', width: '100%', boxSizing: 'border-box' as const },
+  input:     { padding: '.2rem .4rem', border: '1px solid #e2e8f0', borderRadius: 3, fontSize: '.8rem', width: '100%', boxSizing: 'border-box' as const },
   btnSave:   { padding: '.2rem .55rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 3, fontSize: '.75rem', fontWeight: 600, cursor: 'pointer', marginRight: 3 },
-  btnCancel: { padding: '.2rem .55rem', background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: 3, fontSize: '.75rem', cursor: 'pointer' },
-  btnEdit:   { padding: '.2rem .5rem', background: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db', borderRadius: 3, fontSize: '.75rem', cursor: 'pointer', marginRight: 3 },
+  btnCancel: { padding: '.2rem .55rem', background: '#f1f5f9', color: '#374151', border: '1px solid #e2e8f0', borderRadius: 3, fontSize: '.75rem', cursor: 'pointer' },
+  btnEdit:   { padding: '.2rem .5rem', background: '#f1f5f9', color: '#374151', border: '1px solid #e2e8f0', borderRadius: 3, fontSize: '.75rem', cursor: 'pointer', marginRight: 3 },
   btnDelete: { padding: '.2rem .5rem', background: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', borderRadius: 3, fontSize: '.75rem', cursor: 'pointer' },
 }

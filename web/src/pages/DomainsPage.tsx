@@ -10,7 +10,7 @@ import { getDirtyDomainFqdns, subscribe } from '../hooks/domainEditCache'
 
 const INLINE_STYLES = `
   .condensed-row { transition: background 0.08s; }
-  .condensed-row:hover { background: #f0f4ff !important; }
+  .condensed-row:hover { background: #eff6ff !important; }
 `
 
 export default function DomainsPage() {
@@ -71,8 +71,8 @@ export default function DomainsPage() {
   return (
     <div>
       <style>{INLINE_STYLES}</style>
-      <div style={{ padding: '.625rem .75rem', borderBottom: '1px solid #e5e7eb', position: 'sticky', top: 0, zIndex: 10, background: '#fff' }}>
-        <h2 style={{ margin: '0 0 .5rem', fontSize: '1.25rem', fontWeight: 700 }}>{t('domains_title')}</h2>
+      <div style={{ padding: '.5rem .625rem', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10, background: '#fafafa' }}>
+        <h2 style={{ margin: '0 0 .375rem', fontSize: '.875rem', fontWeight: 700, color: '#1e293b' }}>{t('domains_title')}</h2>
         <input
           placeholder={t('domains_searchPlaceholder')}
           value={search}
@@ -253,7 +253,7 @@ export default function DomainsPage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  searchInput: { padding: '.25rem .5rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.8125rem', width: 240 },
+  searchInput: { padding: '.25rem .5rem', border: '1px solid #e2e8f0', borderRadius: 3, fontSize: '.8125rem', width: 240, background: '#fff' },
   btnClear: { padding: '.2rem .4rem', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '.8125rem', lineHeight: 1 },
   labelDropdown: { position: 'absolute' as const, top: '100%', left: 0, right: 0, marginTop: 2, background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.1)', zIndex: 20, maxHeight: 240, overflowY: 'auto' as const, padding: '4px 0' },
   labelDropdownItem: { display: 'flex', alignItems: 'center', width: '100%', padding: '.25rem .5rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left' as const, fontSize: '.8125rem' },

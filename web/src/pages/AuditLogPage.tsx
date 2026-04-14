@@ -88,7 +88,7 @@ export default function AuditLogPage() {
       {isLoading ? (
         <p style={styles.muted}>{t('loading')}</p>
       ) : (
-        <>
+        <><div style={{ overflowX: 'auto' }}>
           <table style={{ ...styles.table, opacity: isFetching ? 0.6 : 1 }}>
             <thead>
               <tr>
@@ -156,7 +156,7 @@ export default function AuditLogPage() {
                 </tr>
               )}
             </tbody>
-          </table>
+          </table></div>
 
           {/* Pagination */}
           {totalPages > 1 && (
@@ -216,24 +216,24 @@ function ActionBadge({ action }: { action: string }) {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  header:      { display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' },
-  h2:          { margin: 0, fontSize: '1.25rem', fontWeight: 700 },
-  totalBadge:  { background: '#f3f4f6', color: '#6b7280', padding: '2px 8px', borderRadius: 12, fontSize: '.75rem', fontWeight: 600 },
-  filters:     { display: 'flex', gap: '.5rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' },
-  filterInput: { padding: '.375rem .75rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem', width: 130 },
-  btnSecondary:{ padding: '.375rem .875rem', background: '#fff', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.875rem', cursor: 'pointer' },
+  header:      { display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1rem', flexWrap: 'wrap' },
+  h2:          { margin: 0, fontSize: '.9375rem', fontWeight: 700, color: '#1e293b' },
+  totalBadge:  { background: '#e2e8f0', color: '#475569', padding: '1px 7px', borderRadius: 4, fontSize: '.75rem', fontWeight: 600 },
+  filters:     { display: 'flex', gap: '.5rem', marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center', padding: '.5rem .75rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6 },
+  filterInput: { padding: '.3rem .6rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8125rem', width: 120, background: '#fff' },
+  btnSecondary:{ padding: '.3rem .6rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8125rem', cursor: 'pointer', color: '#374151' },
   table:       { width: '100%', borderCollapse: 'collapse', transition: 'opacity .15s' },
-  th:          { textAlign: 'left', padding: '.5rem .75rem', background: '#f9fafb', borderBottom: '1px solid #e5e7eb', fontSize: '.75rem', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' },
-  tr:          { borderBottom: '1px solid #e5e7eb' },
-  td:          { padding: '.5rem .75rem', fontSize: '.875rem', verticalAlign: 'middle' },
-  tdMono:      { padding: '.5rem .75rem', fontSize: '.8125rem', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", verticalAlign: 'middle', color: '#374151' },
-  code:        { background: '#f3f4f6', padding: '1px 5px', borderRadius: 3, fontSize: '.8125rem' },
-  muted:       { color: '#9ca3af' },
+  th:          { textAlign: 'left', padding: '.5rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', whiteSpace: 'nowrap', letterSpacing: '.04em' },
+  tr:          { borderBottom: '1px solid #f1f5f9' },
+  td:          { padding: '.4375rem .75rem', fontSize: '.8125rem', verticalAlign: 'middle', color: '#1e293b' },
+  tdMono:      { padding: '.4375rem .75rem', fontSize: '.8125rem', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", verticalAlign: 'middle', color: '#374151' },
+  code:        { background: '#f1f5f9', padding: '1px 5px', borderRadius: 3, fontSize: '.8125rem' },
+  muted:       { color: '#94a3b8' },
   diffToggle:  { background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '.8125rem', padding: 0, textDecoration: 'underline' },
   diffGrid:    { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' },
-  diffLabel:   { fontSize: '.75rem', fontWeight: 600, marginBottom: '.25rem' },
-  diffPre:     { fontSize: '.75rem', background: '#f9fafb', border: '1px solid', borderRadius: 4, padding: '.5rem', overflow: 'auto', maxHeight: 200, margin: 0 },
+  diffLabel:   { fontSize: '.75rem', fontWeight: 600, marginBottom: '.25rem', color: '#64748b' },
+  diffPre:     { fontSize: '.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 4, padding: '.5rem', overflow: 'auto', maxHeight: 200, margin: 0 },
   pagination:  { display: 'flex', alignItems: 'center', gap: '.5rem', justifyContent: 'center', padding: '1rem 0' },
-  pageBtn:     { padding: '.25rem .6rem', border: '1px solid #d1d5db', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: '.875rem' },
-  pageInfo:    { fontSize: '.875rem', color: '#6b7280', padding: '0 .5rem' },
+  pageBtn:     { padding: '.25rem .6rem', border: '1px solid #e2e8f0', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: '.8125rem', color: '#374151' },
+  pageInfo:    { fontSize: '.8125rem', color: '#64748b', padding: '0 .5rem' },
 }
