@@ -7,8 +7,9 @@ import {
   createBulkJob, previewBulkJob, approveBulkJob, searchByRecord,
   updateDomainLabels, getLabelSuggestions, updateDomain, deleteDomain, getZoneText,
   getTenants, getTemplates, previewApplyTemplate, applyTemplate,
+  getDomainTemplates, assignDomainTemplate, unassignDomainTemplate,
   type DnsRecord, type Label, type Domain, type LabelSuggestion, type Tenant,
-  type ApplyMode, type ApplyTemplateDiff,
+  type ApplyMode, type ApplyTemplateDiff, type AssignedTemplate,
 } from '../api/client'
 import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import Select from '../components/Select'
@@ -135,11 +136,16 @@ export default function DomainDetailPage() {
   // Apply Template panel
   const [showApplyPanel, setShowApplyPanel] = useState(false)
   const [applyTplId, setApplyTplId] = useState<number | ''>('')
-  const [applyMode, setApplyMode] = useState<ApplyMode | 'assign_permanent'>('add_missing')
+  const [applyMode, setApplyMode] = useState<ApplyMode>('add_missing')
   const [applyDiff, setApplyDiff] = useState<ApplyTemplateDiff | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [applyingTpl, setApplyingTpl] = useState(false)
   const [applyTplError, setApplyTplError] = useState<string | null>(null)
+
+  // Multi-template manager
+  const [addingTplId, setAddingTplId] = useState<number | ''>('')
+  const [savingTplAssign, setSavingTplAssign] = useState(false)
+  const [tplManagerError, setTplManagerError] = useState<string | null>(null)
 
   const { data: domain, isLoading: loadingDomain } = useQuery<Domain>({
     queryKey: ['domain', name],
@@ -174,6 +180,13 @@ export default function DomainDetailPage() {
   const { data: tplList = [] } = useQuery({
     queryKey: ['templates'],
     queryFn: () => getTemplates().then(r => r.data),
+    staleTime: 30_000,
+  })
+
+  const { data: assignedTemplates = [], refetch: refetchAssignedTemplates } = useQuery<AssignedTemplate[]>({
+    queryKey: ['domain-templates', domain?.id],
+    queryFn: () => getDomainTemplates(domain!.id).then(r => r.data),
+    enabled: !!domain,
     staleTime: 30_000,
   })
 
@@ -222,9 +235,9 @@ export default function DomainDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataUpdatedAt])
 
-  // Auto-preview whenever template or mode changes (only for one-time apply modes)
+  // Auto-preview whenever template or mode changes
   useEffect(() => {
-    if (!domain || !applyTplId || !showApplyPanel || applyMode === 'assign_permanent') {
+    if (!domain || !applyTplId || !showApplyPanel) {
       setApplyDiff(null); return
     }
     let cancelled = false
@@ -452,21 +465,42 @@ export default function DomainDetailPage() {
     if (!domain || !applyTplId) return
     setApplyingTpl(true); setApplyTplError(null)
     try {
-      if (applyMode === 'assign_permanent') {
-        await updateDomain(domain.id, { template_id: Number(applyTplId) })
-        qc.invalidateQueries({ queryKey: ['domain', name] })
-        qc.invalidateQueries({ queryKey: ['records', domain.id] })
-      } else {
-        await applyTemplate(domain.id, Number(applyTplId), applyMode as ApplyMode)
-        qc.invalidateQueries({ queryKey: ['records', domain.id] })
-        qc.invalidateQueries({ queryKey: ['domain', name] })
-      }
+      await applyTemplate(domain.id, Number(applyTplId), applyMode)
+      qc.invalidateQueries({ queryKey: ['records', domain.id] })
+      qc.invalidateQueries({ queryKey: ['domain', name] })
       setShowApplyPanel(false)
       setApplyTplId(''); setApplyMode('add_missing'); setApplyDiff(null)
     } catch (err: any) {
       setApplyTplError(err.response?.data?.message ?? err.message)
     } finally {
       setApplyingTpl(false)
+    }
+  }
+
+  async function handleAssignTemplate() {
+    if (!domain || addingTplId === '') return
+    setSavingTplAssign(true); setTplManagerError(null)
+    try {
+      await assignDomainTemplate(domain.id, Number(addingTplId))
+      await refetchAssignedTemplates()
+      qc.invalidateQueries({ queryKey: ['records', recordSourceId] })
+      setAddingTplId('')
+    } catch (err: any) {
+      setTplManagerError(err.response?.data?.message ?? err.message)
+    } finally {
+      setSavingTplAssign(false)
+    }
+  }
+
+  async function handleUnassignTemplate(templateId: number) {
+    if (!domain) return
+    setTplManagerError(null)
+    try {
+      await unassignDomainTemplate(domain.id, templateId)
+      await refetchAssignedTemplates()
+      qc.invalidateQueries({ queryKey: ['records', recordSourceId] })
+    } catch (err: any) {
+      setTplManagerError(err.response?.data?.message ?? err.message)
     }
   }
 
@@ -829,12 +863,41 @@ export default function DomainDetailPage() {
             />
             {savingNsRef && <span style={{ color: '#9ca3af' }}>…</span>}
           </span>
-        {domain.template_id && domain.template_name && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', fontSize: '.8125rem' }}>
-            Template: <span style={{ color: '#2563eb', fontWeight: 500 }}>{domain.template_name}</span>
-            <button onClick={() => setShowApplyPanel(true)} style={{ ...styles.btnIcon, fontSize: '.75rem' }}>change</button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '.4rem', fontSize: '.8125rem' }}>
+          <span style={{ color: '#64748b', fontWeight: 500 }}>Templates:</span>
+          {assignedTemplates.map(t => (
+            <span key={t.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#e0f2fe', color: '#0369a1', borderRadius: 4, padding: '1px 6px', fontSize: '.75rem', fontWeight: 600 }}>
+              {t.name}
+              <button
+                onClick={() => handleUnassignTemplate(t.id)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0369a1', padding: '0 0 0 2px', lineHeight: 1, fontSize: '.75rem' }}
+                title="Remove template"
+              >✕</button>
+            </span>
+          ))}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <select
+              value={addingTplId}
+              onChange={e => setAddingTplId(e.target.value === '' ? '' : Number(e.target.value) as any)}
+              style={{ fontSize: '.75rem', border: '1px solid #d1d5db', borderRadius: 4, padding: '1px 4px', color: '#374151', background: '#fff' }}
+            >
+              <option value="">+ add template…</option>
+              {(tplList as any[]).filter(t => !assignedTemplates.some(a => a.id === t.id)).map((t: any) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+            {addingTplId !== '' && (
+              <button
+                onClick={handleAssignTemplate}
+                disabled={savingTplAssign}
+                style={{ ...styles.btnPrimary, fontSize: '.75rem', padding: '2px 8px' }}
+              >
+                {savingTplAssign ? '…' : 'Add'}
+              </button>
+            )}
           </span>
-        )}
+          {tplManagerError && <span style={{ color: '#b91c1c', fontSize: '.75rem' }}>{tplManagerError}</span>}
+        </div>
       </div>
 
       {showDnssecModal && (
@@ -978,10 +1041,9 @@ export default function DomainDetailPage() {
                   ['add_missing',       t('templates_modeAddMissing')],
                   ['overwrite_matching',t('templates_modeOverwrite')],
                   ['replace_all',       t('templates_modeReplaceAll')],
-                  ['assign_permanent',  'Assign permanently'],
-                ] as [string, string][]).map(([m, label]) => (
+                ] as [ApplyMode, string][]).map(([m, label]) => (
                   <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '.8125rem', fontWeight: 400, cursor: 'pointer' }}>
-                    <input type="radio" name="applyMode" value={m} checked={applyMode === m} onChange={() => setApplyMode(m as any)} />
+                    <input type="radio" name="applyMode" value={m} checked={applyMode === m} onChange={() => setApplyMode(m)} />
                     {label}
                   </label>
                 ))}
@@ -992,17 +1054,7 @@ export default function DomainDetailPage() {
           {/* Step 3: preview / confirm */}
           {applyTplId !== '' && (
             <div style={{ ...styles.applyPreview, marginTop: '.5rem' }}>
-              {applyMode === 'assign_permanent' ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '.375rem' }}>
-                  <span style={{ fontSize: '.8125rem', color: '#374151' }}>
-                    Template records will always render into the zone and stay in sync with the template. They appear as read-only <strong>TPL</strong> rows.
-                  </span>
-                  {applyTplError && <div style={styles.applyError}>{applyTplError}</div>}
-                  <button onClick={handleTplApply} disabled={applyingTpl} style={{ ...styles.btnPrimary, alignSelf: 'flex-start' }}>
-                    {applyingTpl ? t('saving') : 'Assign template'}
-                  </button>
-                </div>
-              ) : previewing ? (
+              {previewing ? (
                 <span style={{ fontSize: '.8125rem', color: '#64748b' }}>{t('loading')}</span>
               ) : applyTplError ? (
                 <div style={styles.applyError}>{applyTplError}</div>
@@ -1084,28 +1136,6 @@ export default function DomainDetailPage() {
             </div>
           )}
 
-          {/* Unassign current permanent template */}
-          {domain?.template_id && (
-            <div style={{ marginTop: '.5rem', paddingTop: '.5rem', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.8125rem' }}>
-              <span style={{ color: '#64748b' }}>Currently assigned: <strong>{domain.template_name}</strong></span>
-              <button
-                onClick={async () => {
-                  setApplyingTpl(true); setApplyTplError(null)
-                  try {
-                    await updateDomain(domain.id, { template_id: null })
-                    qc.invalidateQueries({ queryKey: ['domain', name] })
-                    qc.invalidateQueries({ queryKey: ['records', domain.id] })
-                    setShowApplyPanel(false)
-                  } catch (err: any) { setApplyTplError(err.response?.data?.message ?? err.message) }
-                  finally { setApplyingTpl(false) }
-                }}
-                disabled={applyingTpl}
-                style={{ ...styles.btnIcon, color: '#b91c1c' }}
-              >
-                Unassign
-              </button>
-            </div>
-          )}
         </div>
       )}
 
@@ -1207,12 +1237,13 @@ export default function DomainDetailPage() {
             {(records as DnsRecord[]).map(rec => {
               // ── Template records: read-only display ──
               if (rec._from_template) {
+                const tplName = assignedTemplates.find(t => t.id === rec.template_id)?.name ?? 'TPL'
                 return (
                   <tr key={`tpl-${rec.id}`} style={{ ...styles.tr, background: '#f0f9ff' }}>
                     <td style={{ ...styles.td, fontFamily: MONO, color: '#374151' }}>{rec.name}</td>
                     <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <span style={styles.tplBadge}>TPL</span>
+                        <span style={styles.tplBadge} title={tplName}>{tplName.slice(0, 10)}</span>
                         <span style={{ fontSize: '.8125rem', color: '#374151', fontFamily: MONO }}>{rec.type}</span>
                       </span>
                     </td>

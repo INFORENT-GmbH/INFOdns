@@ -3,21 +3,13 @@ import { z } from 'zod'
 import { query, queryOne, execute } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { writeAuditLog } from '../audit/middleware.js'
+import { enqueueRender } from '../lib/queue.js'
 
 async function queueMail(to: string, template: string, payload: unknown): Promise<void> {
   await execute(
     `INSERT INTO mail_queue (to_email, template, payload) VALUES (?, ?, ?)`,
     [to, template, JSON.stringify(payload)]
   )
-}
-
-async function enqueueRender(domainId: number) {
-  await execute(
-    `INSERT INTO zone_render_queue (domain_id, status) VALUES (?, 'pending')
-     ON DUPLICATE KEY UPDATE status = IF(status = 'processing', status, 'pending'), updated_at = NOW()`,
-    [domainId]
-  )
-  await execute("UPDATE domains SET zone_status = 'dirty' WHERE id = ?", [domainId])
 }
 
 const FQDN_RE = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i
@@ -39,7 +31,6 @@ const UpdateDomainBody = z.object({
   dnssec_enabled: z.boolean().optional(),
   tenant_id: z.number().int().positive().optional(),
   ns_reference: z.string().max(253).nullable().optional(),
-  template_id: z.number().int().positive().nullable().optional(),
 })
 
 const LabelSchema = z.object({
@@ -245,21 +236,25 @@ export async function domainRoutes(app: FastifyInstance) {
     const whereCol = isNumeric ? 'd.id' : 'd.fqdn'
     const row = await queryOne(
       `SELECT d.*, c.name AS tenant_name,
-              q.error AS zone_error, q.retries AS zone_retries,
-              t.name AS template_name
+              q.error AS zone_error, q.retries AS zone_retries
        FROM domains d
        JOIN tenants c ON c.id = d.tenant_id
        LEFT JOIN zone_render_queue q ON q.domain_id = d.id AND q.id = (
          SELECT MAX(id) FROM zone_render_queue WHERE domain_id = d.id
        )
-       LEFT JOIN dns_templates t ON t.id = d.template_id
        WHERE ${whereCol} = ? AND d.status != 'deleted'${ownerFilter(req)}`,
       [req.params.id]
     ) as any
     if (!row) return reply.status(404).send({ code: 'NOT_FOUND' })
     const isAdmin = (req as any).user.role === 'admin'
     const labelMap = await fetchLabels([row.id], isAdmin)
-    return { ...row, labels: labelMap.get(row.id) ?? [], expected_ns: EXPECTED_NS }
+    const templates = await query(
+      `SELECT t.id, t.name FROM domain_templates dt
+       JOIN dns_templates t ON t.id = dt.template_id
+       WHERE dt.domain_id = ? ORDER BY dt.assigned_at`,
+      [row.id]
+    )
+    return { ...row, labels: labelMap.get(row.id) ?? [], expected_ns: EXPECTED_NS, templates }
   })
 
   // PUT /domains/:id
@@ -291,19 +286,8 @@ export async function domainRoutes(app: FastifyInstance) {
       if (!targetTenant) return reply.status(422).send({ code: 'TENANT_NOT_FOUND' })
     }
 
-    // Validate template visibility if provided
-    if (body.data.template_id !== undefined && body.data.template_id !== null) {
-      const visClause = req.user.role === 'admin'
-        ? ''
-        : ` AND (tenant_id IS NULL OR tenant_id IN (SELECT tenant_id FROM user_tenants WHERE user_id = ${Number(req.user.sub)}))`
-      const tpl = await queryOne(`SELECT id FROM dns_templates WHERE id = ?${visClause}`, [body.data.template_id])
-      if (!tpl) return reply.status(404).send({ code: 'NOT_FOUND', message: 'Template not found' })
-    }
-
     const dnssecVal = body.data.dnssec_enabled != null ? (body.data.dnssec_enabled ? 1 : 0) : null
-    // ns_reference / template_id: undefined = don't touch; null = clear; value = set
     const nsRefProvided = body.data.ns_reference !== undefined
-    const tplProvided = body.data.template_id !== undefined
 
     const setParts: string[] = [
       'status         = COALESCE(?, status)',
@@ -321,14 +305,13 @@ export async function domainRoutes(app: FastifyInstance) {
     ]
 
     if (nsRefProvided) { setParts.push('ns_reference = ?'); setParams.push(body.data.ns_reference) }
-    if (tplProvided)   { setParts.push('template_id = ?');  setParams.push(body.data.template_id) }
 
     setParams.push(req.params.id)
     await execute(`UPDATE domains SET ${setParts.join(', ')} WHERE id = ?`, setParams)
 
     const updated = await queryOne('SELECT * FROM domains WHERE id = ?', [req.params.id])
     await writeAuditLog({ req, entityType: 'domain', entityId: Number(req.params.id), domainId: Number(req.params.id), action: 'update', oldValue: old, newValue: updated })
-    const zoneRelevant = body.data.status !== undefined || body.data.default_ttl !== undefined || body.data.dnssec_enabled !== undefined || nsRefProvided || tplProvided
+    const zoneRelevant = body.data.status !== undefined || body.data.default_ttl !== undefined || body.data.dnssec_enabled !== undefined || nsRefProvided
     if (zoneRelevant) await enqueueRender(Number(req.params.id))
     return updated
   })

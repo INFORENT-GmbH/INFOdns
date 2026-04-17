@@ -94,8 +94,7 @@ export interface Domain {
   dnssec_ok: number | null
   dnssec_checked_at: string | null
   ns_reference: string | null
-  template_id: number | null
-  template_name: string | null
+  templates: { id: number; name: string }[]
 }
 
 export interface DnsRecord {
@@ -111,6 +110,7 @@ export interface DnsRecord {
   created_at: string
   updated_at: string
   _from_template?: boolean
+  template_id?: number
 }
 
 export interface Tenant {
@@ -633,6 +633,25 @@ export const applyTemplate = (domainId: number, templateId: number, mode: ApplyM
     `/domains/${domainId}/apply-template`,
     { templateId, mode }
   )
+
+export interface AssignedTemplate {
+  id: number
+  name: string
+  description: string | null
+  assigned_at: string
+}
+
+export const getDomainTemplates = (domainId: number) =>
+  api.get<AssignedTemplate[]>(`/domains/${domainId}/templates`)
+
+export const assignDomainTemplate = (domainId: number, templateId: number) =>
+  api.post<{ ok: boolean; templateId: number; templateName: string }>(
+    `/domains/${domainId}/templates`,
+    { templateId }
+  )
+
+export const unassignDomainTemplate = (domainId: number, templateId: number) =>
+  api.delete(`/domains/${domainId}/templates/${templateId}`)
 
 export const downloadAttachment = async (ticketId: number, fileId: number, originalName: string) => {
   const resp = await api.get(`/tickets/${ticketId}/attachments/${fileId}`, { responseType: 'blob' })

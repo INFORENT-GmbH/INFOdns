@@ -3,6 +3,7 @@ import { promises as dns } from 'dns'
 import { query, queryOne, execute } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { writeAuditLog } from '../audit/middleware.js'
+import { enqueueRender } from '../lib/queue.js'
 import { validateRecord } from './validators.js'
 import { broadcast } from '../ws/hub.js'
 import { parseZoneFile } from './parseZone.js'
@@ -96,16 +97,6 @@ async function renderZoneText(domain: any, records: any[], soa: any, serial: num
   return lines.join('\n')
 }
 
-/** Enqueue a zone render job for a domain (upsert — one pending job per domain) */
-async function enqueueRender(domainId: number) {
-  await execute(
-    `INSERT INTO zone_render_queue (domain_id, status) VALUES (?, 'pending')
-     ON DUPLICATE KEY UPDATE status = IF(status = 'processing', status, 'pending'), updated_at = NOW()`,
-    [domainId]
-  )
-  await execute("UPDATE domains SET zone_status = 'dirty' WHERE id = ?", [domainId])
-}
-
 /** Resolve domain and enforce ownership */
 async function resolveDomain(domainId: string, req: any, reply: any) {
   const ownerClause = req.user.role === 'admin' ? '' : ` AND tenant_id IN (SELECT tenant_id FROM user_tenants WHERE user_id = ${Number(req.user.sub)})`
@@ -132,16 +123,20 @@ export async function recordRoutes(app: FastifyInstance) {
         [domain.id]
       )
 
-      // If a template is permanently assigned, append its records with a marker
-      const domainRow = await queryOne<{ template_id: number | null }>(
-        'SELECT template_id FROM domains WHERE id = ?',
+      // Append records from all assigned templates with a marker
+      const assignedTemplates = await query<{ template_id: number }>(
+        'SELECT template_id FROM domain_templates WHERE domain_id = ?',
         [domain.id]
       )
-      if (domainRow?.template_id) {
+      if (assignedTemplates.length > 0) {
+        const ids = assignedTemplates.map(r => r.template_id)
+        const placeholders = ids.map(() => '?').join(', ')
         const templateRecords = await query(
-          `SELECT id, name, type, ttl, priority, weight, port, value, NULL AS created_at, NULL AS updated_at
-           FROM dns_template_records WHERE template_id = ? ORDER BY type, name`,
-          [domainRow.template_id]
+          `SELECT id, name, type, ttl, priority, weight, port, value,
+                  NULL AS created_at, NULL AS updated_at, template_id
+           FROM dns_template_records WHERE template_id IN (${placeholders})
+           ORDER BY template_id, type, name`,
+          ids
         )
         return [...ownRecords, ...templateRecords.map((r: any) => ({ ...r, _from_template: true }))]
       }

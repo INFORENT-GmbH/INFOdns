@@ -4,6 +4,7 @@ import { requireAuth, requireOperatorOrAdmin } from '../middleware/auth.js'
 import { writeAuditLog } from '../audit/middleware.js'
 import { validateRecord } from '../records/validators.js'
 import { broadcast } from '../ws/hub.js'
+import { enqueueRender, enqueueRendersByTemplate } from '../lib/queue.js'
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -34,16 +35,6 @@ async function resolveDomain(domainId: string, req: any, reply: any) {
   )
   if (!domain) { reply.status(404).send({ code: 'NOT_FOUND' }); return null }
   return domain
-}
-
-/** Enqueue a zone render job for a domain */
-async function enqueueRender(domainId: number) {
-  await execute(
-    `INSERT INTO zone_render_queue (domain_id, status) VALUES (?, 'pending')
-     ON DUPLICATE KEY UPDATE status = IF(status = 'processing', status, 'pending'), updated_at = NOW()`,
-    [domainId]
-  )
-  await execute("UPDATE domains SET zone_status = 'dirty' WHERE id = ?", [domainId])
 }
 
 // ── Diff computation ──────────────────────────────────────────
@@ -217,6 +208,8 @@ export async function templateRoutes(app: FastifyInstance) {
       return reply.status(403).send({ code: 'FORBIDDEN' })
     }
 
+    // Enqueue renders for all linked domains before the cascade removes assignments
+    await enqueueRendersByTemplate(template.id)
     await execute('DELETE FROM dns_templates WHERE id = ?', [req.params.id])
     await writeAuditLog({ req, entityType: 'dns_template', entityId: Number(req.params.id), action: 'delete', oldValue: template })
     return { ok: true }
@@ -243,6 +236,7 @@ export async function templateRoutes(app: FastifyInstance) {
     )
     const created = await queryOne('SELECT * FROM dns_template_records WHERE id = ?', [result.insertId])
     await writeAuditLog({ req, entityType: 'dns_template_record', entityId: result.insertId, action: 'create', newValue: created })
+    await enqueueRendersByTemplate(template.id)
     return reply.status(201).send(created)
   })
 
@@ -273,6 +267,7 @@ export async function templateRoutes(app: FastifyInstance) {
     )
     const updated = await queryOne('SELECT * FROM dns_template_records WHERE id = ?', [req.params.recordId])
     await writeAuditLog({ req, entityType: 'dns_template_record', entityId: Number(req.params.recordId), action: 'update', oldValue: old, newValue: updated })
+    await enqueueRendersByTemplate(template.id)
     return updated
   })
 
@@ -295,8 +290,105 @@ export async function templateRoutes(app: FastifyInstance) {
 
     await execute('DELETE FROM dns_template_records WHERE id = ?', [req.params.recordId])
     await writeAuditLog({ req, entityType: 'dns_template_record', entityId: Number(req.params.recordId), action: 'delete', oldValue: old })
+    await enqueueRendersByTemplate(template.id)
     return { ok: true }
   })
+
+  // ── Domain-template assignment endpoints ──────────────────────
+
+  // GET /domains/:domainId/templates
+  app.get<{ Params: { domainId: string } }>(
+    '/domains/:domainId/templates',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const domain = await resolveDomain(req.params.domainId, req, reply)
+      if (!domain) return
+
+      const rows = await query(
+        `SELECT t.id, t.name, t.description, dt.assigned_at
+         FROM domain_templates dt
+         JOIN dns_templates t ON t.id = dt.template_id
+         WHERE dt.domain_id = ?
+         ORDER BY dt.assigned_at`,
+        [domain.id]
+      )
+      return rows
+    }
+  )
+
+  // POST /domains/:domainId/templates
+  app.post<{ Params: { domainId: string } }>(
+    '/domains/:domainId/templates',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const domain = await resolveDomain(req.params.domainId, req, reply)
+      if (!domain) return
+
+      const body = req.body as any
+      const templateId = Number(body?.templateId)
+      if (!templateId) {
+        return reply.status(400).send({ code: 'VALIDATION_ERROR', message: 'templateId is required' })
+      }
+
+      const vis = visibilityClause(req)
+      const template = await queryOne<{ id: number; name: string }>(
+        `SELECT t.id, t.name FROM dns_templates t WHERE t.id = ?${vis.sql}`,
+        [templateId, ...vis.params]
+      )
+      if (!template) return reply.status(404).send({ code: 'NOT_FOUND', message: 'Template not found' })
+
+      // INSERT IGNORE: silently succeeds if already assigned (idempotent)
+      await execute(
+        `INSERT IGNORE INTO domain_templates (domain_id, template_id) VALUES (?, ?)`,
+        [domain.id, template.id]
+      )
+
+      await enqueueRender(domain.id)
+      await writeAuditLog({
+        req,
+        entityType: 'domain_template',
+        entityId: template.id,
+        domainId: domain.id,
+        action: 'assign',
+        newValue: { templateId: template.id, templateName: template.name },
+      })
+
+      reply.status(201)
+      return { ok: true, templateId: template.id, templateName: template.name }
+    }
+  )
+
+  // DELETE /domains/:domainId/templates/:templateId
+  app.delete<{ Params: { domainId: string; templateId: string } }>(
+    '/domains/:domainId/templates/:templateId',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const domain = await resolveDomain(req.params.domainId, req, reply)
+      if (!domain) return
+
+      const result = await execute(
+        `DELETE FROM domain_templates WHERE domain_id = ? AND template_id = ?`,
+        [domain.id, req.params.templateId]
+      )
+      if (result.affectedRows === 0) {
+        return reply.status(404).send({ code: 'NOT_FOUND' })
+      }
+
+      await enqueueRender(domain.id)
+      await writeAuditLog({
+        req,
+        entityType: 'domain_template',
+        entityId: Number(req.params.templateId),
+        domainId: domain.id,
+        action: 'unassign',
+        oldValue: { templateId: Number(req.params.templateId) },
+      })
+
+      return { ok: true }
+    }
+  )
+
+  // ── Apply-template endpoints (one-time copy) ──────────────────
 
   // POST /domains/:domainId/apply-template/preview
   app.post<{ Params: { domainId: string } }>(

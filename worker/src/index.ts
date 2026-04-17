@@ -46,7 +46,6 @@ interface DomainRow {
   status: string
   ns_reference: string | null
   publish: number
-  template_id: number | null
 }
 
 interface SoaRow {
@@ -113,7 +112,7 @@ async function processJob(job: QueueRow): Promise<void> {
   console.log(`[worker] Processing job ${job.id} for domain ${domainId}`)
 
   // Step 2: Load domain + records + SOA template
-  const domain = await queryOne<DomainRow>('SELECT id, fqdn, default_ttl, tenant_id, status, ns_reference, publish, template_id FROM domains WHERE id = ?', [domainId])
+  const domain = await queryOne<DomainRow>('SELECT id, fqdn, default_ttl, tenant_id, status, ns_reference, publish FROM domains WHERE id = ?', [domainId])
   if (!domain) throw new Error(`Domain ${domainId} not found`)
 
   // Non-active domain: just sync named.conf to remove it from BIND, skip render
@@ -156,12 +155,18 @@ async function processJob(job: QueueRow): Promise<void> {
     [recordSourceId]
   )
 
-  // If a template is permanently assigned, merge its records into the zone
-  if (domain.template_id) {
+  // Merge records from all assigned templates into the zone
+  const assignedTemplates = await query<{ template_id: number }>(
+    'SELECT template_id FROM domain_templates WHERE domain_id = ?',
+    [domainId]
+  )
+  if (assignedTemplates.length > 0) {
+    const ids = assignedTemplates.map(r => r.template_id)
+    const placeholders = ids.map(() => '?').join(', ')
     const templateRecords = await query<RecordRow>(
       `SELECT name, type, ttl, priority, weight, port, value
-       FROM dns_template_records WHERE template_id = ?`,
-      [domain.template_id]
+       FROM dns_template_records WHERE template_id IN (${placeholders})`,
+      ids
     )
     records.push(...templateRecords)
   }
