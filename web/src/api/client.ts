@@ -277,6 +277,28 @@ export const updateRecord = (domainId: number, id: number, data: Partial<DnsReco
 export const deleteRecord = (domainId: number, id: number) =>
   api.delete(`/domains/${domainId}/records/${id}`)
 
+// DNS Check
+export interface DnsCheckResolverResult {
+  values: string[]
+  error?: string
+  unsupported?: true
+}
+
+export interface DnsCheckRow {
+  name: string
+  type: string
+  answers: Record<string, DnsCheckResolverResult>
+}
+
+export interface DnsCheckResult {
+  fqdn: string
+  resolvers: string[]
+  results: DnsCheckRow[]
+}
+
+export const dnsCheck = (domainId: number) =>
+  api.get<DnsCheckResult>(`/domains/${domainId}/dns-check`).then(r => r.data)
+
 // Tenants
 export const getTenants = () => api.get<Tenant[]>('/tenants')
 export const createTenant = (data: Partial<Tenant>) => api.post<Tenant>('/tenants', data)

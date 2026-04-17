@@ -17,6 +17,7 @@ import LabelChip, { getLabelColors } from '../components/LabelChip'
 import ColorPicker from '../components/ColorPicker'
 import ImportZoneModal from '../components/ImportZoneModal'
 import DnssecModal from '../components/DnssecModal'
+import DnsCheckModal from '../components/DnsCheckModal'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
 
@@ -127,6 +128,7 @@ export default function DomainDetailPage() {
   const [savingTtl, setSavingTtl] = useState(false)
   const [savingNsRef, setSavingNsRef] = useState(false)
   const [showDnssecModal, setShowDnssecModal] = useState(false)
+  const [showDnsCheckModal, setShowDnsCheckModal] = useState(false)
   const [copiedNs, setCopiedNs] = useState<string | null>(null)
   const [hoveredNsItem, setHoveredNsItem] = useState<string | null>(null)
   const [deletingDomain, setDeletingDomain] = useState(false)
@@ -733,6 +735,11 @@ export default function DomainDetailPage() {
                 {togglingDnssec ? '…' : domain.dnssec_enabled ? t('domainDetail_dnssecBtn') : t('domainDetail_enableDnssec')}
               </button>
             )}
+            {domain.status !== 'deleted' && (
+              <button onClick={() => setShowDnsCheckModal(true)} style={styles.btnSecondary}>
+                {t('domainDetail_dnsCheckBtn')}
+              </button>
+            )}
             {isAdmin && (
               <button onClick={handleDelete} disabled={deletingDomain} style={styles.btnDanger}>
                 {deletingDomain ? '…' : t('delete')}
@@ -908,6 +915,14 @@ export default function DomainDetailPage() {
           onDisable={async () => { await handleToggleDnssec(); setShowDnssecModal(false) }}
           disabling={togglingDnssec}
           onClose={() => setShowDnssecModal(false)}
+        />
+      )}
+
+      {showDnsCheckModal && (
+        <DnsCheckModal
+          domainId={domain.id}
+          fqdn={domain.fqdn}
+          onClose={() => setShowDnsCheckModal(false)}
         />
       )}
 

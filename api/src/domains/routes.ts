@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
+import { promises as dns } from 'dns'
 import { query, queryOne, execute } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { writeAuditLog } from '../audit/middleware.js'
@@ -69,6 +70,58 @@ async function fetchLabels(domainIds: number[], isAdmin = false): Promise<Map<nu
 function ownerFilter(req: any): string {
   if (req.user.role === 'admin') return ''
   return ` AND d.tenant_id IN (SELECT tenant_id FROM user_tenants WHERE user_id = ${Number(req.user.sub)})`
+}
+
+// ── DNS check helpers ────────────────────────────────────────────────
+
+const SECONDARY_IPS = (process.env.SECONDARY_IPS ?? '').split(',').map(s => s.trim()).filter(Boolean)
+const NS_RECORD_NAMES = (process.env.NS_RECORDS ?? '').split(',')
+  .map(s => s.trim().replace(/\.$/, '').split('.')[0]).filter(Boolean)
+
+const DNS_RESOLVERS = [
+  { name: NS_RECORD_NAMES[0] ?? 'ns1', ip: SECONDARY_IPS[0] ?? '80.243.196.38' },
+  { name: NS_RECORD_NAMES[1] ?? 'ns2', ip: SECONDARY_IPS[1] ?? '80.243.196.39' },
+  { name: '1.1.1.1', ip: '1.1.1.1' },
+  { name: '8.8.8.8', ip: '8.8.8.8' },
+]
+
+const UNSUPPORTED_TYPES = new Set(['TLSA', 'SSHFP', 'DNSKEY', 'DS'])
+
+function buildQueryFqdn(label: string, domainFqdn: string): string {
+  return label === '@' || label === '' ? domainFqdn : `${label}.${domainFqdn}`
+}
+
+function formatDnsAnswers(type: string, raw: any): string[] {
+  if (!Array.isArray(raw)) return []
+  const t = type === 'ALIAS' ? 'A' : type
+  switch (t) {
+    case 'MX':    return raw.map((r: any) => `${r.priority} ${r.exchange}`)
+    case 'TXT':   return raw.map((chunks: string[]) => chunks.join(''))
+    case 'SRV':   return raw.map((r: any) => `${r.priority} ${r.weight} ${r.port} ${r.name}`)
+    case 'CAA':   return raw.map((r: any) => `${r.critical} ${r.issue ?? r.issuewild ?? r.iodef ?? ''}`)
+    case 'NAPTR': return raw.map((r: any) =>
+                    `${r.order} ${r.preference} "${r.flags}" "${r.service}" "${r.regexp}" ${r.replacement}`)
+    default:      return raw as string[]
+  }
+}
+
+async function queryResolver(
+  resolverIp: string,
+  fqdn: string,
+  type: string,
+): Promise<{ values: string[]; error?: string }> {
+  const effectiveType = type === 'ALIAS' ? 'A' : type
+  const resolver = new dns.Resolver()
+  resolver.setServers([`${resolverIp}:53`])
+  try {
+    const raw = await Promise.race<any>([
+      resolver.resolve(fqdn, effectiveType as any),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
+    ])
+    return { values: formatDnsAnswers(type, raw) }
+  } catch (err: any) {
+    return { values: [], error: err.code ?? err.message ?? 'error' }
+  }
 }
 
 export async function domainRoutes(app: FastifyInstance) {
@@ -473,5 +526,43 @@ export async function domainRoutes(app: FastifyInstance) {
     await writeAuditLog({ req, entityType: 'domain', entityId: Number(req.params.id), domainId: Number(req.params.id), action: 'restore', oldValue: old, newValue: restored })
     await enqueueRender(Number(req.params.id))
     return restored
+  })
+
+  // GET /domains/:id/dns-check
+  app.get<{ Params: { id: string } }>('/domains/:id/dns-check', { preHandler: requireAuth }, async (req, reply) => {
+    const isNumeric = /^\d+$/.test(req.params.id)
+    const whereCol = isNumeric ? 'd.id' : 'd.fqdn'
+    const domain = await queryOne(
+      `SELECT d.id, d.fqdn FROM domains d
+       WHERE ${whereCol} = ? AND d.status != 'deleted'${ownerFilter(req)}`,
+      [req.params.id]
+    ) as any
+    if (!domain) return reply.status(404).send({ code: 'NOT_FOUND' })
+
+    const records = await query(
+      `SELECT DISTINCT name, type FROM dns_records WHERE domain_id = ? AND is_deleted = 0`,
+      [domain.id]
+    ) as { name: string; type: string }[]
+
+    const results = await Promise.all(
+      records.map(async ({ name, type }) => {
+        const fqdn = buildQueryFqdn(name, domain.fqdn)
+        const answers: Record<string, any> = {}
+        await Promise.all(DNS_RESOLVERS.map(async ({ name: rName, ip }) => {
+          if (UNSUPPORTED_TYPES.has(type)) {
+            answers[rName] = { values: [], unsupported: true }
+            return
+          }
+          answers[rName] = await queryResolver(ip, fqdn, type)
+        }))
+        return { name, type, answers }
+      })
+    )
+
+    return {
+      fqdn: domain.fqdn,
+      resolvers: DNS_RESOLVERS.map(r => r.name),
+      results,
+    }
   })
 }

@@ -111,6 +111,7 @@ export const translations = {
     domainDetail_suspend:          'Suspend',
     domainDetail_enableDnssec:     'Enable DNSSEC',
     domainDetail_dnssecBtn:        'DNSSEC',
+    domainDetail_dnsCheckBtn:      'DNS Check',
     domainDetail_conflictWarning:  'This zone was updated by someone else while you were away. Your unsaved edits may conflict.',
     domainDetail_discardReload:    'Discard & reload',
     domainDetail_suspendedMsg:     (activate: string) => `Suspended — zone is not served to secondaries. Click ${activate} to resume.`,
@@ -332,6 +333,14 @@ export const translations = {
     dnssec_computing: 'computing…',
     dnssec_signing:  'Signing in progress — DNSKEY will appear here once BIND has generated keys (may take ~10 seconds after enabling).',
 
+    // DNS Check modal
+    dnsCheck_title:     (fqdn: string) => `DNS Check — ${fqdn}`,
+    dnsCheck_loading:   'Running DNS queries…',
+    dnsCheck_error:     'DNS check failed',
+    dnsCheck_colName:   'Name',
+    dnsCheck_colType:   'Type',
+    dnsCheck_noRecords: 'No DNS records configured for this domain.',
+
     // Layout NS bar
     layout_clickToCopy: (fqdn: string) => `${fqdn} — click to copy`,
     layout_copied:      'Copied!',
@@ -520,6 +529,7 @@ export const translations = {
     domainDetail_suspend:          'Sperren',
     domainDetail_enableDnssec:     'DNSSEC aktivieren',
     domainDetail_dnssecBtn:        'DNSSEC',
+    domainDetail_dnsCheckBtn:      'DNS-Check',
     domainDetail_conflictWarning:  'Diese Zone wurde von jemand anderem geändert, während Sie weg waren. Ihre ungespeicherten Änderungen könnten Konflikte verursachen.',
     domainDetail_discardReload:    'Verwerfen & neu laden',
     domainDetail_suspendedMsg:     (activate: string) => `Gesperrt — Zone wird nicht an Sekundärnameserver ausgespielt. Klicken Sie auf ${activate}, um fortzufahren.`,
@@ -740,6 +750,14 @@ export const translations = {
     dnssec_disable:  'DNSSEC deaktivieren',
     dnssec_computing: 'wird berechnet…',
     dnssec_signing:  'Signierung läuft — DNSKEY erscheint hier, sobald BIND die Schlüssel generiert hat (kann ~10 Sekunden dauern).',
+
+    // DNS Check modal
+    dnsCheck_title:     (fqdn: string) => `DNS-Check — ${fqdn}`,
+    dnsCheck_loading:   'DNS-Abfragen werden ausgeführt…',
+    dnsCheck_error:     'DNS-Check fehlgeschlagen',
+    dnsCheck_colName:   'Name',
+    dnsCheck_colType:   'Typ',
+    dnsCheck_noRecords: 'Keine DNS-Einträge für diese Domain konfiguriert.',
 
     // Layout NS bar
     layout_clickToCopy: (fqdn: string) => `${fqdn} — Klicken zum Kopieren`,
