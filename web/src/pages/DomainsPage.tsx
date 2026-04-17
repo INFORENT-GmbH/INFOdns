@@ -3,14 +3,51 @@ import { useNavigate, useMatch } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getDomains, getTenants, getLabelSuggestions, type Domain } from '../api/client'
 import LabelChip from '../components/LabelChip'
-import ZoneStatusBadge from '../components/ZoneStatusBadge'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
 import { getDirtyDomainFqdns, subscribe } from '../hooks/domainEditCache'
 
+const zoneStatusDotColors: Record<string, string> = {
+  clean:     '#16a34a',
+  dirty:     '#ca8a04',
+  error:     '#dc2626',
+  suspended: '#9ca3af',
+}
+
+const spinnerDotStyle: React.CSSProperties = {
+  display: 'inline-block',
+  width: '0.55em',
+  height: '0.55em',
+  border: '1.5px solid #ca8a04',
+  borderTopColor: 'transparent',
+  borderRadius: '50%',
+  animation: 'spin 0.7s linear infinite',
+  flexShrink: 0,
+  verticalAlign: 'middle',
+}
+
+function ZoneStatusDot({ status, suspended }: { status: string; suspended: boolean }) {
+  const key = suspended ? 'suspended' : status
+  if (!key) return null
+  if (key === 'dirty') return <span className="tip" data-tip="Zone dirty" style={spinnerDotStyle} />
+  const color = zoneStatusDotColors[key]
+  if (!color) return null
+  return <span className="tip" data-tip={`Zone ${key}`} style={{ fontSize: '.45rem', color, flexShrink: 0, lineHeight: 1, cursor: 'default' }}>●</span>
+}
+
 const INLINE_STYLES = `
   .condensed-row { transition: background 0.08s; }
   .condensed-row:hover { background: #eff6ff !important; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .tip { position: relative; display: inline-block; }
+  .tip::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+    background: #1f2937; color: #f9fafb; font-size: .75rem; font-weight: 400;
+    padding: 5px 8px; border-radius: 5px; white-space: normal; width: max-content; max-width: 220px;
+    pointer-events: none; opacity: 0; transition: opacity 0s;
+  }
+  .tip:hover::after { opacity: 1; }
 `
 
 export default function DomainsPage() {
@@ -209,7 +246,7 @@ export default function DomainsPage() {
                 background: isSelected ? '#eff6ff' : suspended ? '#fffbeb' : undefined,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '.25rem', overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem' }}>
                 {dirtyDomainIds.has(d.fqdn) && (
                   <span style={{ color: '#f59e0b', fontSize: '.45rem', flexShrink: 0, lineHeight: 1 }} title="Unsaved changes">●</span>
                 )}
@@ -222,19 +259,16 @@ export default function DomainsPage() {
                     </span>
                   )}
                 </span>
+                <ZoneStatusDot status={d.zone_status} suspended={suspended} />
+                {d.ns_ok === 0 && (
+                  <span className="tip" data-tip={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#dc2626', flexShrink: 0, cursor: 'default' }}>⚠</span>
+                )}
                 {d.tenant_name && (
                   <span style={{ fontSize: '.65rem', color: '#9ca3af', whiteSpace: 'nowrap' as const, flexShrink: 0, marginLeft: 'auto' }}>{d.tenant_name}</span>
                 )}
               </div>
-              {!!(d.zone_status || d.ns_ok === 0 || d.dnssec_enabled || suspended || (d.labels && d.labels.length > 0)) && (
+              {!!(suspended || (d.labels && d.labels.length > 0)) && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 1, flexWrap: 'wrap' as const }}>
-                  <ZoneStatusBadge status={d.zone_status} suspended={d.status === 'suspended'} />
-                  {d.ns_ok === 0 && (
-                    <span className="tip" data-tip={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#dc2626', background: '#fee2e2', padding: '1px 4px', borderRadius: 6 }}>⚠ NS</span>
-                  )}
-                  {!!d.dnssec_enabled && (
-                    <span style={{ fontSize: '.6rem', fontWeight: 600, color: '#166534', background: '#dcfce7', padding: '1px 4px', borderRadius: 6 }}>DNSSEC</span>
-                  )}
                   {suspended && (
                     <span style={{ fontSize: '.65rem', color: '#92400e' }}>{t('domains_suspended')}</span>
                   )}
