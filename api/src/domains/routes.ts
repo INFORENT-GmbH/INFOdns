@@ -540,8 +540,12 @@ export async function domainRoutes(app: FastifyInstance) {
     if (!domain) return reply.status(404).send({ code: 'NOT_FOUND' })
 
     const records = await query(
-      `SELECT DISTINCT name, type FROM dns_records WHERE domain_id = ? AND is_deleted = 0`,
-      [domain.id]
+      `SELECT DISTINCT name, type FROM dns_records WHERE domain_id = ? AND is_deleted = 0
+       UNION
+       SELECT DISTINCT r.name, r.type FROM dns_template_records r
+       JOIN domain_templates dt ON dt.template_id = r.template_id
+       WHERE dt.domain_id = ?`,
+      [domain.id, domain.id]
     ) as { name: string; type: string }[]
 
     const results = await Promise.all(
