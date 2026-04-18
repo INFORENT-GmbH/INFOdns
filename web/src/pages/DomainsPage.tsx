@@ -1,11 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useMatch } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { getDomains, getTenants, getLabelSuggestions, type Domain } from '../api/client'
+import { type Domain, type LabelSuggestion, type Tenant } from '../api/client'
 import LabelChip from '../components/LabelChip'
-import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
 import { getDirtyDomainFqdns, subscribe } from '../hooks/domainEditCache'
+
+interface Props {
+  domains: Domain[]
+  isLoading: boolean
+  search: string
+  setSearch: (v: string) => void
+  labelFilter: string
+  setLabelFilter: (v: string) => void
+  labelSuggestions: LabelSuggestion[]
+  tenantFilter: number[]
+  setTenantFilter: (v: number[]) => void
+  tenants: Tenant[]
+}
 
 const zoneStatusDotColors: Record<string, string> = {
   clean:     '#16a34a',
@@ -37,59 +48,39 @@ function ZoneStatusDot({ status, suspended }: { status: string; suspended: boole
 
 const INLINE_STYLES = `
   .condensed-row { transition: background 0.08s; }
-  .condensed-row:hover { background: #eff6ff !important; }
+  .condensed-row:hover { background: #e8f0fe !important; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .tip { position: relative; display: inline-block; }
+  .tip { position: relative; display: inline-block; z-index: 11; }
   .tip::after {
     content: attr(data-tip);
-    position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
-    background: #1f2937; color: #f9fafb; font-size: .75rem; font-weight: 400;
-    padding: 5px 8px; border-radius: 5px; white-space: normal; width: max-content; max-width: 220px;
-    pointer-events: none; opacity: 0; transition: opacity 0s;
+    position: absolute; bottom: calc(100% + 5px); left: 50%; transform: translateX(-50%);
+    background: #0f172a; color: #f8fafc; font-size: .7rem; font-weight: 400;
+    padding: .25rem .5rem; border-radius: 4px; border: 1px solid #1e293b;
+    white-space: nowrap; width: max-content; max-width: 200px;
+    pointer-events: none; opacity: 0;
   }
   .tip:hover::after { opacity: 1; }
 `
 
-export default function DomainsPage() {
-  const { user } = useAuth()
+export default function DomainsPage({
+  domains, isLoading,
+  search, setSearch,
+  labelFilter, setLabelFilter, labelSuggestions,
+  tenantFilter, setTenantFilter, tenants,
+}: Props) {
   const { t } = useI18n()
   const navigate = useNavigate()
   const detailMatch = useMatch('/domains/:id')
-  const selectedId = detailMatch?.params.id ? Number(detailMatch.params.id) : null
-  const [search, setSearch] = useState('')
-  const [labelFilter, setLabelFilter] = useState('')
+  const selectedFqdn = detailMatch?.params.id ?? null
+
   const [labelDropdownOpen, setLabelDropdownOpen] = useState(false)
   const labelDropdownRef = useRef<HTMLDivElement>(null)
-  const [tenantFilter, setTenantFilter] = useState<number[]>([])
   const [tenantDropdownOpen, setTenantDropdownOpen] = useState(false)
   const [tenantSearch, setTenantSearch] = useState('')
   const tenantDropdownRef = useRef<HTMLDivElement>(null)
 
-  const { data: labelSuggestions = [] } = useQuery({
-    queryKey: ['label-suggestions'],
-    queryFn: () => getLabelSuggestions().then(r => r.data),
-    staleTime: 30_000,
-  })
-
-  const { data: tenants = [] } = useQuery({
-    queryKey: ['tenants'],
-    queryFn: () => getTenants().then(r => r.data),
-    enabled: !!user,
-  })
-
-  const { data: domains = [], isLoading } = useQuery({
-    queryKey: ['domains', search, labelFilter, tenantFilter.join(',')],
-    queryFn: () => {
-      const params: Record<string, string> = { limit: '9999' }
-      if (search) params.search = search
-      if (labelFilter) params.label = labelFilter
-      if (tenantFilter.length > 0) params.tenant_id = tenantFilter.join(',')
-      return getDomains(params).then(r => r.data)
-    },
-  })
-
   function toggleTenant(id: number) {
-    setTenantFilter(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+    setTenantFilter(tenantFilter.includes(id) ? tenantFilter.filter(x => x !== id) : [...tenantFilter, id])
   }
 
   const filteredTenants = tenants.filter(c =>
@@ -108,15 +99,28 @@ export default function DomainsPage() {
   return (
     <div>
       <style>{INLINE_STYLES}</style>
-      <div style={{ padding: '.5rem .625rem', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10, background: '#fafafa' }}>
-        <h2 style={{ margin: '0 0 .375rem', fontSize: '.875rem', fontWeight: 700, color: '#1e293b' }}>{t('domains_title')}</h2>
+
+      {/* Header */}
+      <div style={{ padding: '.5rem .625rem .375rem', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10, background: '#fafafa' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.375rem' }}>
+          <h2 style={{ margin: 0, fontSize: '.875rem', fontWeight: 700, color: '#1e293b' }}>{t('domains_title')}</h2>
+          {!isLoading && (
+            <span style={{ fontSize: '.7rem', fontWeight: 600, color: '#64748b', background: '#e2e8f0', borderRadius: 10, padding: '1px 7px' }}>
+              {domains.length}
+            </span>
+          )}
+        </div>
+
+        {/* Search */}
         <input
           placeholder={t('domains_searchPlaceholder')}
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={{ ...styles.searchInput, width: '100%', boxSizing: 'border-box' as const, marginBottom: '.375rem' }}
         />
-        <div ref={labelDropdownRef} style={{ position: 'relative' }}>
+
+        {/* Label filter */}
+        <div ref={labelDropdownRef} style={{ position: 'relative', marginBottom: '.375rem' }}>
           <button
             type="button"
             onClick={() => setLabelDropdownOpen(v => !v)}
@@ -163,8 +167,10 @@ export default function DomainsPage() {
             </div>
           )}
         </div>
+
+        {/* Tenant filter */}
         {tenants.length > 1 && (
-          <div ref={tenantDropdownRef} style={{ position: 'relative', marginTop: '.375rem' }}>
+          <div ref={tenantDropdownRef} style={{ position: 'relative' }}>
             <button
               type="button"
               onClick={() => setTenantDropdownOpen(v => !v)}
@@ -217,20 +223,19 @@ export default function DomainsPage() {
             )}
           </div>
         )}
-        {!isLoading && (
-          <div style={{ fontSize: '.7rem', color: '#9ca3af', marginTop: '.375rem' }}>
-            {domains.length} domain{domains.length !== 1 ? 's' : ''}
-          </div>
-        )}
       </div>
+
+      {/* Loading */}
       {isLoading && (
         <div style={{ display: 'flex', justifyContent: 'center', padding: '1.5rem' }}>
           <div style={{ width: 18, height: 18, border: '2px solid #e5e7eb', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
         </div>
       )}
+
+      {/* Domain rows */}
       <div>
         {domains.map((d: Domain) => {
-          const isSelected = selectedId === d.id
+          const isSelected = selectedFqdn === d.fqdn
           const suspended = d.status === 'suspended'
           return (
             <div
@@ -238,7 +243,7 @@ export default function DomainsPage() {
               className={isSelected ? undefined : 'condensed-row'}
               onClick={() => navigate(`/domains/${d.fqdn}`)}
               style={{
-                padding: '.3rem .625rem',
+                padding: '.35rem .625rem',
                 paddingLeft: isSelected ? 'calc(.625rem - 3px)' : '.625rem',
                 borderLeft: isSelected ? '3px solid #2563eb' : '3px solid transparent',
                 borderBottom: '1px solid #f3f4f6',
@@ -246,11 +251,9 @@ export default function DomainsPage() {
                 background: isSelected ? '#eff6ff' : suspended ? '#fffbeb' : undefined,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem' }}>
-                {dirtyDomainIds.has(d.fqdn) && (
-                  <span style={{ color: '#f59e0b', fontSize: '.45rem', flexShrink: 0, lineHeight: 1 }} title="Unsaved changes">●</span>
-                )}
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500, fontSize: '.75rem', color: isSelected ? '#1d4ed8' : '#111827', flexShrink: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '.3rem' }}>
+                <ZoneStatusDot status={d.zone_status} suspended={suspended} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500, fontSize: '.8125rem', color: isSelected ? '#1d4ed8' : '#111827', flexShrink: 1, minWidth: 0 }}>
                   {d.fqdn}
                   {d.ns_reference && (
                     <span style={{ fontWeight: 400, color: '#9ca3af' }}>
@@ -259,16 +262,18 @@ export default function DomainsPage() {
                     </span>
                   )}
                 </span>
-                <ZoneStatusDot status={d.zone_status} suspended={suspended} />
                 {d.ns_ok === 0 && (
                   <span className="tip" data-tip={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#dc2626', flexShrink: 0, cursor: 'default' }}>⚠</span>
+                )}
+                {dirtyDomainIds.has(d.fqdn) && (
+                  <span style={{ color: '#f59e0b', fontSize: '.45rem', flexShrink: 0, lineHeight: 1 }} title="Unsaved changes">●</span>
                 )}
                 {d.tenant_name && (
                   <span style={{ fontSize: '.65rem', color: '#9ca3af', whiteSpace: 'nowrap' as const, flexShrink: 0, marginLeft: 'auto' }}>{d.tenant_name}</span>
                 )}
               </div>
               {!!(suspended || (d.labels && d.labels.length > 0)) && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 1, flexWrap: 'wrap' as const }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 2, flexWrap: 'wrap' as const }}>
                   {suspended && (
                     <span style={{ fontSize: '.65rem', color: '#92400e' }}>{t('domains_suspended')}</span>
                   )}
