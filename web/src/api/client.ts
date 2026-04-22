@@ -116,6 +116,18 @@ export interface DnsRecord {
 export interface Tenant {
   id: number
   name: string
+  company_name: string | null
+  first_name: string | null
+  last_name: string | null
+  street: string | null
+  zip: string | null
+  city: string | null
+  country: string | null
+  phone: string | null
+  fax: string | null
+  email: string | null
+  vat_id: string | null
+  notes: string | null
   is_active: number
   created_at: string
 }
@@ -129,6 +141,11 @@ export interface User {
   tenant_ids: number[]
   is_active: number
   locale: 'en' | 'de'
+  phone: string | null
+  street: string | null
+  zip: string | null
+  city: string | null
+  country: string | null
   created_at: string
 }
 
