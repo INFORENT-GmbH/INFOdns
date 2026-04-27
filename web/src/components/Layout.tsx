@@ -68,22 +68,19 @@ export default function Layout() {
         @keyframes dropdown-in { from { opacity: 0; transform: translateX(-50%) translateY(-4px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
       `}</style>
 
+      <div style={styles.sectionHeader}>{t('nav_products')}</div>
       <NavLink to="/domains" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
         {t('nav_domains')}
       </NavLink>
+
+      <div style={styles.sectionHeader}>{t('nav_help')}</div>
       <NavLink to="/tickets" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
         {t('nav_support')}
       </NavLink>
 
       <div style={styles.sectionHeader}>System</div>
-      <NavLink to="/jobs" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
-        {t('nav_jobs')}
-      </NavLink>
       <NavLink to="/audit-logs" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
         {t('nav_auditLog')}
-      </NavLink>
-      <NavLink to="/mail-queue" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
-        {t('nav_mailQueue')}
       </NavLink>
       <NavLink to="/templates" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
         {t('nav_templates')}
@@ -96,6 +93,12 @@ export default function Layout() {
         </NavLink>
         <NavLink to="/tenants" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
           {t('nav_tenants')}
+        </NavLink>
+        <NavLink to="/jobs" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
+          {t('nav_jobs')}
+        </NavLink>
+        <NavLink to="/mail-queue" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
+          {t('nav_mailQueue')}
         </NavLink>
         <NavLink to="/tld-pricing" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
           TLD Pricing

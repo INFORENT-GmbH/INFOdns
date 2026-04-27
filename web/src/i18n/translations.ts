@@ -376,6 +376,8 @@ export const translations = {
     modal_ttlHint:    '(blank = zone default)',
 
     // Support tickets
+    nav_products:             'Products',
+    nav_help:                 'Help',
     nav_support:              'Support',
     tickets_title:            'Support Tickets',
     tickets_newTicket:        '+ New Ticket',
@@ -815,6 +817,8 @@ export const translations = {
     modal_ttlHint:    '(leer = Zonen-Standard)',
 
     // Support tickets
+    nav_products:             'Produkte',
+    nav_help:                 'Hilfe',
     nav_support:              'Support',
     tickets_title:            'Support-Tickets',
     tickets_newTicket:        '+ Neues Ticket',
