@@ -4,6 +4,7 @@ import { saveDomainEdits, loadDomainEdits, clearDomainEdits, setLiveDirty } from
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   getDomain, getDomains, getRecords, createRecord, deleteRecord,
+  checkDomainSerial, checkDomainDnssec,
   createBulkJob, previewBulkJob, approveBulkJob, searchByRecord,
   updateDomainLabels, getLabelSuggestions, updateDomain, deleteDomain, getZoneText,
   getTenants, getTemplates, previewApplyTemplate, applyTemplate,
@@ -20,6 +21,8 @@ import DnssecModal from '../components/DnssecModal'
 import DnsCheckModal from '../components/DnsCheckModal'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
+import { formatApiError } from '../lib/formError'
+import { useModalA11y } from '../hooks/useModalA11y'
 
 const INLINE_STYLES = `
   .inline-field:hover { border-color: #d1d5db !important; background: #fff !important; }
@@ -121,6 +124,7 @@ export default function DomainDetailPage() {
   const [savingLabels, setSavingLabels] = useState(false)
   const [togglingStatus, setTogglingStatus] = useState(false)
   const [togglingDnssec, setTogglingDnssec] = useState(false)
+  const [recheckingDnssec, setRecheckingDnssec] = useState(false)
   const [movingTenant, setMovingTenant] = useState(false)
   const [editingTtl, setEditingTtl] = useState(false)
   const [ttlDraft, setTtlDraft] = useState('')
@@ -242,7 +246,7 @@ export default function DomainDetailPage() {
     setPreviewing(true); setApplyTplError(null); setApplyDiff(null)
     previewApplyTemplate(domain.id, Number(applyTplId), applyMode as ApplyMode)
       .then(res => { if (!cancelled) setApplyDiff(res.data) })
-      .catch(err => { if (!cancelled) setApplyTplError(err.response?.data?.message ?? err.message) })
+      .catch(err => { if (!cancelled) setApplyTplError(formatApiError(err)) })
       .finally(() => { if (!cancelled) setPreviewing(false) })
     return () => { cancelled = true }
   }, [applyTplId, applyMode, showApplyPanel, domain?.id])
@@ -355,6 +359,14 @@ export default function DomainDetailPage() {
     // Snapshot the rows to submit — skip new rows with empty value
     const rowsToCreate = newRows.filter(r => r.value.trim() !== '')
     try {
+      // 0. Optimistic-locking preflight: refuse to apply if the zone has advanced
+      // since we loaded the records the user is editing. Defends against races
+      // between two browser tabs and against resuming stale localStorage edits.
+      const expectedSerial = loadedFromCacheSerial ?? lastKnownSerialRef.current
+      if (expectedSerial && domain) {
+        await checkDomainSerial(domain.id, expectedSerial)
+      }
+
       // 1. Create new records directly (API enqueues render)
       for (const row of rowsToCreate) {
         const ttlNum = row.ttl === '' ? undefined : Number(row.ttl)
@@ -425,17 +437,7 @@ export default function DomainDetailPage() {
         pendingRefreshTimer.current = setTimeout(() => setPendingRefresh(false), 8_000)
       }
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { message?: string; error?: string } }; message?: string }
-      const data = err?.response?.data
-      let msg: string = data?.message ?? data?.error ?? err.message ?? 'Failed to apply changes'
-      // Zod errors come back as a JSON string — unwrap to readable text
-      try {
-        const parsed: unknown = JSON.parse(msg)
-        if (Array.isArray(parsed)) {
-          msg = parsed.map((z: { path?: string[]; message?: string }) => `${z.path?.join('.') || 'field'}: ${z.message}`).join(', ')
-        }
-      } catch { /* not JSON, use as-is */ }
-      setApplyError(msg)
+      setApplyError(formatApiError(e, 'Failed to apply changes'))
     } finally {
       applyingRef.current = false
       setApplying(false)
@@ -466,7 +468,7 @@ export default function DomainDetailPage() {
       setShowApplyPanel(false)
       setApplyTplId(''); setApplyMode('add_missing'); setApplyDiff(null)
     } catch (err: any) {
-      setApplyTplError(err.response?.data?.message ?? err.message)
+      setApplyTplError(formatApiError(err))
     } finally {
       setApplyingTpl(false)
     }
@@ -481,7 +483,7 @@ export default function DomainDetailPage() {
       qc.invalidateQueries({ queryKey: ['records', recordSourceId] })
       setAddingTplId('')
     } catch (err: any) {
-      setTplManagerError(err.response?.data?.message ?? err.message)
+      setTplManagerError(formatApiError(err))
     } finally {
       setSavingTplAssign(false)
     }
@@ -495,7 +497,7 @@ export default function DomainDetailPage() {
       await refetchAssignedTemplates()
       qc.invalidateQueries({ queryKey: ['records', recordSourceId] })
     } catch (err: any) {
-      setTplManagerError(err.response?.data?.message ?? err.message)
+      setTplManagerError(formatApiError(err))
     }
   }
 
@@ -600,7 +602,7 @@ export default function DomainDetailPage() {
       qc.invalidateQueries({ queryKey: ['domain', name] })
       qc.invalidateQueries({ queryKey: ['domains'] })
     } catch (err: any) {
-      alert(err.response?.data?.message ?? err.message)
+      alert(formatApiError(err))
     } finally {
       setTogglingStatus(false)
     }
@@ -614,7 +616,7 @@ export default function DomainDetailPage() {
       qc.invalidateQueries({ queryKey: ['domain', name] })
       qc.invalidateQueries({ queryKey: ['domains'] })
     } catch (err: any) {
-      alert(err.response?.data?.message ?? err.message)
+      alert(formatApiError(err))
     } finally {
       setMovingTenant(false)
     }
@@ -630,7 +632,7 @@ export default function DomainDetailPage() {
       await updateDomain(domain!.id, { default_ttl: val } as any)
       qc.invalidateQueries({ queryKey: ['domain', name] })
     } catch (err: any) {
-      alert(err.response?.data?.message ?? err.message)
+      alert(formatApiError(err))
     } finally {
       setSavingTtl(false)
       setEditingTtl(false)
@@ -645,7 +647,7 @@ export default function DomainDetailPage() {
       await updateDomain(domain!.id, { ns_reference: v } as any)
       qc.invalidateQueries({ queryKey: ['domain', name] })
     } catch (err: any) {
-      alert(err.response?.data?.message ?? err.message)
+      alert(formatApiError(err))
     } finally {
       setSavingNsRef(false)
     }
@@ -659,7 +661,7 @@ export default function DomainDetailPage() {
       qc.invalidateQueries({ queryKey: ['domain', name] })
       qc.invalidateQueries({ queryKey: ['domains'] })
     } catch (err: any) {
-      alert(err.response?.data?.message ?? err.message)
+      alert(formatApiError(err))
     } finally {
       setTogglingDnssec(false)
     }
@@ -672,7 +674,7 @@ export default function DomainDetailPage() {
       await deleteDomain(domain!.id)
       navigate('/domains')
     } catch (err: any) {
-      alert(err.response?.data?.message ?? err.message)
+      alert(formatApiError(err))
       setDeletingDomain(false)
     }
   }
@@ -809,9 +811,30 @@ export default function DomainDetailPage() {
       )}
 
       {domain.dnssec_enabled === 1 && domain.dnssec_ok === 0 && domain.status === 'active' && (
-        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.375rem .75rem', borderRadius: 6, margin: '.5rem .75rem 0', fontSize: '.8125rem', border: '1px solid #fde68a' }}>
-          <strong>{t('domainDetail_dnssecNotVisible')}</strong> — {t('domainDetail_dnssecNotVisibleDesc')}
-          <div style={{ marginTop: '.25rem', fontSize: '.7rem', color: '#a16207' }}>{t('domainDetail_dnssecCheckedEvery')}</div>
+        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.375rem .75rem', borderRadius: 6, margin: '.5rem .75rem 0', fontSize: '.8125rem', border: '1px solid #fde68a', display: 'flex', alignItems: 'flex-start', gap: '.75rem' }}>
+          <div style={{ flex: 1 }}>
+            <strong>{t('domainDetail_dnssecNotVisible')}</strong> — {t('domainDetail_dnssecNotVisibleDesc')}
+            <div style={{ marginTop: '.25rem', fontSize: '.7rem', color: '#a16207' }}>{t('domainDetail_dnssecCheckedEvery')}</div>
+          </div>
+          <button
+            type="button"
+            disabled={recheckingDnssec}
+            onClick={async () => {
+              if (!domain || recheckingDnssec) return
+              setRecheckingDnssec(true)
+              try {
+                await checkDomainDnssec(domain.id)
+                qc.invalidateQueries({ queryKey: ['domain', name] })
+              } catch (err) {
+                alert(formatApiError(err, 'DNSSEC check failed'))
+              } finally {
+                setRecheckingDnssec(false)
+              }
+            }}
+            style={{ background: '#fff', color: '#92400e', border: '1px solid #fde68a', borderRadius: 4, padding: '.25rem .625rem', fontSize: '.75rem', fontWeight: 600, cursor: recheckingDnssec ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}
+          >
+            {recheckingDnssec ? '…' : t('domainDetail_dnssecCheckNow')}
+          </button>
         </div>
       )}
 
@@ -1466,7 +1489,9 @@ const styles: Record<string, React.CSSProperties> = {
 
 // ── Zone error with clickable file paths ──────────────────────
 
-const ZONE_PATH_RE = /(\/tmp\/infodns-[a-f0-9]+\.zone):(\d+)/g
+// Match the worker's tmp zone-file path (see worker/src/validateZone.ts).
+// Generic prefix so this survives a future rename of the tmpfile prefix.
+const ZONE_PATH_RE = /(\/tmp\/[a-z]+-[a-f0-9]+\.zone):(\d+)/g
 
 function renderZoneError(
   errorText: string,
@@ -1507,6 +1532,7 @@ function renderZoneError(
 function ZoneFileModal({ text, highlightLine, onClose }: { text: string; highlightLine: number; onClose: () => void }) {
   const lines = text.split('\n')
   const lineRefs = useRef<(HTMLTableRowElement | null)[]>([])
+  const modalRef = useModalA11y<HTMLDivElement>(onClose)
 
   useEffect(() => {
     lineRefs.current[highlightLine - 1]?.scrollIntoView({ block: 'center' })
@@ -1514,10 +1540,11 @@ function ZoneFileModal({ text, highlightLine, onClose }: { text: string; highlig
 
   return (
     <div style={zm.overlay} onClick={onClose}>
-      <div style={zm.modal} onClick={e => e.stopPropagation()}>
+      <div ref={modalRef} style={zm.modal} onClick={e => e.stopPropagation()}
+           role="dialog" aria-modal="true" aria-labelledby="zone-file-modal-title" tabIndex={-1}>
         <div style={zm.header}>
-          <span style={zm.title}>Zone file — line {highlightLine} highlighted</span>
-          <button onClick={onClose} style={zm.closeBtn}>✕</button>
+          <span id="zone-file-modal-title" style={zm.title}>Zone file — line {highlightLine} highlighted</span>
+          <button onClick={onClose} style={zm.closeBtn} aria-label="Close zone file viewer">✕</button>
         </div>
         <div style={zm.body}>
           <table style={zm.table}>

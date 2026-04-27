@@ -39,6 +39,19 @@ type UserRow = {
   tenant_id: number | null
   is_active: number
   locale: 'en' | 'de'
+  failed_login_count: number
+  locked_until: string | null
+}
+
+const LOGIN_LOCKOUT_THRESHOLD = 5
+const LOGIN_LOCKOUT_MINUTES = 15
+
+const REFRESH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: 'lax' as const,
+  secure: process.env.NODE_ENV === 'production',
+  path: '/api/v1/auth/refresh',
+  maxAge: 7 * 24 * 60 * 60,
 }
 
 export async function authRoutes(app: FastifyInstance) {
@@ -48,13 +61,40 @@ export async function authRoutes(app: FastifyInstance) {
     if (!body.success) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: body.error.message })
 
     const user = await queryOne<UserRow>(
-      'SELECT id, email, password_hash, role, tenant_id, is_active, locale FROM users WHERE email = ?',
+      'SELECT id, email, password_hash, role, tenant_id, is_active, locale, failed_login_count, locked_until FROM users WHERE email = ?',
       [body.data.email]
     )
     if (!user || !user.is_active) return reply.status(401).send({ code: 'INVALID_CREDENTIALS' })
 
+    // Per-account lockout — defends against distributed brute force where the
+    // IP rate-limit (10/min per IP) doesn't apply because attempts span IPs.
+    if (user.locked_until && new Date(user.locked_until) > new Date()) {
+      return reply.status(423).send({
+        code: 'ACCOUNT_LOCKED',
+        message: `Too many failed attempts. Try again after ${user.locked_until}.`,
+      })
+    }
+
     const valid = await bcrypt.compare(body.data.password, user.password_hash)
-    if (!valid) return reply.status(401).send({ code: 'INVALID_CREDENTIALS' })
+    if (!valid) {
+      const newCount = user.failed_login_count + 1
+      const shouldLock = newCount >= LOGIN_LOCKOUT_THRESHOLD
+      await execute(
+        shouldLock
+          ? 'UPDATE users SET failed_login_count = ?, locked_until = DATE_ADD(NOW(), INTERVAL ? MINUTE) WHERE id = ?'
+          : 'UPDATE users SET failed_login_count = ? WHERE id = ?',
+        shouldLock ? [newCount, LOGIN_LOCKOUT_MINUTES, user.id] : [newCount, user.id]
+      )
+      if (shouldLock) {
+        console.warn(`[auth] Account locked for ${LOGIN_LOCKOUT_MINUTES}min after ${newCount} failed logins: ${user.email}`)
+      }
+      return reply.status(401).send({ code: 'INVALID_CREDENTIALS' })
+    }
+
+    // Success — clear failure counters
+    if (user.failed_login_count > 0 || user.locked_until) {
+      await execute('UPDATE users SET failed_login_count = 0, locked_until = NULL WHERE id = ?', [user.id])
+    }
 
     const payload: JwtPayload = { sub: user.id, role: user.role, tenantId: user.tenant_id }
     const accessToken = app.jwt.sign(payload, { expiresIn: '15m' })
@@ -62,12 +102,7 @@ export async function authRoutes(app: FastifyInstance) {
     await saveRefreshToken(user.id, refreshToken)
 
     reply
-      .setCookie('refresh_token', refreshToken, {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/api/v1/auth/refresh',
-        maxAge: 7 * 24 * 60 * 60,
-      })
+      .setCookie('refresh_token', refreshToken, REFRESH_COOKIE_OPTIONS)
       .send({ accessToken })
 
     // Enqueue login notification email (non-blocking)
@@ -104,12 +139,7 @@ export async function authRoutes(app: FastifyInstance) {
     await saveRefreshToken(user.id, newRefresh)
 
     reply
-      .setCookie('refresh_token', newRefresh, {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/api/v1/auth/refresh',
-        maxAge: 7 * 24 * 60 * 60,
-      })
+      .setCookie('refresh_token', newRefresh, REFRESH_COOKIE_OPTIONS)
       .send({ accessToken })
   })
 

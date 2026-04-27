@@ -10,6 +10,14 @@ const RNDC_HOST     = process.env.BIND_PRIMARY_HOST      ?? 'bind-primary'
 const RNDC_PORT     = process.env.BIND_PRIMARY_RNDC_PORT ?? '953'
 const RNDC_KEY_FILE = process.env.RNDC_KEY_FILE          ?? '/etc/rndc/rndc.key'
 
+// Mirror of the API's FQDN validator. Re-checked here so a malformed value
+// from the DB (or a future caller) can never reach rndc as a positional arg.
+const FQDN_RE = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i
+
+function assertFqdn(fqdn: string): void {
+  if (!FQDN_RE.test(fqdn)) throw new Error(`refusing to invoke rndc with invalid fqdn: ${JSON.stringify(fqdn)}`)
+}
+
 /**
  * Write content to destPath in-place (truncate + write + fsync).
  * We do NOT use rename because Docker bind-mounted directories are
@@ -32,6 +40,7 @@ export async function writeAtomic(destPath: string, content: string): Promise<vo
  * Retries reload if BIND hasn't finished processing reconfig yet.
  */
 export async function deployZone(fqdn: string, content: string): Promise<void> {
+  assertFqdn(fqdn)
   const zonePath = join(ZONE_DIR, `${fqdn}.zone`)
 
   // Delete stale BIND journal files before replacing the zone file.
@@ -66,6 +75,7 @@ export async function deployZone(fqdn: string, content: string): Promise<void> {
 }
 
 export async function rndcReload(fqdn: string): Promise<void> {
+  assertFqdn(fqdn)
   await execFileAsync('rndc', [
     '-4',
     '-s', RNDC_HOST,
@@ -86,6 +96,7 @@ export async function rndcReconfig(host: string, port = RNDC_PORT): Promise<void
 }
 
 export async function rndcDnssecStatus(fqdn: string): Promise<string> {
+  assertFqdn(fqdn)
   const { stdout } = await execFileAsync('rndc', [
     '-4',
     '-s', RNDC_HOST,

@@ -1,10 +1,11 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { promises as dns } from 'dns'
+import { promises as dns, Resolver } from 'dns'
 import { query, queryOne, execute } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { writeAuditLog } from '../audit/middleware.js'
 import { enqueueRender } from '../lib/queue.js'
+import { broadcast } from '../ws/hub.js'
 
 async function queueMail(to: string, template: string, payload: unknown): Promise<void> {
   await execute(
@@ -241,10 +242,17 @@ export async function domainRoutes(app: FastifyInstance) {
     const existing = await queryOne('SELECT id FROM domains WHERE fqdn = ?', [body.data.fqdn])
     if (existing) return reply.status(409).send({ code: 'FQDN_TAKEN' })
 
-    const result = await execute(
-      'INSERT INTO domains (fqdn, tenant_id, default_ttl, notes, status, zone_status) VALUES (?, ?, ?, ?, ?, ?)',
-      [body.data.fqdn, body.data.tenant_id, body.data.default_ttl, body.data.notes ?? null, 'active', 'dirty']
-    )
+    let result
+    try {
+      result = await execute(
+        'INSERT INTO domains (fqdn, tenant_id, default_ttl, notes, status, zone_status) VALUES (?, ?, ?, ?, ?, ?)',
+        [body.data.fqdn, body.data.tenant_id, body.data.default_ttl, body.data.notes ?? null, 'active', 'dirty']
+      )
+    } catch (err: any) {
+      // Race: another concurrent request inserted the same FQDN between our SELECT and INSERT.
+      if (err?.code === 'ER_DUP_ENTRY') return reply.status(409).send({ code: 'FQDN_TAKEN' })
+      throw err
+    }
     const created = await queryOne('SELECT * FROM domains WHERE id = ?', [result.insertId])
     await writeAuditLog({ req, entityType: 'domain', entityId: result.insertId, domainId: result.insertId, action: 'create', newValue: created })
     await enqueueRender(result.insertId)
@@ -309,6 +317,79 @@ export async function domainRoutes(app: FastifyInstance) {
     )
     return { ...row, labels: labelMap.get(row.id) ?? [], expected_ns: EXPECTED_NS, templates }
   })
+
+  // POST /domains/:id/check-dnssec — force a DNSKEY visibility check NOW (instead of
+  // waiting for the worker's polling cadence). Updates dnssec_ok + dnssec_checked_at
+  // and broadcasts the change so the UI updates everywhere.
+  app.post<{ Params: { id: string } }>(
+    '/domains/:id/check-dnssec',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const isNumeric = /^\d+$/.test(req.params.id)
+      const whereCol = isNumeric ? 'd.id' : 'd.fqdn'
+      const row = await queryOne<{ id: number; fqdn: string; tenant_id: number; dnssec_enabled: number; zone_status: string }>(
+        `SELECT d.id, d.fqdn, d.tenant_id, d.dnssec_enabled, d.zone_status FROM domains d
+         WHERE ${whereCol} = ? AND d.status != 'deleted'${ownerFilter(req)}`,
+        [req.params.id]
+      )
+      if (!row) return reply.status(404).send({ code: 'NOT_FOUND' })
+      if (!row.dnssec_enabled) return reply.status(400).send({ code: 'DNSSEC_NOT_ENABLED' })
+
+      const resolver = new Resolver()
+      resolver.setServers(['8.8.8.8'])
+      const ok = await new Promise<boolean>((resolve) => {
+        const t = setTimeout(() => resolve(false), 5000)
+        resolver.resolve(row.fqdn, 'DNSKEY', (err, addresses) => {
+          clearTimeout(t)
+          resolve(!err && Array.isArray(addresses) && addresses.length > 0)
+        })
+      })
+
+      const newOk = ok ? 1 : 0
+      await execute(
+        'UPDATE domains SET dnssec_ok = ?, dnssec_checked_at = NOW() WHERE id = ?',
+        [newOk, row.id]
+      )
+      broadcast({
+        type: 'domain_status',
+        domainId: row.id,
+        fqdn: row.fqdn,
+        zone_status: row.zone_status,
+        tenantId: row.tenant_id,
+        dnssec_ok: newOk,
+      })
+      return { ok: !!newOk, dnssec_ok: newOk, checked_at: new Date().toISOString() }
+    }
+  )
+
+  // POST /domains/:id/check-serial — preflight optimistic-locking check before bulk apply
+  // Body: { expected_serial: number }. 200 if matches, 409 if zone has advanced.
+  app.post<{ Params: { id: string }; Body: { expected_serial?: number } }>(
+    '/domains/:id/check-serial',
+    { preHandler: requireAuth },
+    async (req, reply) => {
+      const expected = Number(req.body?.expected_serial)
+      if (!Number.isFinite(expected) || expected <= 0) {
+        return reply.status(400).send({ code: 'VALIDATION_ERROR', message: 'expected_serial must be a positive integer' })
+      }
+      const isNumeric = /^\d+$/.test(req.params.id)
+      const whereCol = isNumeric ? 'd.id' : 'd.fqdn'
+      const row = await queryOne<{ last_serial: number }>(
+        `SELECT d.last_serial FROM domains d
+         WHERE ${whereCol} = ? AND d.status != 'deleted'${ownerFilter(req)}`,
+        [req.params.id]
+      )
+      if (!row) return reply.status(404).send({ code: 'NOT_FOUND' })
+      if (row.last_serial !== expected) {
+        return reply.status(409).send({
+          code: 'SERIAL_CONFLICT',
+          message: `Zone has been updated by someone else (your serial: ${expected}, current: ${row.last_serial}). Reload to see the latest records.`,
+          current_serial: row.last_serial,
+        })
+      }
+      return { ok: true, current_serial: row.last_serial }
+    }
+  )
 
   // PUT /domains/:id
   app.put<{ Params: { id: string } }>('/domains/:id', { preHandler: requireAuth }, async (req, reply) => {

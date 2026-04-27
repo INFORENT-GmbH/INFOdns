@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { parseZoneImport, type DnsRecord, type ParsedImportRecord, type ImportConflict, type ZoneImportParseResult } from '../api/client'
 import { useI18n } from '../i18n/I18nContext'
+import { useModalA11y } from '../hooks/useModalA11y'
 
 interface EditRow { name: string; type: string; ttl: string; value: string; priority: string; weight: string; port: string }
 interface NewRow extends EditRow { _newId: string }
@@ -37,6 +38,7 @@ export default function ImportZoneModal({ domainId, onStage, onClose }: Props) {
   const [result, setResult] = useState<ZoneImportParseResult | null>(null)
   const [entries, setEntries] = useState<Entry[]>([])
   const [showSkipped, setShowSkipped] = useState(false)
+  const modalRef = useModalA11y<HTMLDivElement>(onClose)
 
   async function handleFile(file: File) {
     setFileName(file.name)
@@ -113,10 +115,11 @@ export default function ImportZoneModal({ domainId, onStage, onClose }: Props) {
 
   return (
     <div style={s.overlay} onClick={onClose}>
-      <div style={s.modal} onClick={e => e.stopPropagation()}>
+      <div ref={modalRef} style={s.modal} onClick={e => e.stopPropagation()}
+           role="dialog" aria-modal="true" aria-labelledby="import-zone-modal-title" tabIndex={-1}>
         <div style={s.header}>
-          <h3 style={s.title}>{t('importZone_title')}</h3>
-          <button onClick={onClose} style={s.closeBtn}>✕</button>
+          <h3 id="import-zone-modal-title" style={s.title}>{t('importZone_title')}</h3>
+          <button onClick={onClose} style={s.closeBtn} aria-label={t('close') ?? 'Close'}>✕</button>
         </div>
 
         {/* File picker */}

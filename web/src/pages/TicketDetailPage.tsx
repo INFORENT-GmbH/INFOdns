@@ -5,6 +5,7 @@ import { getTicket, getUsers, updateTicket, addTicketMessage, uploadAttachments,
 import Select from '../components/Select'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
+import { formatApiError } from '../lib/formError'
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
   open:        { bg: '#fef3c7', fg: '#92400e' },
@@ -85,7 +86,7 @@ export default function TicketDetailPage() {
       setIsInternal(false)
       setFiles([])
     } catch (err: any) {
-      setSendError(err.response?.data?.message ?? 'Error')
+      setSendError(formatApiError(err))
     } finally {
       setSending(false)
     }

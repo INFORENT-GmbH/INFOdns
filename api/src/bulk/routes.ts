@@ -168,8 +168,14 @@ export async function bulkRoutes(app: FastifyInstance) {
 
     await execute("UPDATE bulk_jobs SET status = 'previewing' WHERE id = ?", [job.id])
 
-    const filter = typeof job.filter_json === 'string' ? JSON.parse(job.filter_json) : job.filter_json
-    const payload = typeof job.payload_json === 'string' ? JSON.parse(job.payload_json) : job.payload_json
+    let filter, payload
+    try {
+      filter  = typeof job.filter_json  === 'string' ? JSON.parse(job.filter_json)  : job.filter_json
+      payload = typeof job.payload_json === 'string' ? JSON.parse(job.payload_json) : job.payload_json
+    } catch (err: any) {
+      await execute("UPDATE bulk_jobs SET status = 'draft' WHERE id = ?", [job.id])
+      return reply.status(422).send({ code: 'CORRUPT_JOB_PAYLOAD', message: `Stored job JSON is invalid: ${err.message}` })
+    }
 
     const domainIds = await resolveDomainIds(filter, req)
 

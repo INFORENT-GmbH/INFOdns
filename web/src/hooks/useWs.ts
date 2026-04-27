@@ -38,18 +38,21 @@ export function useWs(token: string | null): WsStatus {
 
     function connect() {
       if (destroyed) return
-      const url = `${WS_BASE}/api/v1/ws?token=${encodeURIComponent(token!)}`
-      const ws = new WebSocket(url)
+      // Token is carried in Sec-WebSocket-Protocol (set via the second arg to
+      // `new WebSocket`) instead of the query string, to keep it out of nginx
+      // access logs, browser history, and Referer headers.
+      const url = `${WS_BASE}/api/v1/ws`
+      const ws = new WebSocket(url, ['bearer', token!])
       wsRef.current = ws
 
       ws.onopen = () => {
         if (everConnected.current) {
-          // Was disconnected — reload to sync any missed events
-          window.location.reload()
-        } else {
-          everConnected.current = true
-          setStatus('connected')
+          // Was disconnected — refetch all active queries to catch up on missed events.
+          // Avoid window.location.reload() so staged edits (e.g. on DomainDetailPage) survive.
+          qc.invalidateQueries()
         }
+        everConnected.current = true
+        setStatus('connected')
       }
 
       ws.onmessage = (e) => {

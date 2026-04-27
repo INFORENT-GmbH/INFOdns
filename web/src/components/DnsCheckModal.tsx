@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useI18n } from '../i18n/I18nContext'
+import { useModalA11y } from '../hooks/useModalA11y'
 import { dnsCheck } from '../api/client'
 import type { DnsCheckResult, DnsCheckRow, DnsCheckResolverResult } from '../api/client'
 
@@ -158,6 +159,7 @@ export default function DnsCheckModal({ domainId, fqdn, onClose }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<DnsCheckResult | null>(null)
+  const modalRef = useModalA11y<HTMLDivElement>(onClose)
 
   useEffect(() => {
     let cancelled = false
@@ -171,9 +173,10 @@ export default function DnsCheckModal({ domainId, fqdn, onClose }: Props) {
 
   return (
     <div style={styles.overlay} onClick={onClose}>
-      <div style={styles.modal} onClick={e => e.stopPropagation()}>
+      <div ref={modalRef} style={styles.modal} onClick={e => e.stopPropagation()}
+           role="dialog" aria-modal="true" aria-labelledby="dns-check-modal-title" tabIndex={-1}>
         <div style={styles.header}>
-          <h2 style={styles.title}>{t('dnsCheck_title', fqdn)}</h2>
+          <h2 id="dns-check-modal-title" style={styles.title}>{t('dnsCheck_title', fqdn)}</h2>
           <button style={styles.closeBtn} onClick={onClose} aria-label="Close">×</button>
         </div>
 

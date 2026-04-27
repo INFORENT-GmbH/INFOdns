@@ -224,6 +224,12 @@ export const getDomains = (params?: Record<string, string>) =>
 export const getDomain = (name: string) =>
   api.get<Domain>(`/domains/${name}`)
 
+export const checkDomainSerial = (name: string | number, expected_serial: number) =>
+  api.post<{ ok: true; current_serial: number }>(`/domains/${name}/check-serial`, { expected_serial })
+
+export const checkDomainDnssec = (name: string | number) =>
+  api.post<{ ok: boolean; dnssec_ok: number; checked_at: string }>(`/domains/${name}/check-dnssec`)
+
 export const createDomain = (data: Partial<Domain>) =>
   api.post<Domain>('/domains', data)
 

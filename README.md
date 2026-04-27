@@ -456,7 +456,7 @@ Set `VITE_API_URL=http://localhost:3000` in `web/.env.local` for the dev server 
 ### Rebuilding after code changes
 
 ```bash
-docker compose up -d --build api worker web
+docker compose up -d --build --remove-orphans api worker web
 ```
 
 ### Viewing logs

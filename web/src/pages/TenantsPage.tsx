@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenants, createTenant, updateTenant, deleteTenant, type Tenant } from '../api/client'
 import { useI18n } from '../i18n/I18nContext'
+import { formatApiError } from '../lib/formError'
 
 const INLINE_STYLES = `
   .tenant-row { transition: background 0.08s; cursor: pointer; }
@@ -74,7 +75,7 @@ export default function TenantsPage() {
       qc.invalidateQueries({ queryKey: ['tenants'] })
       setShowForm(false)
     } catch (err: any) {
-      setError(err.response?.data?.message ?? err.message)
+      setError(formatApiError(err))
     } finally {
       setSaving(false)
     }

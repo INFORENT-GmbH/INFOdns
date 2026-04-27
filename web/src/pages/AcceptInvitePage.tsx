@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import { getInvite, acceptInvite } from '../api/client'
 import { useI18n } from '../i18n/I18nContext'
+import { formatApiError } from '../lib/formError'
 
 type Status = 'loading' | 'ready' | 'submitting' | 'success' | 'error'
 type InviteError = 'INVITE_NOT_FOUND' | 'INVITE_USED' | 'INVITE_EXPIRED' | string
@@ -47,7 +48,7 @@ export default function AcceptInvitePage() {
         setInviteError(code)
         setStatus('error')
       } else {
-        setFormError(err.response?.data?.message ?? err.message)
+        setFormError(formatApiError(err))
         setStatus('ready')
       }
     }

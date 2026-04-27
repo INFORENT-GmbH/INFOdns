@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import {
@@ -9,6 +9,7 @@ import {
 import { useI18n } from '../i18n/I18nContext'
 import Select from '../components/Select'
 import { useAuth } from '../context/AuthContext'
+import { formatApiError } from '../lib/formError'
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -177,6 +178,7 @@ function PayloadForm({ operation, matchType, matchName, matchValue, onChange }: 
 
 function JobDetail({ job }: { job: BulkJob }) {
   const { t } = useI18n()
+  const [expandedDomain, setExpandedDomain] = useState<number | null>(null)
 
   const { data: domains = [] } = useQuery<BulkJobDomain[]>({
     queryKey: ['bulk-job-domains', job.id],
@@ -232,19 +234,51 @@ function JobDetail({ job }: { job: BulkJob }) {
               <tbody>
                 {(domains as BulkJobDomain[]).map(d => {
                   const pd = preview?.per_domain?.find((p: any) => p.domain_id === d.domain_id)
+                  const isExpanded = expandedDomain === d.domain_id
+                  const hasChanges = pd && pd.changes.length > 0
                   return (
-                    <tr key={d.id} style={styles.tr}>
-                      <td style={styles.td}>{d.fqdn}</td>
-                      <td style={styles.td}><StatusBadge status={d.status} /></td>
-                      <td style={styles.td}>
-                        {pd ? <span style={{ color: '#6b7280' }}>{pd.changes.length}</span> : '—'}
-                      </td>
-                      <td style={styles.td}>
-                        {d.error
-                          ? <span style={{ color: '#b91c1c', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: '.75rem' }}>{d.error}</span>
-                          : <span style={{ color: '#9ca3af' }}>—</span>}
-                      </td>
-                    </tr>
+                    <Fragment key={d.id}>
+                      <tr style={styles.tr}>
+                        <td style={styles.td}>{d.fqdn}</td>
+                        <td style={styles.td}><StatusBadge status={d.status} /></td>
+                        <td style={styles.td}>
+                          {hasChanges ? (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedDomain(isExpanded ? null : d.domain_id)}
+                              style={{ background: 'none', border: 'none', padding: 0, color: '#2563eb', cursor: 'pointer', fontSize: '.8125rem', textDecoration: 'underline dotted' }}
+                              title={isExpanded ? 'Hide details' : 'Show details'}
+                            >
+                              {isExpanded ? '▼' : '▶'} {pd.changes.length}
+                            </button>
+                          ) : '—'}
+                        </td>
+                        <td style={styles.td}>
+                          {d.error
+                            ? <span style={{ color: '#b91c1c', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace", fontSize: '.75rem' }}>{d.error}</span>
+                            : <span style={{ color: '#9ca3af' }}>—</span>}
+                        </td>
+                      </tr>
+                      {isExpanded && hasChanges && (
+                        <tr>
+                          <td colSpan={4} style={{ ...styles.td, background: '#f8fafc', padding: '.5rem .75rem' }}>
+                            <table style={{ width: '100%', fontSize: '.75rem', fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}>
+                              <tbody>
+                                {pd.changes.slice(0, 20).map((c: any, i: number) => (
+                                  <tr key={i}>
+                                    <td style={{ padding: '.125rem .5rem', color: c.op === 'delete' ? '#b91c1c' : c.op === 'add' ? '#15803d' : '#92400e', width: '5rem', textTransform: 'uppercase', fontSize: '.7rem', fontWeight: 600 }}>{c.op}</td>
+                                    <td style={{ padding: '.125rem .5rem', color: '#374151' }}>{JSON.stringify(c.record)}</td>
+                                  </tr>
+                                ))}
+                                {pd.changes.length > 20 && (
+                                  <tr><td colSpan={2} style={{ padding: '.25rem .5rem', color: '#6b7280', fontStyle: 'italic' }}>… and {pd.changes.length - 20} more</td></tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   )
                 })}
               </tbody>
@@ -377,7 +411,7 @@ export default function JobsPage() {
       qc.invalidateQueries({ queryKey: ['bulk-job-domains', jobId] })
       setStep('preview')
     } catch (err: any) {
-      setWizardError(err.response?.data?.message ?? err.message)
+      setWizardError(formatApiError(err))
     } finally {
       setBusy(false)
     }
@@ -392,7 +426,7 @@ export default function JobsPage() {
       qc.invalidateQueries({ queryKey: ['bulk-jobs'] })
       setStep('done')
     } catch (err: any) {
-      setWizardError(err.response?.data?.message ?? err.message)
+      setWizardError(formatApiError(err))
     } finally {
       setBusy(false)
     }

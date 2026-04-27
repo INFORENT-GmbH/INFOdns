@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useI18n } from '../i18n/I18nContext'
+import { useModalA11y } from '../hooks/useModalA11y'
 
 const MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
 
@@ -51,6 +52,7 @@ export default function DnssecModal({ fqdn, defaultTtl, dnssecDs, onDisable, dis
   const { t } = useI18n()
   const [copied, setCopied] = useState<string | null>(null)
   const [dsLine, setDsLine] = useState<string | null>(null)
+  const modalRef = useModalA11y<HTMLDivElement>(onClose)
 
   useEffect(() => {
     if (!dnssecDs) { setDsLine(null); return }
@@ -87,11 +89,12 @@ export default function DnssecModal({ fqdn, defaultTtl, dnssecDs, onDisable, dis
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}
       onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 8, padding: '1.5rem', width: 680, maxWidth: '100%', boxShadow: '0 8px 32px rgba(0,0,0,.18)', display: 'flex', flexDirection: 'column', gap: '1.25rem', animation: 'modal-in 0.12s ease' }}
-        onClick={e => e.stopPropagation()}>
+      <div ref={modalRef} style={{ background: '#fff', borderRadius: 8, padding: '1.5rem', width: 680, maxWidth: '100%', boxShadow: '0 8px 32px rgba(0,0,0,.18)', display: 'flex', flexDirection: 'column', gap: '1.25rem', animation: 'modal-in 0.12s ease' }}
+        onClick={e => e.stopPropagation()}
+        role="dialog" aria-modal="true" aria-labelledby="dnssec-modal-title" tabIndex={-1}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: '#111827' }}>{t('dnssec_title', fqdn)}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#6b7280', lineHeight: 1 }}>×</button>
+          <h3 id="dnssec-modal-title" style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: '#111827' }}>{t('dnssec_title', fqdn)}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.25rem', cursor: 'pointer', color: '#6b7280', lineHeight: 1 }} aria-label={t('close') ?? 'Close'}>×</button>
         </div>
 
         {dnssecDs ? (

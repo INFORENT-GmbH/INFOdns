@@ -10,6 +10,7 @@ import {
   type ImportRunResult,
   type ImportStatus,
 } from '../api/client'
+import { formatApiError } from '../lib/formError'
 
 // ── Status badge ──────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ export default function ImportPage() {
       setResults(res.data)
       setPhase('results')
     } catch (err: any) {
-      setRunError(err.response?.data?.message ?? err.message)
+      setRunError(formatApiError(err))
     } finally {
       setRunning(false)
     }
@@ -151,7 +152,7 @@ export default function ImportPage() {
   if (isLoading) return <div style={styles.muted}>Loading isp database…</div>
 
   if (isError) {
-    const msg = (error as any)?.response?.data?.message ?? (error as any)?.message ?? 'Unknown error'
+    const msg = formatApiError(error, 'Unknown error')
     return (
       <div>
         <p style={styles.errorText}>{msg}</p>

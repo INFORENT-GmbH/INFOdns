@@ -452,61 +452,92 @@ console.log('[worker] Starting INFORENT Prisma Worker')
 // Re-queue any zones missing their zone files (e.g. after redeploy)
 await requeueMissingZones()
 
+// Periodic background tasks. Tracked so SIGTERM can clear them all.
+const intervals: NodeJS.Timeout[] = []
+const safeInterval = (fn: () => void | Promise<void>, ms: number, label: string) => {
+  intervals.push(setInterval(() => {
+    if (!running) return
+    Promise.resolve(fn()).catch(err => console.error(`[worker] ${label} failed:`, err.message))
+  }, ms))
+}
+
 // Initial conf sync, then every 60s
 await syncNamedConf()
-setInterval(syncNamedConf, 60_000)
+safeInterval(syncNamedConf, 60_000, 'syncNamedConf')
 
 // Domain lifecycle: reminders + hard purge, hourly
 await processDomainLifecycle()
-setInterval(processDomainLifecycle, 60 * 60 * 1000)
+safeInterval(processDomainLifecycle, 60 * 60 * 1000, 'processDomainLifecycle')
 
 // ALIAS refresh: re-queue domains with ALIAS records on a fixed interval
-setInterval(requeueAliasZones, ALIAS_REFRESH_INTERVAL_MS)
+safeInterval(requeueAliasZones, ALIAS_REFRESH_INTERVAL_MS, 'requeueAliasZones')
 
 // NS delegation check: all on startup, then split by status
 await checkNsDelegation(NS_RECORDS, 'all')
 // Pending/mismatch domains: every 15s (fast feedback when delegation is set)
-setInterval(() => checkNsDelegation(NS_RECORDS, 'pending').catch(err =>
-  console.error('[worker] checkNsDelegation (pending) failed:', err.message)
-), 15_000)
+safeInterval(() => checkNsDelegation(NS_RECORDS, 'pending'), 15_000, 'checkNsDelegation (pending)')
 // Ok domains: every 5 minutes (steady-state confirmation)
-setInterval(() => checkNsDelegation(NS_RECORDS, 'ok').catch(err =>
-  console.error('[worker] checkNsDelegation (ok) failed:', err.message)
-), 5 * 60 * 1000)
+safeInterval(() => checkNsDelegation(NS_RECORDS, 'ok'), 5 * 60 * 1000, 'checkNsDelegation (ok)')
 
 // DNSSEC check: DNSKEY visibility in public DNS
 await checkDnssec('all')
 // Pending/broken: every 30s (DNSKEY propagation takes time after signing)
-setInterval(() => checkDnssec('pending').catch(err =>
-  console.error('[worker] checkDnssec (pending) failed:', err.message)
-), 30_000)
+safeInterval(() => checkDnssec('pending'), 30_000, 'checkDnssec (pending)')
 // Ok domains: every 10 minutes (steady-state confirmation)
-setInterval(() => checkDnssec('ok').catch(err =>
-  console.error('[worker] checkDnssec (ok) failed:', err.message)
-), 10 * 60 * 1000)
+safeInterval(() => checkDnssec('ok'), 10 * 60 * 1000, 'checkDnssec (ok)')
 
-// Poll loop
-;(async function loop() {
+// Graceful shutdown plumbing — declared before the loop so the loop's sleep can register wakeups.
+const shutdownWakeups: Array<() => void> = []
+let shuttingDown = false
+
+// Poll loop. Promise resolves once the loop exits, so shutdown can await it.
+const loopFinished = (async function loop() {
   while (running) {
     try {
       await poll()
+      if (!running) break
       await pollBulkJobs()
+      if (!running) break
       await pollMailQueue()
+      if (!running) break
       await pollImap()
     } catch (err: any) {
       console.error('[worker] Poll error:', err.message)
     }
-    await new Promise(r => setTimeout(r, POLL_INTERVAL_MS))
+    if (!running) break
+    // Sleep, but wake immediately on shutdown so we don't add up to POLL_INTERVAL_MS of latency.
+    await new Promise<void>(resolve => {
+      const t = setTimeout(resolve, POLL_INTERVAL_MS)
+      shutdownWakeups.push(() => { clearTimeout(t); resolve() })
+    })
   }
-  await pool.end()
-  console.log('[worker] Shut down cleanly')
 })()
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('[worker] SIGTERM received — finishing current job then exiting')
+async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return
+  shuttingDown = true
+  console.log(`[worker] ${signal} received — clearing timers and finishing current job`)
   running = false
-})
-process.on('SIGINT', () => {
-  running = false
-})
+  for (const id of intervals) clearInterval(id)
+  while (shutdownWakeups.length) shutdownWakeups.shift()!()
+
+  // Force exit after 30s so a hung job doesn't block container shutdown.
+  const force = setTimeout(() => {
+    console.error('[worker] Shutdown timeout — forcing exit')
+    process.exit(1)
+  }, 30_000)
+  force.unref()
+
+  try {
+    await loopFinished
+    await pool.end()
+    console.log('[worker] Shut down cleanly')
+    process.exit(0)
+  } catch (err: any) {
+    console.error('[worker] Shutdown error:', err.message)
+    process.exit(1)
+  }
+}
+
+process.on('SIGTERM', () => { void shutdown('SIGTERM') })
+process.on('SIGINT', () => { void shutdown('SIGINT') })

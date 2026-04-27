@@ -4,6 +4,7 @@ import {
   getRegistrars, createRegistrar, updateRegistrar, deleteRegistrar,
   type Registrar,
 } from '../api/client'
+import { formatApiError } from '../lib/formError'
 
 type EditState = Partial<Omit<Registrar, 'created_at' | 'updated_at'>>
 const EMPTY: EditState = { code: '', name: '', url: '', notes: '' }
@@ -71,7 +72,7 @@ export default function RegistrarsPage() {
       setEditCode(null)
       setAdding(false)
     } catch (err: any) {
-      setError(err.response?.data?.message ?? err.message)
+      setError(formatApiError(err))
     } finally {
       setSaving(false)
     }
@@ -84,7 +85,7 @@ export default function RegistrarsPage() {
       await deleteRegistrar(code)
       qc.invalidateQueries({ queryKey: ['registrars'] })
     } catch (err: any) {
-      setError(err.response?.data?.message ?? err.message)
+      setError(formatApiError(err))
     }
   }
 

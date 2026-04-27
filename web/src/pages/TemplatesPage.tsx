@@ -9,6 +9,7 @@ import {
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
 import Select from '../components/Select'
+import { formatApiError } from '../lib/formError'
 
 const RECORD_TYPES = ['A','AAAA','CNAME','MX','NS','TXT','SRV','CAA','PTR','NAPTR','TLSA','SSHFP','DS','ALIAS']
 const MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
@@ -156,7 +157,7 @@ export default function TemplatesPage() {
       qc.invalidateQueries({ queryKey: ['templates'] })
       setEdits({}); setPendingDeletes(new Set()); setNewRows([])
     } catch (err: any) {
-      setApplyError(err.response?.data?.message ?? err.message)
+      setApplyError(formatApiError(err))
     } finally {
       setApplying(false)
     }
@@ -189,7 +190,7 @@ export default function TemplatesPage() {
       setNewName(''); setNewDesc(''); setNewTenantId('')
       setSelectedId(res.data.id)
     } catch (err: any) {
-      setCreateError(err.response?.data?.message ?? err.message)
+      setCreateError(formatApiError(err))
     } finally {
       setCreating(false)
     }

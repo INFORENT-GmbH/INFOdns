@@ -41,8 +41,18 @@ export function broadcast(event: WsEvent): void {
   if (clients.size === 0) return
   const msg = JSON.stringify(event)
   for (const [ws, info] of clients) {
-    if (ws.readyState === 1 /* OPEN */ && shouldReceive(event, info)) {
+    if (ws.readyState !== 1 /* OPEN */) {
+      // Socket already closed/closing — drop it so we don't keep retrying.
+      clients.delete(ws)
+      continue
+    }
+    if (!shouldReceive(event, info)) continue
+    try {
       ws.send(msg)
+    } catch (err: any) {
+      console.warn(`[ws] broadcast send failed (sub=${info.sub}): ${err.message}`)
+      clients.delete(ws)
+      try { ws.terminate() } catch { /* ignore */ }
     }
   }
 }

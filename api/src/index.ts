@@ -29,7 +29,20 @@ const app = Fastify({ logger: true, trustProxy: true })
 await app.register(fhelmet, { global: true })
 await app.register(fcookie)
 await app.register(fjwt, { secret: process.env.JWT_SECRET! })
-await app.register(fws)
+// handleProtocols echoes back one of the client's offered sub-protocols so the
+// WS handshake succeeds. We carry the access token in Sec-WebSocket-Protocol
+// (see api/src/ws/routes.ts) instead of a query string to keep tokens out of
+// nginx access logs and Referer headers.
+await app.register(fws, {
+  options: {
+    handleProtocols: (protocols: Set<string>) => {
+      if (protocols.has('bearer')) return 'bearer'
+      // Single-element fallback (the JWT itself). Echo it so the browser accepts.
+      const first = protocols.values().next().value
+      return first ?? false
+    },
+  },
+})
 await app.register(fmultipart, {
   limits: { fileSize: 20 * 1024 * 1024, files: 20 },
 })

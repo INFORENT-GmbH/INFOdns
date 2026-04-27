@@ -4,6 +4,7 @@ import { getUsers, createUser, updateUser, inviteUser, getInvites, revokeInvite,
 import Select from '../components/Select'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
+import { formatApiError } from '../lib/formError'
 
 const INLINE_STYLES = `
   .user-row { transition: background 0.08s; }
@@ -94,7 +95,7 @@ export default function UsersPage() {
       qc.invalidateQueries({ queryKey: ['users'] })
       setEditingId(null)
     } catch (err: any) {
-      setEditError(err.response?.data?.message ?? err.message)
+      setEditError(formatApiError(err))
     } finally {
       setEditSaving(false)
     }
@@ -111,7 +112,7 @@ export default function UsersPage() {
       setInviteTenantIds([])
       setShowInviteForm(false)
     } catch (err: any) {
-      setInviteError(err.response?.data?.message ?? err.message)
+      setInviteError(formatApiError(err))
     } finally {
       setInviting(false)
     }
@@ -135,7 +136,7 @@ export default function UsersPage() {
       setForm({ email: '', password: '', full_name: '', role: 'tenant', locale: 'de', phone: '', street: '', zip: '', city: '', country: '' })
       setSelectedTenantIds([])
     } catch (err: any) {
-      setError(err.response?.data?.message ?? err.message)
+      setError(formatApiError(err))
     } finally {
       setSaving(false)
     }

@@ -5,6 +5,7 @@ import {
   type TldPricing,
 } from '../api/client'
 import Select from '../components/Select'
+import { formatApiError } from '../lib/formError'
 
 const REGISTRARS = ['', 'CN', 'MARCARIA', 'UD', 'UDR'] as const
 
@@ -135,7 +136,7 @@ export default function TldPricingPage() {
       setEditZone(null)
       setAdding(false)
     } catch (err: any) {
-      setError(err.response?.data?.message ?? err.message)
+      setError(formatApiError(err))
     } finally {
       setSaving(false)
     }
@@ -148,7 +149,7 @@ export default function TldPricingPage() {
       await deleteTldPricing(zone)
       qc.invalidateQueries({ queryKey: ['tld-pricing'] })
     } catch (err: any) {
-      setError(err.response?.data?.message ?? err.message)
+      setError(formatApiError(err))
     }
   }
 

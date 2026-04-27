@@ -2,6 +2,8 @@ import { useState, useEffect, type FormEvent } from 'react'
 import Select from './Select'
 import { type DnsRecord } from '../api/client'
 import { useI18n } from '../i18n/I18nContext'
+import { formatApiError } from '../lib/formError'
+import { useModalA11y } from '../hooks/useModalA11y'
 
 const RECORD_TYPES = ['A', 'AAAA', 'CNAME', 'MX', 'NS', 'TXT', 'SRV', 'CAA', 'PTR', 'TLSA', 'SSHFP', 'DS', 'NAPTR']
 
@@ -20,6 +22,7 @@ export default function RecordModal({ record, onSave, onClose }: Props) {
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const modalRef = useModalA11y<HTMLFormElement>(onClose)
 
   useEffect(() => {
     if (record) setForm(record)
@@ -37,7 +40,7 @@ export default function RecordModal({ record, onSave, onClose }: Props) {
       await onSave(form)
       onClose()
     } catch (err: any) {
-      setError(err.response?.data?.message ?? err.message)
+      setError(formatApiError(err))
     } finally {
       setSaving(false)
     }
@@ -48,8 +51,9 @@ export default function RecordModal({ record, onSave, onClose }: Props) {
 
   return (
     <div style={styles.overlay} onClick={onClose}>
-      <form style={styles.modal} onClick={e => e.stopPropagation()} onSubmit={handleSubmit}>
-        <h3 style={styles.title}>{isEdit ? t('modal_editRecord') : t('modal_addRecord')}</h3>
+      <form ref={modalRef} style={styles.modal} onClick={e => e.stopPropagation()} onSubmit={handleSubmit}
+            role="dialog" aria-modal="true" aria-labelledby="record-modal-title" tabIndex={-1}>
+        <h3 id="record-modal-title" style={styles.title}>{isEdit ? t('modal_editRecord') : t('modal_addRecord')}</h3>
 
         {error && <div style={styles.error}>{error}</div>}
 

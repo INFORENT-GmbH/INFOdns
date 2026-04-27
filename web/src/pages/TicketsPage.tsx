@@ -5,6 +5,7 @@ import { getTickets, getUsers, createTicket, uploadAttachments, type Ticket } fr
 import Select from '../components/Select'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
+import { formatApiError } from '../lib/formError'
 
 const LIMIT = 50
 
@@ -99,7 +100,7 @@ export default function TicketsPage() {
       setCreateFiles([])
       setShowCreate(false)
     } catch (err: any) {
-      setCreateError(err.response?.data?.message ?? 'Error')
+      setCreateError(formatApiError(err))
     } finally {
       setCreating(false)
     }
