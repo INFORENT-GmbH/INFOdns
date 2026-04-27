@@ -49,22 +49,30 @@ function WarnPill({ label, value, color = '#dc2626' }: { label: string; value: n
   )
 }
 
-function ZoneBadge({ status, suspended }: { status: string; suspended: boolean }) {
+const ZONE_BADGE_LABELS: Record<string, 'zone_clean' | 'zone_dirty' | 'zone_error' | 'zone_suspended'> = {
+  clean:     'zone_clean',
+  dirty:     'zone_dirty',
+  error:     'zone_error',
+  suspended: 'zone_suspended',
+}
+
+function ZoneBadge({ status, suspended, t }: { status: string; suspended: boolean; t: (k: any) => string }) {
   const key = suspended ? 'suspended' : status
-  const cfg: Record<string, { color: string; bg: string; label: string; spin?: boolean }> = {
-    clean:     { color: '#15803d', bg: '#dcfce7', label: 'clean' },
-    dirty:     { color: '#92400e', bg: '#fef3c7', label: 'dirty', spin: true },
-    error:     { color: '#991b1b', bg: '#fee2e2', label: 'error' },
-    suspended: { color: '#374151', bg: '#f3f4f6', label: 'suspended' },
+  const cfg: Record<string, { color: string; bg: string; spin?: boolean }> = {
+    clean:     { color: '#15803d', bg: '#dcfce7' },
+    dirty:     { color: '#92400e', bg: '#fef3c7', spin: true },
+    error:     { color: '#991b1b', bg: '#fee2e2' },
+    suspended: { color: '#374151', bg: '#f3f4f6' },
   }
   const c = cfg[key]
   if (!c) return null
+  const labelKey = ZONE_BADGE_LABELS[key]
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '.75rem', fontWeight: 500, color: c.color, background: c.bg, borderRadius: 3, padding: '1px 6px', whiteSpace: 'nowrap' }}>
       {c.spin
         ? <span style={{ display: 'inline-block', width: '0.5em', height: '0.5em', border: '1.5px solid #ca8a04', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
         : <span style={{ fontSize: '.4rem' }}>●</span>}
-      {c.label}
+      {labelKey ? t(labelKey) : key}
     </span>
   )
 }
@@ -162,18 +170,18 @@ export default function DomainsTableView({
 
       {/* Stats bar */}
       <div style={{ ...s.filterBar, gap: '.5rem', flexShrink: 0 }}>
-        <StatPill label="domains" value={stats?.total} />
+        <StatPill label={t('dashboard_domains').toLowerCase()} value={stats?.total} />
         {stats && stats.active > 0 && (
-          <span style={{ fontSize: '.8125rem', color: '#64748b' }}>{stats.active} active</span>
+          <span style={{ fontSize: '.8125rem', color: '#64748b' }}>{stats.active} {t('dashboard_active').toLowerCase()}</span>
         )}
         {stats && stats.suspended > 0 && (
-          <WarnPill label="suspended" value={stats.suspended} color="#d97706" />
+          <WarnPill label={t('dashboard_suspended').toLowerCase()} value={stats.suspended} color="#d97706" />
         )}
-        <WarnPill label="zone errors" value={stats?.zone_error} />
-        <WarnPill label="dirty" value={stats?.zone_dirty} color="#d97706" />
-        <WarnPill label="NS issues" value={stats?.ns_not_ok} />
+        <WarnPill label={t('dashboard_zoneErrors').toLowerCase()} value={stats?.zone_error} />
+        <WarnPill label={t('dashboard_dirtyZones').toLowerCase()} value={stats?.zone_dirty} color="#d97706" />
+        <WarnPill label={t('dashboard_nsIssues').toLowerCase()} value={stats?.ns_not_ok} />
         {stats && stats.dnssec_enabled > 0 && (
-          <span style={{ fontSize: '.8125rem', color: '#64748b' }}>{stats.dnssec_enabled} DNSSEC</span>
+          <span style={{ fontSize: '.8125rem', color: '#64748b' }}>{stats.dnssec_enabled} {t('dashboard_dnssec')}</span>
         )}
       </div>
 
@@ -295,18 +303,18 @@ export default function DomainsTableView({
             <div style={{ width: 18, height: 18, border: '2px solid #e2e8f0', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
           </div>
         ) : domains.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>No domains found</div>
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>{t('domains_noneFound')}</div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr>
-                <SortTh label="Domain" col="fqdn" sort={sort} setSort={setSort} />
-                <SortTh label="Zone" col="zone_status" sort={sort} setSort={setSort} />
+                <SortTh label={t('domain')} col="fqdn" sort={sort} setSort={setSort} />
+                <SortTh label={t('domains_zone')} col="zone_status" sort={sort} setSort={setSort} />
                 <SortTh label="NS" col="ns_ok" sort={sort} setSort={setSort} />
-                <SortTh label="DNSSEC" col="dnssec_enabled" sort={sort} setSort={setSort} />
-                <SortTh label="Status" col="status" sort={sort} setSort={setSort} />
-                <SortTh label="Tenant" col="tenant_name" sort={sort} setSort={setSort} />
-                <th style={s.th}>Labels</th>
+                <SortTh label={t('dashboard_dnssec')} col="dnssec_enabled" sort={sort} setSort={setSort} />
+                <SortTh label={t('status')} col="status" sort={sort} setSort={setSort} />
+                <SortTh label={t('tenant')} col="tenant_name" sort={sort} setSort={setSort} />
+                <th style={s.th}>{t('domains_labels')}</th>
               </tr>
             </thead>
             <tbody>
@@ -328,7 +336,7 @@ export default function DomainsTableView({
                       )}
                     </td>
                     <td style={s.td}>
-                      <ZoneBadge status={d.zone_status} suspended={suspended} />
+                      <ZoneBadge status={d.zone_status} suspended={suspended} t={t} />
                     </td>
                     <td style={s.td}>
                       {d.ns_ok === 0
@@ -344,8 +352,8 @@ export default function DomainsTableView({
                     </td>
                     <td style={s.td}>
                       {suspended
-                        ? <span style={{ fontSize: '.75rem', fontWeight: 500, color: '#92400e', background: '#fef3c7', borderRadius: 3, padding: '1px 6px' }}>suspended</span>
-                        : <span style={{ color: '#6b7280', fontSize: '.8125rem' }}>active</span>}
+                        ? <span style={{ fontSize: '.75rem', fontWeight: 500, color: '#92400e', background: '#fef3c7', borderRadius: 3, padding: '1px 6px' }}>{t('domains_suspended')}</span>
+                        : <span style={{ color: '#6b7280', fontSize: '.8125rem' }}>{t('active').toLowerCase()}</span>}
                     </td>
                     <td style={{ ...s.td, color: '#6b7280' }}>{d.tenant_name ?? '—'}</td>
                     <td style={s.td}>
