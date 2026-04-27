@@ -58,7 +58,7 @@ const INLINE_STYLES = `
     padding: .25rem .5rem; border-radius: 4px; border: 1px solid #1e293b;
     white-space: nowrap; width: max-content; max-width: 200px;
     pointer-events: none; opacity: 0;
-    z-index: 30;
+    z-index: 100;
   }
   .tip:hover::after { opacity: 1; }
 `

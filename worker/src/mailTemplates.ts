@@ -31,7 +31,7 @@ function wrap(title: string, bodyHtml: string): string {
 <body>
 <div class="outer">
 <div class="card">
-  <div class="hdr"><img src="${process.env.APP_PUBLIC_URL ?? ''}/logo-wide.png" alt="INFOdns"></div>
+  <div class="hdr"><img src="${process.env.APP_PUBLIC_URL ?? ''}/inforent-original-logo.png" alt="INFOdns"></div>
   <div class="body">${bodyHtml}</div>
   <div class="ftr">&copy; 1988&ndash;2026 INFORENT GmbH</div>
 </div>

@@ -140,7 +140,7 @@ export default function Layout() {
           </button>
         )}
         <a href="/domains" style={{ display: 'flex', alignItems: 'center', marginRight: isMobile ? 'auto' : undefined }}>
-          <img src="/logo.png" alt="INFOdns" style={styles.logo} />
+          <img src="/inforent-original-logo.png" alt="INFORENT" style={styles.logo} />
         </a>
 
         {!isMobile && <div style={{ flex: 1 }} />}
