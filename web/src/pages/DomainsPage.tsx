@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useMatch } from 'react-router-dom'
 import { type Domain, type LabelSuggestion, type Tenant } from '../api/client'
 import LabelChip from '../components/LabelChip'
+import Tooltip from '../components/Tooltip'
 import { useI18n } from '../i18n/I18nContext'
 import { getDirtyDomainFqdns, subscribe } from '../hooks/domainEditCache'
 
@@ -40,27 +41,16 @@ const spinnerDotStyle: React.CSSProperties = {
 function ZoneStatusDot({ status, suspended }: { status: string; suspended: boolean }) {
   const key = suspended ? 'suspended' : status
   if (!key) return null
-  if (key === 'dirty') return <span className="tip" data-tip="Zone dirty" style={spinnerDotStyle} />
+  if (key === 'dirty') return <Tooltip tip="Zone dirty" style={spinnerDotStyle} />
   const color = zoneStatusDotColors[key]
   if (!color) return null
-  return <span className="tip" data-tip={`Zone ${key}`} style={{ fontSize: '.45rem', color, flexShrink: 0, lineHeight: 1, cursor: 'default' }}>●</span>
+  return <Tooltip tip={`Zone ${key}`} style={{ fontSize: '.45rem', color, flexShrink: 0, lineHeight: 1, cursor: 'default' }}>●</Tooltip>
 }
 
 const INLINE_STYLES = `
   .condensed-row { transition: background 0.08s; }
   .condensed-row:hover { background: #e8f0fe !important; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .tip { position: relative; display: inline-block; }
-  .tip::after {
-    content: attr(data-tip);
-    position: absolute; bottom: calc(100% + 5px); left: 50%; transform: translateX(-50%);
-    background: #0f172a; color: #f8fafc; font-size: .7rem; font-weight: 400;
-    padding: .25rem .5rem; border-radius: 4px; border: 1px solid #1e293b;
-    white-space: nowrap; width: max-content; max-width: 200px;
-    pointer-events: none; opacity: 0;
-    z-index: 100;
-  }
-  .tip:hover::after { opacity: 1; }
 `
 
 export default function DomainsPage({
@@ -264,7 +254,7 @@ export default function DomainsPage({
                   )}
                 </span>
                 {d.ns_ok === 0 && (
-                  <span className="tip" data-tip={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#dc2626', flexShrink: 0, cursor: 'default' }}>⚠</span>
+                  <Tooltip tip={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#dc2626', flexShrink: 0, cursor: 'default' }}>⚠</Tooltip>
                 )}
                 {dirtyDomainIds.has(d.fqdn) && (
                   <span style={{ color: '#f59e0b', fontSize: '.45rem', flexShrink: 0, lineHeight: 1 }} title="Unsaved changes">●</span>
