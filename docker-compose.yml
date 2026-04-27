@@ -24,14 +24,12 @@ services:
     ports:
       - "3306:3306"
 
-  # PHPMYADMIN with auto login on port 8080
+  # phpMyAdmin on port 8080 (login form — no auto-login)
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
     restart: unless-stopped
     environment:
       PMA_HOST: db
-      PMA_USER: root
-      PMA_PASSWORD: ${DB_ROOT_PASSWORD}
     ports:
       - "8080:80"
     networks:
