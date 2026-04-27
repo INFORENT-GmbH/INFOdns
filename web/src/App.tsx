@@ -36,7 +36,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, ready } = useAuth()
   if (!ready) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#9ca3af', fontSize: '.875rem' }}>
-      INFOdns
+      INFORENT Prisma
     </div>
   )
   if (!user) return <Navigate to="/login" replace />

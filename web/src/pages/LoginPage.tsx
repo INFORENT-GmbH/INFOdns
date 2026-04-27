@@ -33,7 +33,7 @@ export default function LoginPage() {
         {locale === 'de' ? 'EN' : 'DE'}
       </button>
       <form onSubmit={handleSubmit} style={styles.card}>
-        <img src="/logo.png" alt="INFOdns" style={styles.logo} />
+        <img src="/inforent-original-logo.png" alt="INFORENT Prisma" style={styles.logo} />
         {error && <div style={styles.error}>{error}</div>}
         <label style={styles.label}>
           {t('login_email')}

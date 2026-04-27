@@ -1,4 +1,4 @@
-# INFOdns — AI Contributor Instructions
+# INFORENT Prisma — AI Contributor Instructions
 
 These instructions apply to GitHub Copilot, Claude Code, and any other AI assistant working in this repository.
 

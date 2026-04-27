@@ -31,7 +31,7 @@ function wrap(title: string, bodyHtml: string): string {
 <body>
 <div class="outer">
 <div class="card">
-  <div class="hdr"><img src="${process.env.APP_PUBLIC_URL ?? ''}/inforent-original-logo.png" alt="INFOdns"></div>
+  <div class="hdr"><img src="${process.env.APP_PUBLIC_URL ?? ''}/inforent-original-logo.png" alt="INFORENT Prisma"></div>
   <div class="body">${bodyHtml}</div>
   <div class="ftr">&copy; 1988&ndash;2026 INFORENT GmbH</div>
 </div>
@@ -62,8 +62,8 @@ function loginNotification(locale: Locale, p: LoginPayload): MailContent {
   const isEn = locale === 'en'
 
   const subject = isEn
-    ? 'New login to your INFOdns account'
-    : 'Neue Anmeldung in Ihrem INFOdns-Konto'
+    ? 'New login to your INFORENT Prisma account'
+    : 'Neue Anmeldung in Ihrem INFORENT Prisma-Konto'
 
   const heading = isEn ? 'New sign-in detected' : 'Neue Anmeldung erkannt'
   const intro = isEn
@@ -104,7 +104,7 @@ interface ZoneDeploySuccessPayload {
 }
 
 function zoneDeploySuccess(_locale: Locale, p: ZoneDeploySuccessPayload): MailContent {
-  const subject = `[INFOdns] Zone deployed: ${p.fqdn}`
+  const subject = `[INFORENT Prisma] Zone deployed: ${p.fqdn}`
   const bodyHtml = `<h2>Zone deployed successfully</h2>` +
     infoTable([
       ['Domain', p.fqdn],
@@ -126,7 +126,7 @@ interface ZoneDeployFailedPayload {
 }
 
 function zoneDeployFailed(_locale: Locale, p: ZoneDeployFailedPayload): MailContent {
-  const subject = `[INFOdns] Zone deploy FAILED: ${p.fqdn}`
+  const subject = `[INFORENT Prisma] Zone deploy FAILED: ${p.fqdn}`
   const bodyHtml = `<h2 style="color:#b91c1c;">Zone deployment failed</h2>` +
     infoTable([
       ['Domain', p.fqdn],
@@ -150,16 +150,16 @@ function userInvite(locale: Locale, p: UserInvitePayload): MailContent {
   const isEn = locale === 'en'
 
   const subject = isEn
-    ? 'You have been invited to INFOdns'
-    : 'Sie wurden zu INFOdns eingeladen'
+    ? 'You have been invited to INFORENT Prisma'
+    : 'Sie wurden zu INFORENT Prisma eingeladen'
 
   const greeting = p.full_name
     ? (isEn ? `Hello ${esc(p.full_name)},` : `Hallo ${esc(p.full_name)},`)
     : (isEn ? 'Hello,' : 'Hallo,')
 
   const intro = isEn
-    ? 'You have been invited to access <strong>INFOdns</strong>. Click the button below to set your password and activate your account.'
-    : 'Sie wurden eingeladen, auf <strong>INFOdns</strong> zuzugreifen. Klicken Sie auf die Schaltfläche unten, um Ihr Passwort festzulegen und Ihr Konto zu aktivieren.'
+    ? 'You have been invited to access <strong>INFORENT Prisma</strong>. Click the button below to set your password and activate your account.'
+    : 'Sie wurden eingeladen, auf <strong>INFORENT Prisma</strong> zuzugreifen. Klicken Sie auf die Schaltfläche unten, um Ihr Passwort festzulegen und Ihr Konto zu aktivieren.'
 
   const buttonLabel = isEn ? 'Accept invitation' : 'Einladung annehmen'
   const expiry = isEn ? 'This link expires in 7 days.' : 'Dieser Link läuft in 7 Tagen ab.'
@@ -268,7 +268,7 @@ interface TicketAssignedPayload {
 
 function ticketAssigned(_locale: Locale, p: TicketAssignedPayload): MailContent {
   const ref = `[#${p.ticketId}]`
-  const subject = `[INFOdns Support] Ticket ${ref} assigned to you`
+  const subject = `[INFORENT Prisma Support] Ticket ${ref} assigned to you`
 
   const bodyHtml = `<h2>Ticket assigned to you</h2>
 <p>A support ticket has been assigned to you.</p>
@@ -297,7 +297,7 @@ interface TicketNewAdminPayload {
 
 function ticketNewAdmin(_locale: Locale, p: TicketNewAdminPayload): MailContent {
   const ref = `[#${p.ticketId}]`
-  const subject = `[INFOdns Support] New ticket ${ref}: ${p.subject}`
+  const subject = `[INFORENT Prisma Support] New ticket ${ref}: ${p.subject}`
 
   const bodyHtml = `<h2>New support ticket</h2>
 <p>A new support ticket has been submitted.</p>
@@ -324,7 +324,7 @@ interface DomainDeletedPayload {
 }
 
 function domainDeleted(_locale: Locale, p: DomainDeletedPayload): MailContent {
-  const subject = `[INFOdns] Domain deleted: ${p.fqdn}`
+  const subject = `[INFORENT Prisma] Domain deleted: ${p.fqdn}`
 
   const bodyHtml = `<h2 style="color:#b91c1c;">Domain soft-deleted</h2>
 <p>A domain has been soft-deleted and will be permanently purged if not restored.</p>
@@ -334,7 +334,7 @@ ${infoTable([
   ['Deleted on', p.deletedAt],
   ['Purge date', p.purgeDate],
 ])}
-<p>Log in to INFOdns to restore the domain before the purge date.</p>`
+<p>Log in to INFORENT Prisma to restore the domain before the purge date.</p>`
 
   const text = [
     subject, '',
@@ -352,7 +352,7 @@ interface NsDelegationOkPayload {
 }
 
 function nsDelegationOk(_locale: Locale, p: NsDelegationOkPayload): MailContent {
-  const subject = `[INFOdns] NS delegation OK: ${p.fqdn}`
+  const subject = `[INFORENT Prisma] NS delegation OK: ${p.fqdn}`
   const bodyHtml = `<h2 style="color:#15803d;">NS delegation confirmed</h2>
 <p>The name servers for the following domain now correctly point to this DNS service.</p>
 ${infoTable([['Domain', p.fqdn]])}`
@@ -367,7 +367,7 @@ interface NsDelegationBrokenPayload {
 }
 
 function nsDelegationBroken(_locale: Locale, p: NsDelegationBrokenPayload): MailContent {
-  const subject = `[INFOdns] NS delegation BROKEN: ${p.fqdn}`
+  const subject = `[INFORENT Prisma] NS delegation BROKEN: ${p.fqdn}`
   const bodyHtml = `<h2 style="color:#b91c1c;">NS delegation lost</h2>
 <p>The name servers for the following domain no longer point to this DNS service.</p>
 ${infoTable([['Domain', p.fqdn]])}
@@ -387,7 +387,7 @@ interface DomainPurgeReminderPayload {
 
 function domainPurgeReminder(_locale: Locale, p: DomainPurgeReminderPayload): MailContent {
   const urgent = p.daysRemaining <= 3
-  const subject = `[INFOdns] ${urgent ? 'URGENT: ' : ''}Domain purge in ${p.daysRemaining} day${p.daysRemaining === 1 ? '' : 's'}: ${p.fqdn}`
+  const subject = `[INFORENT Prisma] ${urgent ? 'URGENT: ' : ''}Domain purge in ${p.daysRemaining} day${p.daysRemaining === 1 ? '' : 's'}: ${p.fqdn}`
 
   const bodyHtml = `<h2 style="color:${urgent ? '#b91c1c' : '#b45309'};">Permanent deletion reminder</h2>
 <p>The following domain is scheduled for permanent deletion. All DNS records will be lost.</p>
@@ -397,12 +397,12 @@ ${infoTable([
   ['Days remaining', String(p.daysRemaining)],
   ['Purge date', p.purgeDate],
 ])}
-<p>${urgent ? '<strong>Action required:</strong> ' : ''}Log in to INFOdns and restore the domain before ${p.purgeDate} to prevent permanent data loss.</p>`
+<p>${urgent ? '<strong>Action required:</strong> ' : ''}Log in to INFORENT Prisma and restore the domain before ${p.purgeDate} to prevent permanent data loss.</p>`
 
   const text = [
     subject, '',
     `Domain ${p.fqdn} (deleted ${p.deletedAt}) will be permanently deleted in ${p.daysRemaining} day${p.daysRemaining === 1 ? '' : 's'} on ${p.purgeDate}.`,
-    'Log in to INFOdns to restore it before then.',
+    'Log in to INFORENT Prisma to restore it before then.',
   ].join('\n')
 
   return { subject, html: wrap(subject, bodyHtml), text }
@@ -415,7 +415,7 @@ interface DnssecOkPayload {
 }
 
 function dnssecOk(_locale: Locale, p: DnssecOkPayload): MailContent {
-  const subject = `[INFOdns] DNSSEC OK: ${p.fqdn}`
+  const subject = `[INFORENT Prisma] DNSSEC OK: ${p.fqdn}`
   const bodyHtml = `<h2 style="color:#15803d;">DNSSEC signing confirmed</h2>
 <p>The DNSKEY record for the following domain is now visible in public DNS.</p>
 ${infoTable([['Domain', p.fqdn]])}`
@@ -430,7 +430,7 @@ interface DnssecBrokenPayload {
 }
 
 function dnssecBroken(_locale: Locale, p: DnssecBrokenPayload): MailContent {
-  const subject = `[INFOdns] DNSSEC BROKEN: ${p.fqdn}`
+  const subject = `[INFORENT Prisma] DNSSEC BROKEN: ${p.fqdn}`
   const bodyHtml = `<h2 style="color:#b91c1c;">DNSSEC signing lost</h2>
 <p>The DNSKEY record for the following domain is no longer visible in public DNS.</p>
 ${infoTable([['Domain', p.fqdn]])}

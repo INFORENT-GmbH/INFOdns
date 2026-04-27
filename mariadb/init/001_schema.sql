@@ -1,4 +1,4 @@
--- INFOdns schema
+-- INFORENT Prisma schema
 -- All timestamps UTC, all tables utf8mb4 InnoDB
 
 SET NAMES utf8mb4;

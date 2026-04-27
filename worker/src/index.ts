@@ -447,7 +447,7 @@ async function requeueAliasZones(): Promise<void> {
 
 // ── Entry point ───────────────────────────────────────────────
 
-console.log('[worker] Starting INFOdns Worker')
+console.log('[worker] Starting INFORENT Prisma Worker')
 
 // Re-queue any zones missing their zone files (e.g. after redeploy)
 await requeueMissingZones()

@@ -1,4 +1,4 @@
-# INFOdns — Claude Context
+# INFORENT Prisma — Claude Context
 
 ## What this is
 

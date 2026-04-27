@@ -1,4 +1,4 @@
-# INFOdns
+# INFORENT Prisma
 
 An internal DNS management panel modelled on AutoDNS. Staff and tenants manage DNS records for many domains via a hidden primary BIND server that pushes zones to three public secondaries via AXFR/IXFR. The database is the single source of truth; zone files are always derived from it.
 

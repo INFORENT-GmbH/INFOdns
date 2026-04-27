@@ -62,7 +62,7 @@ export default function AcceptInvitePage() {
   return (
     <div style={styles.outer}>
       <div style={styles.card}>
-        <div style={styles.header}><h1 style={styles.logo}>INFOdns</h1></div>
+        <div style={styles.header}><h1 style={styles.logo}>INFORENT Prisma</h1></div>
         <div style={styles.body}>
           {status === 'loading' && <p style={styles.muted}>{t('loading')}</p>}
 
