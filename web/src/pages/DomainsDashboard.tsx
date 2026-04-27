@@ -1,13 +1,22 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { getDomainStats, type Domain } from '../api/client'
+import { getDomainStats, type Domain, type LabelSuggestion, type Tenant } from '../api/client'
 import LabelChip from '../components/LabelChip'
+import { useI18n } from '../i18n/I18nContext'
 import * as s from '../styles/shell'
 
 interface Props {
   domains: Domain[]
   isLoading: boolean
+  search: string
+  setSearch: (v: string) => void
+  labelFilter: string
+  setLabelFilter: (v: string) => void
+  labelSuggestions: LabelSuggestion[]
+  tenantFilter: number[]
+  setTenantFilter: (v: number[]) => void
+  tenants: Tenant[]
 }
 
 type SortKey = 'fqdn' | 'zone_status' | 'ns_ok' | 'dnssec_enabled' | 'status' | 'tenant_name'
@@ -74,9 +83,56 @@ function SortTh({ label, col, sort, setSort }: { label: string; col: SortKey; so
   )
 }
 
-export default function DomainsTableView({ domains, isLoading }: Props) {
+export default function DomainsTableView({
+  domains, isLoading,
+  search, setSearch,
+  labelFilter, setLabelFilter, labelSuggestions,
+  tenantFilter, setTenantFilter, tenants,
+}: Props) {
+  const { t } = useI18n()
   const navigate = useNavigate()
   const [sort, setSort] = useState<[SortKey, SortDir]>(['fqdn', 'asc'])
+
+  const [labelDropdownOpen, setLabelDropdownOpen] = useState(false)
+  const labelDropdownRef = useRef<HTMLDivElement>(null)
+  const [tenantDropdownOpen, setTenantDropdownOpen] = useState(false)
+  const [tenantSearch, setTenantSearch] = useState('')
+  const tenantDropdownRef = useRef<HTMLDivElement>(null)
+
+  function toggleTenant(id: number) {
+    setTenantFilter(tenantFilter.includes(id) ? tenantFilter.filter(x => x !== id) : [...tenantFilter, id])
+  }
+
+  const filteredTenants = tenants.filter(c =>
+    c.name.toLowerCase().includes(tenantSearch.toLowerCase())
+  )
+
+  function tenantButtonLabel(): string {
+    if (tenantFilter.length === 0) return t('domains_allTenants')
+    if (tenantFilter.length === 1) return tenants.find(c => c.id === tenantFilter[0])?.name ?? t('domains_allTenants')
+    return `${tenantFilter.length} ${t('domains_tenantsSelected')}`
+  }
+
+  useEffect(() => {
+    if (!labelDropdownOpen) return
+    const onDoc = (e: MouseEvent) => {
+      if (!labelDropdownRef.current?.contains(e.target as Node)) setLabelDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [labelDropdownOpen])
+
+  useEffect(() => {
+    if (!tenantDropdownOpen) return
+    const onDoc = (e: MouseEvent) => {
+      if (!tenantDropdownRef.current?.contains(e.target as Node)) {
+        setTenantDropdownOpen(false)
+        setTenantSearch('')
+      }
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [tenantDropdownOpen])
 
   const { data: stats } = useQuery({
     queryKey: ['domain-stats'],
@@ -118,6 +174,117 @@ export default function DomainsTableView({ domains, isLoading }: Props) {
         <WarnPill label="NS issues" value={stats?.ns_not_ok} />
         {stats && stats.dnssec_enabled > 0 && (
           <span style={{ fontSize: '.8125rem', color: '#64748b' }}>{stats.dnssec_enabled} DNSSEC</span>
+        )}
+      </div>
+
+      {/* Filter bar */}
+      <div style={{ ...s.filterBar, gap: '.5rem', flexShrink: 0, borderTop: 0 }}>
+        <input
+          placeholder={t('domains_searchPlaceholder')}
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={filterStyles.searchInput}
+        />
+
+        <div ref={labelDropdownRef} style={{ position: 'relative', minWidth: 200 }}>
+          <button
+            type="button"
+            onClick={() => setLabelDropdownOpen(v => !v)}
+            style={{
+              ...filterStyles.searchInput, width: '100%', boxSizing: 'border-box' as const,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              cursor: 'pointer', textAlign: 'left' as const,
+              outline: labelFilter ? '2px solid #2563eb' : undefined,
+            }}
+          >
+            {labelFilter
+              ? <LabelChip label={{ id: 0, key: labelFilter.includes('=') ? labelFilter.split('=')[0] : labelFilter, value: labelFilter.includes('=') ? labelFilter.split('=').slice(1).join('=') : '', color: labelSuggestions.find(sg => sg.key === (labelFilter.includes('=') ? labelFilter.split('=')[0] : labelFilter))?.color ?? null }} />
+              : <span style={{ color: '#9ca3af' }}>{t('domains_labelFilterPlaceholder')}</span>}
+            <span style={{ fontSize: '.65rem', color: '#9ca3af', marginLeft: 4 }}>{labelFilter ? '' : '▼'}</span>
+          </button>
+          {labelFilter && (
+            <button
+              onClick={() => { setLabelFilter(''); setLabelDropdownOpen(false) }}
+              style={{ ...filterStyles.btnClear, position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)' }}
+              title="Clear label filter"
+            >✕</button>
+          )}
+          {labelDropdownOpen && (
+            <div style={filterStyles.labelDropdown}>
+              {labelSuggestions.flatMap(sg => {
+                const items: { key: string; value: string; filter: string; color: string | null }[] = []
+                items.push({ key: sg.key, value: '', filter: sg.key, color: sg.color })
+                for (const v of sg.values) items.push({ key: sg.key, value: v, filter: `${sg.key}=${v}`, color: sg.color })
+                return items
+              }).map(item => (
+                <button
+                  key={item.filter}
+                  type="button"
+                  onMouseDown={e => { e.preventDefault(); setLabelFilter(item.filter); setLabelDropdownOpen(false) }}
+                  style={filterStyles.labelDropdownItem}
+                >
+                  <LabelChip label={{ id: 0, key: item.key, value: item.value, color: item.color }} />
+                </button>
+              ))}
+              {labelSuggestions.length === 0 && (
+                <div style={{ padding: '.5rem .75rem', color: '#9ca3af', fontSize: '.8rem' }}>{t('domains_noLabels')}</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {tenants.length > 1 && (
+          <div ref={tenantDropdownRef} style={{ position: 'relative', minWidth: 200 }}>
+            <button
+              type="button"
+              onClick={() => setTenantDropdownOpen(v => !v)}
+              style={{
+                ...filterStyles.searchInput, width: '100%', boxSizing: 'border-box' as const,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                cursor: 'pointer', textAlign: 'left' as const,
+                outline: tenantFilter.length > 0 ? '2px solid #2563eb' : undefined,
+              }}
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, color: tenantFilter.length > 0 ? '#111827' : '#9ca3af' }}>
+                {tenantButtonLabel()}
+              </span>
+              <span style={{ fontSize: '.65rem', color: '#9ca3af', marginLeft: 4, flexShrink: 0 }}>▼</span>
+            </button>
+            {tenantFilter.length > 0 && (
+              <button
+                onClick={() => { setTenantFilter([]); setTenantDropdownOpen(false); setTenantSearch('') }}
+                style={{ ...filterStyles.btnClear, position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)' }}
+                title="Clear"
+              >✕</button>
+            )}
+            {tenantDropdownOpen && (
+              <div style={filterStyles.labelDropdown}>
+                <div style={{ padding: '4px 8px 6px', borderBottom: '1px solid #f3f4f6' }}>
+                  <input
+                    value={tenantSearch}
+                    onChange={e => setTenantSearch(e.target.value)}
+                    onMouseDown={e => e.stopPropagation()}
+                    placeholder={t('domains_searchTenants')}
+                    style={{ width: '100%', boxSizing: 'border-box' as const, padding: '.25rem .5rem', border: '1px solid #e5e7eb', borderRadius: 3, fontSize: '.8125rem', outline: 'none' }}
+                  />
+                </div>
+                {filteredTenants.map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onMouseDown={e => { e.preventDefault(); toggleTenant(c.id) }}
+                    style={{ ...filterStyles.labelDropdownItem, gap: '.5rem' }}
+                  >
+                    <input type="checkbox" checked={tenantFilter.includes(c.id)} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
+                    {c.name}
+                  </button>
+                ))}
+                {filteredTenants.length === 0 && (
+                  <div style={{ padding: '.5rem .75rem', color: '#9ca3af', fontSize: '.8rem' }}>{t('domains_noTenantMatch')}</div>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -195,4 +362,11 @@ export default function DomainsTableView({ domains, isLoading }: Props) {
       </div>
     </div>
   )
+}
+
+const filterStyles: Record<string, React.CSSProperties> = {
+  searchInput: { padding: '.3125rem .5rem', border: '1px solid #e2e8f0', borderRadius: 3, fontSize: '.8125rem', minWidth: 200, background: '#fff', outline: 'none' },
+  btnClear: { padding: '.2rem .4rem', background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '.8125rem', lineHeight: 1 },
+  labelDropdown: { position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 2, background: '#fff', border: '1px solid #d1d5db', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.1)', zIndex: 20, maxHeight: 240, overflowY: 'auto', padding: '4px 0' },
+  labelDropdownItem: { display: 'flex', alignItems: 'center', width: '100%', padding: '.25rem .5rem', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: '.8125rem' },
 }

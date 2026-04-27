@@ -64,40 +64,55 @@ export default function DomainsLayout() {
       zIndex: 10,
       background: '#fff',
     }}>
-      <div style={{
-        width: isMobile ? '100%' : 300,
-        display: isMobile && detailOpen ? 'none' : 'flex',
-        flexDirection: 'column',
-        overflowY: 'auto',
-        borderRight: '1px solid #e2e8f0',
-        flexShrink: 0,
-        background: '#fafafa',
-        position: 'relative',
-        zIndex: 1,
-      }}>
-        <DomainsPage
-          domains={domains}
-          isLoading={isLoading}
-          search={search}
-          setSearch={setSearch}
-          labelFilter={labelFilter}
-          setLabelFilter={setLabelFilter}
-          labelSuggestions={labelSuggestions}
-          tenantFilter={tenantFilter}
-          setTenantFilter={setTenantFilter}
-          tenants={tenants}
-        />
-      </div>
+      {detailOpen && !isMobile && (
+        <div style={{
+          width: 300,
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto',
+          borderRight: '1px solid #e2e8f0',
+          flexShrink: 0,
+          background: '#fafafa',
+          position: 'relative',
+          zIndex: 1,
+        }}>
+          <DomainsPage
+            domains={domains}
+            isLoading={isLoading}
+            search={search}
+            setSearch={setSearch}
+            labelFilter={labelFilter}
+            setLabelFilter={setLabelFilter}
+            labelSuggestions={labelSuggestions}
+            tenantFilter={tenantFilter}
+            setTenantFilter={setTenantFilter}
+            tenants={tenants}
+          />
+        </div>
+      )}
       <div style={{
         flex: 1,
-        display: isMobile && !detailOpen ? 'none' : 'flex',
+        display: 'flex',
         flexDirection: 'column',
         overflowY: 'auto',
         background: '#fff',
       }}>
         {detailOpen
           ? <Outlet />
-          : <DomainsTableView domains={domains} isLoading={isLoading} />}
+          : (
+            <DomainsTableView
+              domains={domains}
+              isLoading={isLoading}
+              search={search}
+              setSearch={setSearch}
+              labelFilter={labelFilter}
+              setLabelFilter={setLabelFilter}
+              labelSuggestions={labelSuggestions}
+              tenantFilter={tenantFilter}
+              setTenantFilter={setTenantFilter}
+              tenants={tenants}
+            />
+          )}
       </div>
     </div>
   )
