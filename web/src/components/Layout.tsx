@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '../context/AuthContext'
 import { useWs } from '../hooks/useWs'
@@ -18,7 +18,9 @@ export default function Layout() {
   const { t, locale, setLocale } = useI18n()
   const wsStatus = useWs(accessToken)
   const navigate = useNavigate()
+  const location = useLocation()
   const isMobile = useIsMobile()
+  const fullBleed = location.pathname.startsWith('/domains')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [copiedNs, setCopiedNs] = useState<string | null>(null)
   const [hoveredNs, setHoveredNs] = useState<string | null>(null)
@@ -59,6 +61,15 @@ export default function Layout() {
     }
   }
 
+  function subNavItemStyle({ isActive }: { isActive: boolean }): React.CSSProperties {
+    return {
+      ...navItemStyle({ isActive }),
+      height: 30,
+      padding: isActive ? '0 12px 0 29px' : '0 12px 0 32px',
+      fontSize: '.78125rem',
+    }
+  }
+
   const sidebarContent = (
     <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
       <style>{`
@@ -72,6 +83,14 @@ export default function Layout() {
       <NavLink to="/domains" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
         {t('nav_domains')}
       </NavLink>
+      <NavLink to="/templates" className="sb-item" style={subNavItemStyle} onClick={closeSidebar}>
+        {t('nav_templates')}
+      </NavLink>
+      {user?.role === 'admin' && (
+        <NavLink to="/import" className="sb-item" style={subNavItemStyle} onClick={closeSidebar}>
+          INFOease Import
+        </NavLink>
+      )}
 
       <div style={styles.sectionHeader}>{t('nav_help')}</div>
       <NavLink to="/tickets" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
@@ -81,9 +100,6 @@ export default function Layout() {
       <div style={styles.sectionHeader}>System</div>
       <NavLink to="/audit-logs" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
         {t('nav_auditLog')}
-      </NavLink>
-      <NavLink to="/templates" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
-        {t('nav_templates')}
       </NavLink>
 
       {user?.role === 'admin' && (<>
@@ -105,9 +121,6 @@ export default function Layout() {
         </NavLink>
         <NavLink to="/registrars" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
           Registrars
-        </NavLink>
-        <NavLink to="/import" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
-          INFORENT Import
         </NavLink>
       </>)}
     </div>
@@ -237,7 +250,7 @@ export default function Layout() {
         </nav>
 
         {/* Content */}
-        <main style={{ ...styles.content, padding: isMobile ? '.75rem' : '1.5rem' }}>
+        <main style={{ ...styles.content, padding: fullBleed ? 0 : (isMobile ? '.75rem' : '1.5rem'), position: 'relative' }}>
           <Outlet />
         </main>
       </div>

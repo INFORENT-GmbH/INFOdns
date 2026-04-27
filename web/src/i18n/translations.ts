@@ -417,7 +417,7 @@ export const translations = {
     ticketDetail_addFiles:    'Attach files',
 
     // DNS Templates
-    nav_templates:              'Templates',
+    nav_templates:              'DNS-Templates',
     templates_title:            'DNS Templates',
     templates_newTemplate:      '+ New Template',
     templates_namePh:           'Template name',
@@ -858,7 +858,7 @@ export const translations = {
     ticketDetail_addFiles:    'Dateien anhängen',
 
     // DNS Templates
-    nav_templates:              'Vorlagen',
+    nav_templates:              'DNS-Templates',
     templates_title:            'DNS-Vorlagen',
     templates_newTemplate:      '+ Neue Vorlage',
     templates_namePh:           'Vorlagenname',

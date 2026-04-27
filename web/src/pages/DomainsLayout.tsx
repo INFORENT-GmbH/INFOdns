@@ -85,13 +85,9 @@ export default function DomainsLayout() {
 
   return (
     <div style={{
-      position: 'fixed',
-      top: 48,
-      left: isMobile ? 0 : 220,
-      right: 0,
-      bottom: 0,
+      position: 'absolute',
+      inset: 0,
       display: 'flex',
-      zIndex: 10,
       background: '#fff',
     }}>
       <style>{`
