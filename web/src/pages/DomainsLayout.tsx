@@ -30,7 +30,6 @@ export default function DomainsLayout() {
   const { data: labelSuggestions = [] } = useQuery<LabelSuggestion[]>({
     queryKey: ['label-suggestions'],
     queryFn: () => getLabelSuggestions().then(r => r.data),
-    staleTime: 30_000,
   })
 
   const { data: tenants = [] } = useQuery<Tenant[]>({

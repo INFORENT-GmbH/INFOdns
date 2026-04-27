@@ -145,7 +145,6 @@ export default function DomainsTableView({
   const { data: stats } = useQuery({
     queryKey: ['domain-stats'],
     queryFn: () => getDomainStats().then(r => r.data),
-    staleTime: 30_000,
   })
 
   const sorted = [...domains].sort((a, b) => {

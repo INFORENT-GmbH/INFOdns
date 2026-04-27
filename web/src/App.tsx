@@ -19,7 +19,18 @@ import TldPricingPage from './pages/TldPricingPage'
 import RegistrarsPage from './pages/RegistrarsPage'
 import TemplatesPage from './pages/TemplatesPage'
 
-const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 0 } } })
+const qc = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 0,           // every query is always considered stale
+      gcTime: 0,              // discard data immediately when no observers — no cross-mount cache
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+    },
+  },
+})
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, ready } = useAuth()

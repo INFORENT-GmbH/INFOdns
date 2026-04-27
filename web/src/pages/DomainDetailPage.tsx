@@ -65,7 +65,6 @@ function BulkEditButton({ rec }: { rec: DnsRecord }) {
   const { data } = useQuery<{ id: number }[]>({
     queryKey: ['record-search-count', rec.type, rec.name, rawValue],
     queryFn: () => searchByRecord({ type: rec.type, name: rec.name, value: rawValue }).then(r => r.data),
-    staleTime: 30_000,
   })
 
   const count = data?.length ?? null
@@ -167,7 +166,6 @@ export default function DomainDetailPage() {
     queryKey: ['domain-by-fqdn', nsRef],
     queryFn: () => getDomains({ search: nsRef!, limit: '10' }).then(r => r.data.find(d => d.fqdn === nsRef) ?? null),
     enabled: !!nsRef,
-    staleTime: 60_000,
   })
 
   // When ns_reference is set, wait for nsRefDomain to resolve before fetching records
@@ -182,14 +180,12 @@ export default function DomainDetailPage() {
   const { data: tplList = [] } = useQuery({
     queryKey: ['templates'],
     queryFn: () => getTemplates().then(r => r.data),
-    staleTime: 30_000,
   })
 
   const { data: assignedTemplates = [], refetch: refetchAssignedTemplates } = useQuery<AssignedTemplate[]>({
     queryKey: ['domain-templates', domain?.id],
     queryFn: () => getDomainTemplates(domain!.id).then(r => r.data),
     enabled: !!domain,
-    staleTime: 30_000,
   })
 
   // Refs always holding the latest state values — used in the effect cleanup below.
@@ -254,7 +250,6 @@ export default function DomainDetailPage() {
   const { data: labelSuggestions = [] } = useQuery({
     queryKey: ['label-suggestions', domain?.tenant_id],
     queryFn: () => getLabelSuggestions(domain?.tenant_id).then(r => r.data),
-    staleTime: 30_000,
     enabled: !!domain,
   })
 
@@ -262,13 +257,11 @@ export default function DomainDetailPage() {
     queryKey: ['tenants'],
     queryFn: () => getTenants().then(r => r.data),
     enabled: isAdmin,
-    staleTime: 60_000,
   })
 
   const { data: allDomains = [] } = useQuery<Domain[]>({
     queryKey: ['domains'],
     queryFn: () => getDomains({ limit: '9999' }).then(r => r.data),
-    staleTime: 60_000,
     enabled: !!domain,
   })
 

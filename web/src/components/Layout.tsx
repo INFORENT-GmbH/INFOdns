@@ -28,7 +28,6 @@ export default function Layout() {
   const { data: nsStatus } = useQuery({
     queryKey: ['ns-status'],
     queryFn: () => getNsStatus().then(r => r.data),
-    staleTime: Infinity,
   })
 
   const visibleNs = user?.role === 'tenant' ? ['ns2', 'ns3'] : ['ns1', 'ns2', 'ns3']

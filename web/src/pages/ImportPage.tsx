@@ -48,7 +48,6 @@ export default function ImportPage() {
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['import-preview'],
     queryFn: () => getImportPreview().then(r => r.data),
-    staleTime: Infinity,
     retry: 0,
   })
 
