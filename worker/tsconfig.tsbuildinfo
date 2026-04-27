@@ -1,0 +1,1 @@
+{"root":["./src/broadcast.ts","./src/bulkexecutor.ts","./src/catalogzone.ts","./src/db.ts","./src/deployzone.ts","./src/dnsseccheck.ts","./src/index.ts","./src/mailtemplates.ts","./src/mailer.ts","./src/namedconf.ts","./src/nsdelegation.ts","./src/renderzone.ts","./src/serialnumber.ts","./src/ticketmailimporter.ts","./src/validatezone.ts"],"version":"5.9.3"}

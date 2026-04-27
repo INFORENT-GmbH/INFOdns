@@ -37,14 +37,16 @@ export async function checkNsDelegation(
 
   for (const domain of domains) {
     let newOk: number | null = domain.ns_ok
+    let observed: string[] | null = null
 
     try {
       const resolved = await resolveNs(domain.fqdn)
-      const actual = resolved.map(r => r.toLowerCase().replace(/\.$/, ''))
-      newOk = (actual.length === expected.size && actual.every(ns => expected.has(ns))) ? 1 : 0
+      observed = resolved.map(r => r.toLowerCase().replace(/\.$/, '')).sort()
+      newOk = (observed.length === expected.size && observed.every(ns => expected.has(ns))) ? 1 : 0
     } catch (err: any) {
       if (err.code === 'ENOTFOUND' || err.code === 'ENODATA') {
         newOk = null  // unregistered / no NS records in public DNS
+        observed = []
       } else if (err.code === 'ESERVFAIL' || err.code === 'ETIMEDOUT') {
         console.warn(`[nsDelegation] transient DNS error for ${domain.fqdn}: ${err.code}`)
         continue  // keep previous value, skip DB write
@@ -55,8 +57,8 @@ export async function checkNsDelegation(
     }
 
     await execute(
-      'UPDATE domains SET ns_ok = ?, ns_checked_at = NOW() WHERE id = ?',
-      [newOk, domain.id]
+      'UPDATE domains SET ns_ok = ?, ns_checked_at = NOW(), ns_observed = ? WHERE id = ?',
+      [newOk, observed === null ? null : observed.join(','), domain.id]
     )
 
     if (newOk !== domain.ns_ok) {

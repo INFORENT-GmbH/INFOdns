@@ -90,6 +90,7 @@ export interface Domain {
   dnssec_ds: string | null
   ns_ok: number | null
   ns_checked_at: string | null
+  ns_observed: string | null
   expected_ns: string[]
   dnssec_ok: number | null
   dnssec_checked_at: string | null

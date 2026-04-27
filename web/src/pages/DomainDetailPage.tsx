@@ -760,6 +760,21 @@ export default function DomainDetailPage() {
       {domain.ns_ok === 0 && domain.status === 'active' && (
         <div style={{ background: '#fee2e2', color: '#991b1b', padding: '.375rem .75rem', borderRadius: 6, margin: '.5rem .75rem 0', fontSize: '.8125rem', border: '1px solid #fca5a5' }}>
           <strong>{t('domainDetail_nsMismatch')}</strong> — {t('domainDetail_nsMismatchDesc')}
+          {domain.ns_observed !== null && domain.ns_observed !== undefined && (() => {
+            const observed = domain.ns_observed.split(',').map(s => s.trim()).filter(Boolean)
+            return (
+              <div style={{ marginTop: '.375rem' }}>
+                {observed.length > 0 ? t('domainDetail_nsCurrent') : t('domainDetail_nsCurrentNone')}
+                {observed.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: 2 }}>
+                    {observed.map(ns => (
+                      <span key={ns} style={{ fontFamily: MONO, fontSize: '.8rem', marginTop: 2 }}>{ns}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
           {domain.expected_ns?.length > 0 && (
             <div style={{ marginTop: '.375rem' }}>
               {t('domainDetail_nsSetRecords')}
@@ -793,7 +808,7 @@ export default function DomainDetailPage() {
         </div>
       )}
 
-      {domain.dnssec_enabled && domain.dnssec_ok === 0 && domain.status === 'active' && (
+      {domain.dnssec_enabled === 1 && domain.dnssec_ok === 0 && domain.status === 'active' && (
         <div style={{ background: '#fef3c7', color: '#92400e', padding: '.375rem .75rem', borderRadius: 6, margin: '.5rem .75rem 0', fontSize: '.8125rem', border: '1px solid #fde68a' }}>
           <strong>{t('domainDetail_dnssecNotVisible')}</strong> — {t('domainDetail_dnssecNotVisibleDesc')}
           <div style={{ marginTop: '.25rem', fontSize: '.7rem', color: '#a16207' }}>{t('domainDetail_dnssecCheckedEvery')}</div>
