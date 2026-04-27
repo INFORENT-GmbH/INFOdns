@@ -53,6 +53,36 @@ export default function DomainsLayout() {
   const match = useMatch('/domains/:name')
   const detailOpen = !!match
 
+  const sidebar = (
+    <DomainsPage
+      domains={domains}
+      isLoading={isLoading}
+      search={search}
+      setSearch={setSearch}
+      labelFilter={labelFilter}
+      setLabelFilter={setLabelFilter}
+      labelSuggestions={labelSuggestions}
+      tenantFilter={tenantFilter}
+      setTenantFilter={setTenantFilter}
+      tenants={tenants}
+    />
+  )
+
+  const dashboard = (
+    <DomainsTableView
+      domains={domains}
+      isLoading={isLoading}
+      search={search}
+      setSearch={setSearch}
+      labelFilter={labelFilter}
+      setLabelFilter={setLabelFilter}
+      labelSuggestions={labelSuggestions}
+      tenantFilter={tenantFilter}
+      setTenantFilter={setTenantFilter}
+      tenants={tenants}
+    />
+  )
+
   return (
     <div style={{
       position: 'fixed',
@@ -64,55 +94,63 @@ export default function DomainsLayout() {
       zIndex: 10,
       background: '#fff',
     }}>
-      {detailOpen && !isMobile && (
+      <style>{`
+        @keyframes domainPaneFadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+      `}</style>
+
+      {!isMobile && (
         <div style={{
-          width: 300,
-          display: 'flex',
-          flexDirection: 'column',
-          overflowY: 'auto',
-          borderRight: '1px solid #e2e8f0',
+          width: detailOpen ? 300 : 0,
           flexShrink: 0,
-          background: '#fafafa',
+          overflow: 'hidden',
+          transition: 'width 220ms cubic-bezier(0.4, 0, 0.2, 1)',
           position: 'relative',
           zIndex: 1,
         }}>
-          <DomainsPage
-            domains={domains}
-            isLoading={isLoading}
-            search={search}
-            setSearch={setSearch}
-            labelFilter={labelFilter}
-            setLabelFilter={setLabelFilter}
-            labelSuggestions={labelSuggestions}
-            tenantFilter={tenantFilter}
-            setTenantFilter={setTenantFilter}
-            tenants={tenants}
-          />
+          <div style={{
+            width: 300,
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            overflowY: 'auto',
+            background: '#fafafa',
+            borderRight: '1px solid #e2e8f0',
+          }}>
+            {sidebar}
+          </div>
         </div>
       )}
+
+      {isMobile && !detailOpen && (
+        <div style={{
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto',
+          background: '#fafafa',
+          animation: 'domainPaneFadeIn 180ms ease-out',
+        }}>
+          {sidebar}
+        </div>
+      )}
+
       <div style={{
         flex: 1,
-        display: 'flex',
+        display: isMobile && !detailOpen ? 'none' : 'flex',
         flexDirection: 'column',
         overflowY: 'auto',
         background: '#fff',
       }}>
         {detailOpen
-          ? <Outlet />
-          : (
-            <DomainsTableView
-              domains={domains}
-              isLoading={isLoading}
-              search={search}
-              setSearch={setSearch}
-              labelFilter={labelFilter}
-              setLabelFilter={setLabelFilter}
-              labelSuggestions={labelSuggestions}
-              tenantFilter={tenantFilter}
-              setTenantFilter={setTenantFilter}
-              tenants={tenants}
-            />
-          )}
+          ? <div key="detail" style={{ animation: 'domainPaneFadeIn 200ms ease-out' }}><Outlet /></div>
+          : !isMobile && (
+              <div key="dashboard" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, animation: 'domainPaneFadeIn 200ms ease-out' }}>
+                {dashboard}
+              </div>
+            )}
       </div>
     </div>
   )

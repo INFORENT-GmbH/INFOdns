@@ -687,13 +687,13 @@ export default function DomainDetailPage() {
   // ── render ───────────────────────────────────────────────────────────────
 
   if (loadingDomain) return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '3rem 0', color: '#6b7280', fontSize: '.875rem' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', padding: '3rem .75rem', color: '#6b7280', fontSize: '.875rem' }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       <div style={{ width: 18, height: 18, border: '2px solid #e5e7eb', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.7s linear infinite', flexShrink: 0 }} />
       {t('loading')}
     </div>
   )
-  if (!domain) return <p>Domain not found</p>
+  if (!domain) return <p style={{ padding: '1rem .75rem' }}>Domain not found</p>
 
   const nsRefMode = !!nsRef
   const changeCount = dirtyIds.length + pendingDeletes.size + newRows.length
@@ -750,7 +750,7 @@ export default function DomainDetailPage() {
       </div>
 
       {conflictWarning && (
-        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.375rem .75rem', borderRadius: 6, marginBottom: '.5rem', fontSize: '.8125rem', display: 'flex', alignItems: 'center', gap: '.75rem', border: '1px solid #fde68a' }}>
+        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.375rem .75rem', borderRadius: 6, margin: '.5rem .75rem 0', fontSize: '.8125rem', display: 'flex', alignItems: 'center', gap: '.75rem', border: '1px solid #fde68a' }}>
           <span>⚠ {t('domainDetail_conflictWarning')}</span>
           <button onClick={handleForceReload} style={{ flexShrink: 0, padding: '3px 10px', borderRadius: 4, border: '1px solid #f59e0b', background: '#fff', color: '#92400e', fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' }}>
             {t('domainDetail_discardReload')}
@@ -759,13 +759,13 @@ export default function DomainDetailPage() {
       )}
 
       {domain.status === 'suspended' && (
-        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.375rem .75rem', borderRadius: 6, marginBottom: '.5rem', fontSize: '.8125rem', display: 'flex', alignItems: 'center', gap: '.5rem', border: '1px solid #fde68a' }}>
+        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.375rem .75rem', borderRadius: 6, margin: '.5rem .75rem 0', fontSize: '.8125rem', display: 'flex', alignItems: 'center', gap: '.5rem', border: '1px solid #fde68a' }}>
           {t('domainDetail_suspendedMsg', t('domainDetail_activate'))}
         </div>
       )}
 
       {domain.ns_ok === 0 && domain.status === 'active' && (
-        <div style={{ background: '#fee2e2', color: '#991b1b', padding: '.375rem .75rem', borderRadius: 6, marginBottom: '.5rem', fontSize: '.8125rem', border: '1px solid #fca5a5' }}>
+        <div style={{ background: '#fee2e2', color: '#991b1b', padding: '.375rem .75rem', borderRadius: 6, margin: '.5rem .75rem 0', fontSize: '.8125rem', border: '1px solid #fca5a5' }}>
           <strong>{t('domainDetail_nsMismatch')}</strong> — {t('domainDetail_nsMismatchDesc')}
           {domain.expected_ns?.length > 0 && (
             <div style={{ marginTop: '.375rem' }}>
@@ -801,7 +801,7 @@ export default function DomainDetailPage() {
       )}
 
       {domain.dnssec_enabled && domain.dnssec_ok === 0 && domain.status === 'active' && (
-        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.375rem .75rem', borderRadius: 6, marginBottom: '.5rem', fontSize: '.8125rem', border: '1px solid #fde68a' }}>
+        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.375rem .75rem', borderRadius: 6, margin: '.5rem .75rem 0', fontSize: '.8125rem', border: '1px solid #fde68a' }}>
           <strong>{t('domainDetail_dnssecNotVisible')}</strong> — {t('domainDetail_dnssecNotVisibleDesc')}
           <div style={{ marginTop: '.25rem', fontSize: '.7rem', color: '#a16207' }}>{t('domainDetail_dnssecCheckedEvery')}</div>
         </div>
@@ -992,7 +992,7 @@ export default function DomainDetailPage() {
       </div>
 
       {nsRefMode && (
-        <div style={{ marginBottom: '.5rem', padding: '.3rem .75rem', background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 6, display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.8125rem', color: '#92400e' }}>
+        <div style={{ margin: '.5rem .75rem 0', padding: '.3rem .75rem', background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 6, display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.8125rem', color: '#92400e' }}>
           <span style={{ fontWeight: 600 }}>NS-Ref:</span>
           <span>{t('domainDetail_nsRefBanner')}</span>
           {nsRefDomain
@@ -1154,8 +1154,8 @@ export default function DomainDetailPage() {
         </div>
       )}
 
-      {loadingRecords ? <p>{t('domainDetail_loadingRecords')}</p> : (
-        <div style={{ overflowX: 'auto', position: 'relative', ...(nsRefMode ? { border: '2px solid #f59e0b', borderRadius: 6, overflow: 'hidden' } : {}) }}>
+      {loadingRecords ? <p style={{ padding: '0 .75rem' }}>{t('domainDetail_loadingRecords')}</p> : (
+        <div style={{ overflowX: 'auto', position: 'relative', ...(nsRefMode ? { margin: '0 .75rem', border: '2px solid #f59e0b', borderRadius: 6, overflow: 'hidden' } : {}) }}>
         {(applying || pendingRefresh) && (
           <div style={styles.tableOverlay}>
             <div style={styles.spinner} />
@@ -1382,7 +1382,7 @@ export default function DomainDetailPage() {
       )}
 
       {hasDirty && (
-        <div style={{ position: 'sticky', bottom: 0, marginLeft: '-1rem', marginRight: '-1rem', background: '#fff', borderTop: '2px solid #2563eb', padding: '.4rem 1rem', display: 'flex', alignItems: 'center', gap: '1rem', zIndex: 50, boxShadow: '0 -2px 12px rgba(0,0,0,.08)' }}>
+        <div style={{ position: 'sticky', bottom: 0, background: '#fff', borderTop: '2px solid #2563eb', padding: '.4rem .75rem', display: 'flex', alignItems: 'center', gap: '1rem', zIndex: 50, boxShadow: '0 -2px 12px rgba(0,0,0,.08)' }}>
           <span style={styles.dirtyHint}>{changeCount} {changeCount === 1 ? t('domainDetail_unsavedChange') : t('domainDetail_unsavedChanges')}</span>
           {applyError && <span style={{ fontSize: '.8125rem', color: '#b91c1c', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{applyError}</span>}
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '.5rem' }}>
@@ -1413,7 +1413,7 @@ const styles: Record<string, React.CSSProperties> = {
   back: { color: '#64748b', textDecoration: 'none', fontSize: '.8125rem' },
   h2: { margin: 0, fontSize: '1rem', fontWeight: 700, color: '#1e293b' },
   h3: { margin: 0, fontSize: '.875rem', fontWeight: 600, color: '#1e293b' },
-  errorBanner: { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 6, marginBottom: '.625rem', fontSize: '.8125rem' },
+  errorBanner: { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 6, margin: '.5rem .75rem 0', fontSize: '.8125rem' },
   meta: { display: 'flex', gap: '1rem', padding: '.375rem .75rem', fontSize: '.8125rem', color: '#374151', flexWrap: 'wrap', borderBottom: '1px solid #f1f5f9' },
   labelsSection: { padding: '.375rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
   labelsTitle: { fontSize: '.7rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const },
@@ -1422,7 +1422,7 @@ const styles: Record<string, React.CSSProperties> = {
   labelNewBtn: { padding: '1px 6px', background: 'none', border: '1px dashed #cbd5e1', borderRadius: 12, fontSize: '.7rem', color: '#64748b', cursor: 'pointer' },
   tableHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.5rem .75rem', borderBottom: '1px solid #e2e8f0' },
   tplBadge: { display: 'inline-block', background: '#e0f2fe', color: '#0369a1', borderRadius: 4, padding: '0 4px', fontSize: '.7rem', fontWeight: 700, letterSpacing: '.03em', flexShrink: 0 },
-  applyPanel: { margin: '0 0 .5rem', padding: '.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, display: 'flex', flexDirection: 'column' as const, gap: '.5rem' },
+  applyPanel: { margin: '.5rem .75rem 0', padding: '.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, display: 'flex', flexDirection: 'column' as const, gap: '.5rem' },
   applyLabel: { display: 'flex', flexDirection: 'column' as const, gap: 2, fontSize: '.8125rem', fontWeight: 600, color: '#374151' },
   applySelect: { marginTop: 4, padding: '.3125rem .625rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8125rem', minWidth: 200 },
   applyPreview: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, padding: '.625rem .75rem', display: 'flex', flexDirection: 'column' as const, gap: '.375rem' },

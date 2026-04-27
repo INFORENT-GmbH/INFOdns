@@ -50,7 +50,7 @@ const INLINE_STYLES = `
   .condensed-row { transition: background 0.08s; }
   .condensed-row:hover { background: #e8f0fe !important; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  .tip { position: relative; display: inline-block; z-index: 11; }
+  .tip { position: relative; display: inline-block; }
   .tip::after {
     content: attr(data-tip);
     position: absolute; bottom: calc(100% + 5px); left: 50%; transform: translateX(-50%);
@@ -58,6 +58,7 @@ const INLINE_STYLES = `
     padding: .25rem .5rem; border-radius: 4px; border: 1px solid #1e293b;
     white-space: nowrap; width: max-content; max-width: 200px;
     pointer-events: none; opacity: 0;
+    z-index: 30;
   }
   .tip:hover::after { opacity: 1; }
 `
@@ -101,7 +102,7 @@ export default function DomainsPage({
       <style>{INLINE_STYLES}</style>
 
       {/* Header */}
-      <div style={{ padding: '.5rem .625rem .375rem', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 10, background: '#fafafa' }}>
+      <div style={{ padding: '.5rem .625rem .375rem', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 40, background: '#fafafa' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.375rem' }}>
           <h2 style={{ margin: 0, fontSize: '.875rem', fontWeight: 700, color: '#1e293b' }}>{t('domains_title')}</h2>
           {!isLoading && (
