@@ -110,7 +110,6 @@ export default function DomainsLayout() {
             height: '100%',
             display: 'flex',
             flexDirection: 'column',
-            overflowY: 'auto',
             background: '#fafafa',
             borderRight: '1px solid #e2e8f0',
           }}>
@@ -124,7 +123,6 @@ export default function DomainsLayout() {
           width: '100%',
           display: 'flex',
           flexDirection: 'column',
-          overflowY: 'auto',
           background: '#fafafa',
           animation: 'domainPaneFadeIn 180ms ease-out',
         }}>

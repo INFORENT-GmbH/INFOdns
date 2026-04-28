@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useMatch } from 'react-router-dom'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { type Domain, type LabelSuggestion, type Tenant } from '../api/client'
 import LabelChip from '../components/LabelChip'
 import Tooltip from '../components/Tooltip'
@@ -87,12 +88,21 @@ export default function DomainsPage({
   const [dirtyDomainIds, setDirtyDomainIds] = useState(() => getDirtyDomainFqdns())
   useEffect(() => subscribe(() => setDirtyDomainIds(getDirtyDomainFqdns())), [])
 
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const virtualizer = useVirtualizer({
+    count: domains.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 32,
+    overscan: 8,
+    getItemKey: (i) => domains[i].id,
+  })
+
   return (
-    <div>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <style>{INLINE_STYLES}</style>
 
       {/* Header */}
-      <div style={{ padding: '.5rem .625rem .375rem', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 40, background: '#fafafa' }}>
+      <div style={{ padding: '.5rem .625rem .375rem', borderBottom: '1px solid #e2e8f0', background: '#fafafa', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.375rem' }}>
           <h2 style={{ margin: 0, fontSize: '.875rem', fontWeight: 700, color: '#1e293b' }}>{t('domains_title')}</h2>
           {!isLoading && (
@@ -216,66 +226,77 @@ export default function DomainsPage({
         )}
       </div>
 
-      {/* Loading */}
-      {isLoading && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '1.5rem' }}>
-          <div style={{ width: 18, height: 18, border: '2px solid #e5e7eb', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-        </div>
-      )}
-
-      {/* Domain rows */}
-      <div>
-        {domains.map((d: Domain) => {
-          const isSelected = selectedFqdn === d.fqdn
-          const suspended = d.status === 'suspended'
-          return (
-            <div
-              key={d.id}
-              className={isSelected ? undefined : 'condensed-row'}
-              onClick={() => navigate(`/domains/${d.fqdn}`)}
-              style={{
-                padding: '.35rem .625rem',
-                paddingLeft: isSelected ? 'calc(.625rem - 3px)' : '.625rem',
-                borderLeft: isSelected ? '3px solid #2563eb' : '3px solid transparent',
-                borderBottom: '1px solid #f3f4f6',
-                cursor: 'pointer',
-                background: isSelected ? '#eff6ff' : suspended ? '#fffbeb' : undefined,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '.3rem' }}>
-                <ZoneStatusDot status={d.zone_status} suspended={suspended} />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500, fontSize: '.8125rem', color: isSelected ? '#1d4ed8' : '#111827', flexShrink: 1, minWidth: 0 }}>
-                  {d.fqdn}
-                  {d.ns_reference && (
-                    <span style={{ fontWeight: 400, color: '#9ca3af' }}>
-                      <span style={{ margin: '0 3px' }}>→</span>
-                      <span style={{ color: isSelected ? '#6d93e8' : '#6b7280' }}>{d.ns_reference}</span>
-                    </span>
-                  )}
-                </span>
-                {d.ns_ok === 0 && (
-                  <Tooltip tip={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#dc2626', flexShrink: 0, cursor: 'default' }}>⚠</Tooltip>
-                )}
-                {dirtyDomainIds.has(d.fqdn) && (
-                  <span style={{ color: '#f59e0b', fontSize: '.45rem', flexShrink: 0, lineHeight: 1 }} title="Unsaved changes">●</span>
-                )}
-                {d.tenant_name && (
-                  <span style={{ fontSize: '.65rem', color: '#9ca3af', whiteSpace: 'nowrap' as const, flexShrink: 0, marginLeft: 'auto' }}>{d.tenant_name}</span>
-                )}
-              </div>
-              {!!(suspended || (d.labels && d.labels.length > 0)) && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 2, flexWrap: 'wrap' as const }}>
-                  {suspended && (
-                    <span style={{ fontSize: '.65rem', color: '#92400e' }}>{t('domains_suspended')}</span>
-                  )}
-                  {d.labels?.map(l => <LabelChip key={l.id} label={l} />)}
-                </div>
-              )}
-            </div>
-          )
-        })}
+      {/* Domain rows (virtualized) */}
+      <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+        {isLoading && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '1.5rem' }}>
+            <div style={{ width: 18, height: 18, border: '2px solid #e5e7eb', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
+          </div>
+        )}
         {!isLoading && domains.length === 0 && (
           <div style={{ padding: '1.5rem', color: '#9ca3af', textAlign: 'center' as const, fontSize: '.8rem' }}>{t('domains_noneFound')}</div>
+        )}
+        {!isLoading && domains.length > 0 && (
+          <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+            {virtualizer.getVirtualItems().map(vi => {
+              const d = domains[vi.index]
+              const isSelected = selectedFqdn === d.fqdn
+              const suspended = d.status === 'suspended'
+              return (
+                <div
+                  key={vi.key}
+                  data-index={vi.index}
+                  ref={virtualizer.measureElement}
+                  className={isSelected ? undefined : 'condensed-row'}
+                  onClick={() => navigate(`/domains/${d.fqdn}`)}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    transform: `translateY(${vi.start}px)`,
+                    padding: '.35rem .625rem',
+                    paddingLeft: isSelected ? 'calc(.625rem - 3px)' : '.625rem',
+                    borderLeft: isSelected ? '3px solid #2563eb' : '3px solid transparent',
+                    borderBottom: '1px solid #f3f4f6',
+                    cursor: 'pointer',
+                    background: isSelected ? '#eff6ff' : suspended ? '#fffbeb' : undefined,
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.3rem' }}>
+                    <ZoneStatusDot status={d.zone_status} suspended={suspended} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500, fontSize: '.8125rem', color: isSelected ? '#1d4ed8' : '#111827', flexShrink: 1, minWidth: 0 }}>
+                      {d.fqdn}
+                      {d.ns_reference && (
+                        <span style={{ fontWeight: 400, color: '#9ca3af' }}>
+                          <span style={{ margin: '0 3px' }}>→</span>
+                          <span style={{ color: isSelected ? '#6d93e8' : '#6b7280' }}>{d.ns_reference}</span>
+                        </span>
+                      )}
+                    </span>
+                    {d.ns_ok === 0 && (
+                      <Tooltip tip={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#dc2626', flexShrink: 0, cursor: 'default' }}>⚠</Tooltip>
+                    )}
+                    {dirtyDomainIds.has(d.fqdn) && (
+                      <span style={{ color: '#f59e0b', fontSize: '.45rem', flexShrink: 0, lineHeight: 1 }} title="Unsaved changes">●</span>
+                    )}
+                    {d.tenant_name && (
+                      <span style={{ fontSize: '.65rem', color: '#9ca3af', whiteSpace: 'nowrap' as const, flexShrink: 0, marginLeft: 'auto' }}>{d.tenant_name}</span>
+                    )}
+                  </div>
+                  {!!(suspended || (d.labels && d.labels.length > 0)) && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 2, flexWrap: 'wrap' as const }}>
+                      {suspended && (
+                        <span style={{ fontSize: '.65rem', color: '#92400e' }}>{t('domains_suspended')}</span>
+                      )}
+                      {d.labels?.map(l => <LabelChip key={l.id} label={l} />)}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
         )}
       </div>
     </div>

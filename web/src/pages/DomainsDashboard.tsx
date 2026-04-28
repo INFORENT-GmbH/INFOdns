@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { getDomainStats, type Domain, type LabelSuggestion, type Tenant } from '../api/client'
 import LabelChip from '../components/LabelChip'
 import { useI18n } from '../i18n/I18nContext'
@@ -147,21 +148,38 @@ export default function DomainsTableView({
     queryFn: () => getDomainStats().then(r => r.data),
   })
 
-  const sorted = [...domains].sort((a, b) => {
-    const [col, dir] = sort
-    let cmp = 0
-    if (col === 'fqdn') cmp = a.fqdn.localeCompare(b.fqdn)
-    else if (col === 'zone_status') {
-      const ao = ZONE_STATUS_ORDER[a.status === 'suspended' ? 'suspended' : a.zone_status] ?? 9
-      const bo = ZONE_STATUS_ORDER[b.status === 'suspended' ? 'suspended' : b.zone_status] ?? 9
-      cmp = ao - bo
-    }
-    else if (col === 'ns_ok') cmp = (a.ns_ok ?? 1) - (b.ns_ok ?? 1)
-    else if (col === 'dnssec_enabled') cmp = (b.dnssec_enabled ?? 0) - (a.dnssec_enabled ?? 0)
-    else if (col === 'status') cmp = a.status.localeCompare(b.status)
-    else if (col === 'tenant_name') cmp = (a.tenant_name ?? '').localeCompare(b.tenant_name ?? '')
-    return dir === 'asc' ? cmp : -cmp
+  const sorted = useMemo(() => {
+    const arr = [...domains]
+    arr.sort((a, b) => {
+      const [col, dir] = sort
+      let cmp = 0
+      if (col === 'fqdn') cmp = a.fqdn.localeCompare(b.fqdn)
+      else if (col === 'zone_status') {
+        const ao = ZONE_STATUS_ORDER[a.status === 'suspended' ? 'suspended' : a.zone_status] ?? 9
+        const bo = ZONE_STATUS_ORDER[b.status === 'suspended' ? 'suspended' : b.zone_status] ?? 9
+        cmp = ao - bo
+      }
+      else if (col === 'ns_ok') cmp = (a.ns_ok ?? 1) - (b.ns_ok ?? 1)
+      else if (col === 'dnssec_enabled') cmp = (b.dnssec_enabled ?? 0) - (a.dnssec_enabled ?? 0)
+      else if (col === 'status') cmp = a.status.localeCompare(b.status)
+      else if (col === 'tenant_name') cmp = (a.tenant_name ?? '').localeCompare(b.tenant_name ?? '')
+      return dir === 'asc' ? cmp : -cmp
+    })
+    return arr
+  }, [domains, sort])
+
+  const tableScrollRef = useRef<HTMLDivElement>(null)
+  const virtualizer = useVirtualizer({
+    count: sorted.length,
+    getScrollElement: () => tableScrollRef.current,
+    estimateSize: () => 36,
+    overscan: 10,
+    getItemKey: (i) => sorted[i].id,
   })
+  const virtualItems = virtualizer.getVirtualItems()
+  const totalSize = virtualizer.getTotalSize()
+  const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0
+  const paddingBottom = virtualItems.length > 0 ? totalSize - virtualItems[virtualItems.length - 1].end : 0
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -296,7 +314,7 @@ export default function DomainsTableView({
       </div>
 
       {/* Table */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div ref={tableScrollRef} style={{ flex: 1, overflowY: 'auto' }}>
         {isLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '2rem' }}>
             <div style={{ width: 18, height: 18, border: '2px solid #e2e8f0', borderTopColor: '#2563eb', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
@@ -304,7 +322,16 @@ export default function DomainsTableView({
         ) : domains.length === 0 ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>{t('domains_noneFound')}</div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <colgroup>
+              <col />
+              <col style={{ width: 110 }} />
+              <col style={{ width: 60 }} />
+              <col style={{ width: 80 }} />
+              <col style={{ width: 90 }} />
+              <col style={{ width: 160 }} />
+              <col />
+            </colgroup>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr>
                 <SortTh label={t('domain')} col="fqdn" sort={sort} setSort={setSort} />
@@ -317,11 +344,17 @@ export default function DomainsTableView({
               </tr>
             </thead>
             <tbody>
-              {sorted.map(d => {
+              {paddingTop > 0 && (
+                <tr><td colSpan={7} style={{ height: paddingTop, padding: 0, border: 0 }} /></tr>
+              )}
+              {virtualItems.map(vi => {
+                const d = sorted[vi.index]
                 const suspended = d.status === 'suspended'
                 return (
                   <tr
-                    key={d.id}
+                    key={vi.key}
+                    data-index={vi.index}
+                    ref={virtualizer.measureElement}
                     className="dtv-row"
                     onClick={() => navigate(`/domains/${d.fqdn}`)}
                   >
@@ -363,6 +396,9 @@ export default function DomainsTableView({
                   </tr>
                 )
               })}
+              {paddingBottom > 0 && (
+                <tr><td colSpan={7} style={{ height: paddingBottom, padding: 0, border: 0 }} /></tr>
+              )}
             </tbody>
           </table>
         )}
