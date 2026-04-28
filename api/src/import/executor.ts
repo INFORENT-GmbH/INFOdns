@@ -227,15 +227,34 @@ export async function importRecords(
     deleted += (del as any).affectedRows
 
     for (const rec of records) {
+      let priority: number | null = rec.priority ?? null
+      let weight: number | null = null
+      let port: number | null = null
+      let value = rec.value
+
+      if (rec.type === 'SRV') {
+        // Legacy isp.ns.ENTRY holds the full SRV rdata in one field:
+        // "<priority> <weight> <port> <target>". Split into proper columns.
+        const parts = value.trim().split(/\s+/)
+        if (parts.length === 4) {
+          priority = parseInt(parts[0], 10)
+          weight = parseInt(parts[1], 10)
+          port = parseInt(parts[2], 10)
+          value = parts[3].endsWith('.') ? parts[3].slice(0, -1) : parts[3]
+        }
+      }
+
       await conn.execute(
-        `INSERT INTO dns_records (domain_id, name, type, priority, value, ttl)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO dns_records (domain_id, name, type, priority, weight, port, value, ttl)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           domainId,
           rec.name ?? '@',
           rec.type,
-          rec.priority ?? null,
-          rec.value,
+          priority,
+          weight,
+          port,
+          value,
           rec.ttl ?? null,
         ]
       )
