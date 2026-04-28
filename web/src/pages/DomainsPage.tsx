@@ -88,6 +88,9 @@ export default function DomainsPage({
   const [dirtyDomainIds, setDirtyDomainIds] = useState(() => getDirtyDomainFqdns())
   useEffect(() => subscribe(() => setDirtyDomainIds(getDirtyDomainFqdns())), [])
 
+  const [showLabels, setShowLabels] = useState(() => localStorage.getItem('domainsPage.showLabels') !== 'false')
+  useEffect(() => { localStorage.setItem('domainsPage.showLabels', String(showLabels)) }, [showLabels])
+
   const scrollRef = useRef<HTMLDivElement>(null)
   const virtualizer = useVirtualizer({
     count: domains.length,
@@ -224,6 +227,17 @@ export default function DomainsPage({
             )}
           </div>
         )}
+
+        {/* Show labels toggle */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: '.35rem', marginTop: '.375rem', fontSize: '.75rem', color: '#475569', cursor: 'pointer', userSelect: 'none' }}>
+          <input
+            type="checkbox"
+            checked={showLabels}
+            onChange={e => setShowLabels(e.target.checked)}
+            style={{ margin: 0, cursor: 'pointer' }}
+          />
+          {t('domains_showLabels')}
+        </label>
       </div>
 
       {/* Domain rows (virtualized) */}
@@ -285,12 +299,12 @@ export default function DomainsPage({
                       <span style={{ fontSize: '.65rem', color: '#9ca3af', whiteSpace: 'nowrap' as const, flexShrink: 0, marginLeft: 'auto' }}>{d.tenant_name}</span>
                     )}
                   </div>
-                  {!!(suspended || (d.labels && d.labels.length > 0)) && (
+                  {!!(suspended || (showLabels && d.labels && d.labels.length > 0)) && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '.25rem', marginTop: 2, flexWrap: 'wrap' as const }}>
                       {suspended && (
                         <span style={{ fontSize: '.65rem', color: '#92400e' }}>{t('domains_suspended')}</span>
                       )}
-                      {d.labels?.map(l => <LabelChip key={l.id} label={l} />)}
+                      {showLabels && d.labels?.map(l => <LabelChip key={l.id} label={l} />)}
                     </div>
                   )}
                 </div>
