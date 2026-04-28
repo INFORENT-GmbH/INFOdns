@@ -88,7 +88,7 @@ export default function DomainsPage({
   const [dirtyDomainIds, setDirtyDomainIds] = useState(() => getDirtyDomainFqdns())
   useEffect(() => subscribe(() => setDirtyDomainIds(getDirtyDomainFqdns())), [])
 
-  const [showLabels, setShowLabels] = useState(() => localStorage.getItem('domainsPage.showLabels') !== 'false')
+  const [showLabels, setShowLabels] = useState(() => localStorage.getItem('domainsPage.showLabels') === 'true')
   useEffect(() => { localStorage.setItem('domainsPage.showLabels', String(showLabels)) }, [showLabels])
 
   const scrollRef = useRef<HTMLDivElement>(null)
