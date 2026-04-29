@@ -70,6 +70,8 @@ export default function DomainsPage({
   const [tenantDropdownOpen, setTenantDropdownOpen] = useState(false)
   const [tenantSearch, setTenantSearch] = useState('')
   const tenantDropdownRef = useRef<HTMLDivElement>(null)
+  const [displayOptionsOpen, setDisplayOptionsOpen] = useState(false)
+  const displayOptionsRef = useRef<HTMLDivElement>(null)
 
   function toggleTenant(id: number) {
     setTenantFilter(tenantFilter.includes(id) ? tenantFilter.filter(x => x !== id) : [...tenantFilter, id])
@@ -90,6 +92,12 @@ export default function DomainsPage({
 
   const [showLabels, setShowLabels] = useState(() => localStorage.getItem('domainsPage.showLabels') === 'true')
   useEffect(() => { localStorage.setItem('domainsPage.showLabels', String(showLabels)) }, [showLabels])
+  const [showStatus, setShowStatus] = useState(() => localStorage.getItem('domainsPage.showStatus') !== 'false')
+  useEffect(() => { localStorage.setItem('domainsPage.showStatus', String(showStatus)) }, [showStatus])
+  const [showTenant, setShowTenant] = useState(() => localStorage.getItem('domainsPage.showTenant') !== 'false')
+  useEffect(() => { localStorage.setItem('domainsPage.showTenant', String(showTenant)) }, [showTenant])
+  const [showNsRef, setShowNsRef] = useState(() => localStorage.getItem('domainsPage.showNsRef') !== 'false')
+  useEffect(() => { localStorage.setItem('domainsPage.showNsRef', String(showNsRef)) }, [showNsRef])
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const virtualizer = useVirtualizer({
@@ -228,16 +236,55 @@ export default function DomainsPage({
           </div>
         )}
 
-        {/* Show labels toggle */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: '.35rem', marginTop: '.375rem', fontSize: '.75rem', color: '#475569', cursor: 'pointer', userSelect: 'none' }}>
-          <input
-            type="checkbox"
-            checked={showLabels}
-            onChange={e => setShowLabels(e.target.checked)}
-            style={{ margin: 0, cursor: 'pointer' }}
-          />
-          {t('domains_showLabels')}
-        </label>
+        {/* Display options (gear) */}
+        <div ref={displayOptionsRef} style={{ position: 'relative', marginTop: '.375rem', display: 'flex', justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            onClick={() => setDisplayOptionsOpen(v => !v)}
+            onBlur={e => { if (!displayOptionsRef.current?.contains(e.relatedTarget as Node)) setDisplayOptionsOpen(false) }}
+            title={t('domains_displayOptions')}
+            aria-label={t('domains_displayOptions')}
+            style={{ padding: '.15rem .35rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 3, cursor: 'pointer', fontSize: '.85rem', color: '#64748b', lineHeight: 1 }}
+          >
+            ⚙
+          </button>
+          {displayOptionsOpen && (
+            <div style={{ ...styles.labelDropdown, left: 'auto', right: 0, minWidth: 170 }}>
+              <button
+                type="button"
+                onMouseDown={e => { e.preventDefault(); setShowStatus(v => !v) }}
+                style={{ ...styles.labelDropdownItem, gap: '.5rem' }}
+              >
+                <input type="checkbox" checked={showStatus} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
+                {t('domains_showStatus')}
+              </button>
+              <button
+                type="button"
+                onMouseDown={e => { e.preventDefault(); setShowTenant(v => !v) }}
+                style={{ ...styles.labelDropdownItem, gap: '.5rem' }}
+              >
+                <input type="checkbox" checked={showTenant} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
+                {t('domains_showTenant')}
+              </button>
+              <button
+                type="button"
+                onMouseDown={e => { e.preventDefault(); setShowNsRef(v => !v) }}
+                style={{ ...styles.labelDropdownItem, gap: '.5rem' }}
+              >
+                <input type="checkbox" checked={showNsRef} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
+                {t('domains_showNsRef')}
+              </button>
+              <button
+                type="button"
+                onMouseDown={e => { e.preventDefault(); setShowLabels(v => !v) }}
+                style={{ ...styles.labelDropdownItem, gap: '.5rem' }}
+              >
+                <input type="checkbox" checked={showLabels} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
+                {t('domains_showLabels')}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Domain rows (virtualized) */}
@@ -279,23 +326,23 @@ export default function DomainsPage({
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '.3rem' }}>
-                    <ZoneStatusDot status={d.zone_status} suspended={suspended} />
+                    {showStatus && <ZoneStatusDot status={d.zone_status} suspended={suspended} />}
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontWeight: 500, fontSize: '.8125rem', color: isSelected ? '#1d4ed8' : '#111827', flexShrink: 1, minWidth: 0 }}>
                       {d.fqdn}
-                      {d.ns_reference && (
+                      {showNsRef && d.ns_reference && (
                         <span style={{ fontWeight: 400, color: '#9ca3af' }}>
                           <span style={{ margin: '0 3px' }}>→</span>
                           <span style={{ color: isSelected ? '#6d93e8' : '#6b7280' }}>{d.ns_reference}</span>
                         </span>
                       )}
                     </span>
-                    {d.ns_ok === 0 && (
+                    {showStatus && d.ns_ok === 0 && (
                       <Tooltip tip={t('domains_nsWarning')} style={{ fontSize: '.6rem', fontWeight: 600, color: '#dc2626', flexShrink: 0, cursor: 'default' }}>⚠</Tooltip>
                     )}
-                    {dirtyDomainIds.has(d.fqdn) && (
+                    {showStatus && dirtyDomainIds.has(d.fqdn) && (
                       <span style={{ color: '#f59e0b', fontSize: '.45rem', flexShrink: 0, lineHeight: 1 }} title="Unsaved changes">●</span>
                     )}
-                    {d.tenant_name && (
+                    {showTenant && d.tenant_name && (
                       <span style={{ fontSize: '.65rem', color: '#9ca3af', whiteSpace: 'nowrap' as const, flexShrink: 0, marginLeft: 'auto' }}>{d.tenant_name}</span>
                     )}
                   </div>

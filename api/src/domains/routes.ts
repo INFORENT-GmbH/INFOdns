@@ -206,8 +206,15 @@ export async function domainRoutes(app: FastifyInstance) {
       }
     }
     if (search) {
+      // Glob-style: `*` → `%`, `?` → `_`, anchored on both ends.
+      // Escape LIKE specials in raw input first so user-typed `%`/`_`/`\` are literal.
+      const pattern = search
+        .replace(/\\/g, '\\\\')
+        .replace(/[%_]/g, '\\$&')
+        .replace(/\*/g, '%')
+        .replace(/\?/g, '_')
       where += ` AND d.fqdn LIKE ?`
-      params.push(`%${search}%`)
+      params.push(pattern)
     }
 
     const rows = await query(

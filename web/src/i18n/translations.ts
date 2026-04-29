@@ -48,7 +48,7 @@ export const translations = {
 
     // Domains page
     domains_title:               'Domains',
-    domains_searchPlaceholder:   'Search FQDN…',
+    domains_searchPlaceholder:   'FQDN (use * or ? to match)…',
     domains_labelFilterPlaceholder: 'Filter by label…',
     domains_addDomain:           '+ Add Domain',
     domains_fqdnPlaceholder:     'FQDN (e.g. example.com)',
@@ -58,6 +58,10 @@ export const translations = {
     domains_zone:                'Zone',
     domains_labels:              'Labels',
     domains_showLabels:          'Show labels',
+    domains_showStatus:          'Show status',
+    domains_showTenant:          'Show tenant',
+    domains_showNsRef:           'Show NS reference',
+    domains_displayOptions:      'Display options',
     domains_noneFound:           'No domains found',
     domains_loadError:           'Failed to load domains',
     domains_columns:             'Columns',
@@ -510,7 +514,7 @@ export const translations = {
 
     // Domains page
     domains_title:               'Domains',
-    domains_searchPlaceholder:   'FQDN suchen…',
+    domains_searchPlaceholder:   'FQDN (mit * oder ? suchen)…',
     domains_labelFilterPlaceholder: 'Nach Label filtern…',
     domains_addDomain:           '+ Domain hinzufügen',
     domains_fqdnPlaceholder:     'FQDN (z.B. example.com)',
@@ -520,6 +524,10 @@ export const translations = {
     domains_zone:                'Zone',
     domains_labels:              'Labels',
     domains_showLabels:          'Labels anzeigen',
+    domains_showStatus:          'Status anzeigen',
+    domains_showTenant:          'Mandant anzeigen',
+    domains_showNsRef:           'NS-Referenz anzeigen',
+    domains_displayOptions:      'Anzeigeoptionen',
     domains_noneFound:           'Keine Domains gefunden',
     domains_loadError:           'Fehler beim Laden der Domains',
     domains_columns:             'Spalten',
