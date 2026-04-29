@@ -203,6 +203,9 @@ export default function Layout() {
         >
           {locale === 'de' ? 'EN' : 'DE'}
         </button>
+        <NavLink to="/profile" style={styles.headerBtn} title={t('profile_title')}>
+          {t('nav_profile')}
+        </NavLink>
         <button onClick={handleLogout} style={styles.headerBtn}>{t('nav_signOut')}</button>
       </header>
 

@@ -15,6 +15,9 @@ import MailQueuePage from './pages/MailQueuePage'
 import TicketsPage from './pages/TicketsPage'
 import TicketDetailPage from './pages/TicketDetailPage'
 import AcceptInvitePage from './pages/AcceptInvitePage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
+import ProfilePage from './pages/ProfilePage'
 import ImportPage from './pages/ImportPage'
 import TldPricingPage from './pages/TldPricingPage'
 import RegistrarsPage from './pages/RegistrarsPage'
@@ -53,6 +56,8 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/accept-invite" element={<AcceptInvitePage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route
               path="/"
               element={
@@ -62,6 +67,7 @@ export default function App() {
               }
             >
               <Route index element={<DashboardPage />} />
+              <Route path="profile" element={<ProfilePage />} />
               <Route path="domains" element={<DomainsLayout />}>
                 <Route path=":name" element={<DomainDetailPage />} />
               </Route>

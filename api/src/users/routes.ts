@@ -1,7 +1,9 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
 import bcrypt from 'bcrypt'
+import { randomBytes } from 'crypto'
 import { query, queryOne, execute } from '../db.js'
+import { hashToken } from '../auth/jwt.js'
 import { requireAuth, requireAdmin } from '../middleware/auth.js'
 import { writeAuditLog } from '../audit/middleware.js'
 
@@ -23,6 +25,7 @@ const CreateUserBody = z.object({
 const UpdateUserBody = z.object({
   email: z.string().email().optional(),
   password: z.string().min(8).optional(),
+  current_password: z.string().min(1).optional(),
   full_name: z.string().min(1).max(255).optional(),
   role: z.enum(['admin', 'operator', 'tenant']).optional(),
   tenant_ids: z.array(z.number().int().positive()).optional(),
@@ -106,6 +109,15 @@ export async function userRoutes(app: FastifyInstance) {
       return reply.status(403).send({ code: 'FORBIDDEN' })
     }
 
+    // Require current_password when a non-admin changes their own password
+    if (body.data.password && req.user.role !== 'admin') {
+      if (!body.data.current_password) {
+        return reply.status(400).send({ code: 'CURRENT_PASSWORD_REQUIRED' })
+      }
+      const valid = await bcrypt.compare(body.data.current_password, (old as any).password_hash)
+      if (!valid) return reply.status(401).send({ code: 'CURRENT_PASSWORD_INVALID' })
+    }
+
     const hash = body.data.password ? await bcrypt.hash(body.data.password, 12) : null
     await execute(
       `UPDATE users SET
@@ -140,5 +152,47 @@ export async function userRoutes(app: FastifyInstance) {
     const cids = (await query('SELECT tenant_id FROM user_tenants WHERE user_id = ? ORDER BY tenant_id', [targetId]) as any[]).map(r => r.tenant_id)
     await writeAuditLog({ req, entityType: 'user', entityId: targetId, action: 'update', newValue: { ...updated, tenant_ids: cids } })
     return { ...updated, tenant_ids: cids }
+  })
+
+  // POST /users/:id/reset-password  (admin only — sends a password reset email to the user)
+  app.post<{ Params: { id: string } }>('/users/:id/reset-password', { preHandler: requireAdmin }, async (req, reply) => {
+    const targetId = Number(req.params.id)
+    if (!Number.isInteger(targetId) || targetId <= 0) return reply.status(400).send({ code: 'INVALID_ID' })
+
+    type Row = { id: number; email: string; full_name: string; locale: 'en' | 'de'; is_active: number }
+    const user = await queryOne<Row>(
+      'SELECT id, email, full_name, locale, is_active FROM users WHERE id = ?',
+      [targetId]
+    )
+    if (!user) return reply.status(404).send({ code: 'NOT_FOUND' })
+    if (!user.is_active) return reply.status(400).send({ code: 'USER_INACTIVE' })
+
+    await execute('UPDATE password_resets SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL', [user.id])
+
+    const token = randomBytes(32).toString('hex')
+    const tokenHash = hashToken(token)
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+
+    await execute(
+      'INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
+      [user.id, tokenHash, expiresAt.toISOString().slice(0, 19).replace('T', ' ')]
+    )
+
+    const appUrl = process.env.APP_URL ?? 'http://localhost:5173'
+    const resetUrl = `${appUrl}/reset-password?token=${token}`
+
+    execute(
+      `INSERT INTO mail_queue (to_email, template, payload) VALUES (?, 'password_reset', ?)`,
+      [user.email, JSON.stringify({
+        _locale: user.locale,
+        email: user.email,
+        full_name: user.full_name,
+        resetUrl,
+      })]
+    ).catch(err => console.error('[users] Failed to enqueue password reset email:', err.message))
+
+    await writeAuditLog({ req, entityType: 'user', entityId: user.id, action: 'reset_password', newValue: { email: user.email } })
+
+    return reply.send({ ok: true })
   })
 }

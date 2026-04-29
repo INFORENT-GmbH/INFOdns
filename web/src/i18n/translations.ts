@@ -18,6 +18,25 @@ export const translations = {
     login_submit:         'Sign in',
     login_submitting:     'Signing in…',
     login_invalidCreds:   'Invalid email or password',
+    login_forgotLink:     'Forgot password?',
+    login_backToLogin:    '← Back to sign in',
+
+    // Forgot / reset password
+    forgot_heading:       'Reset your password',
+    forgot_intro:         'Enter your email address and we will send you a link to choose a new password.',
+    forgot_submit:        'Send reset link',
+    forgot_submitting:    'Sending…',
+    forgot_success:       'If that email matches an account, a password-reset link is on its way. The link expires in 1 hour.',
+    reset_heading:        'Choose a new password',
+    reset_password:       'New password',
+    reset_confirmPassword: 'Confirm new password',
+    reset_submit:         'Set new password',
+    reset_submitting:     'Saving…',
+    reset_success:        'Password changed. You can now sign in with your new password.',
+    reset_mismatch:       'Passwords do not match.',
+    reset_error_notFound: 'This reset link is invalid.',
+    reset_error_used:     'This reset link has already been used.',
+    reset_error_expired:  'This reset link has expired. Please request a new one.',
 
     // Common
     loading:     'Loading…',
@@ -292,6 +311,23 @@ export const translations = {
     invite_error_expired:   'This invite has expired. Please ask your administrator to send a new one.',
     invite_mismatch:        'Passwords do not match.',
 
+    // Profile / change password
+    nav_profile:                  'My profile',
+    profile_title:                'My profile',
+    profile_changePassword:       'Change password',
+    profile_currentPassword:      'Current password',
+    profile_newPassword:          'New password',
+    profile_confirmPassword:      'Confirm new password',
+    profile_save:                 'Update password',
+    profile_saving:               'Updating…',
+    profile_success:              'Password updated.',
+    profile_currentPasswordWrong: 'Your current password is incorrect.',
+
+    // Admin: reset another user's password
+    users_resetPassword:        'Send reset email',
+    users_resetPasswordConfirm: (email: string) => `Send a password-reset email to ${email}?`,
+    users_resetPasswordSent:    'Password-reset email sent.',
+
     // Impersonation
     impersonation_active: 'You are impersonating another user.',
     impersonation_stop:   'Stop impersonating',
@@ -484,6 +520,25 @@ export const translations = {
     login_submit:         'Anmelden',
     login_submitting:     'Anmelden…',
     login_invalidCreds:   'Ungültige E-Mail oder Passwort',
+    login_forgotLink:     'Passwort vergessen?',
+    login_backToLogin:    '← Zurück zur Anmeldung',
+
+    // Forgot / reset password
+    forgot_heading:       'Passwort zurücksetzen',
+    forgot_intro:         'Geben Sie Ihre E-Mail-Adresse ein und wir senden Ihnen einen Link, um ein neues Passwort zu wählen.',
+    forgot_submit:        'Link senden',
+    forgot_submitting:    'Wird gesendet…',
+    forgot_success:       'Falls diese Adresse einem Konto zugeordnet ist, wurde ein Link zum Zurücksetzen verschickt. Der Link läuft in 1 Stunde ab.',
+    reset_heading:        'Neues Passwort wählen',
+    reset_password:       'Neues Passwort',
+    reset_confirmPassword: 'Neues Passwort bestätigen',
+    reset_submit:         'Passwort speichern',
+    reset_submitting:     'Speichern…',
+    reset_success:        'Passwort geändert. Sie können sich jetzt mit dem neuen Passwort anmelden.',
+    reset_mismatch:       'Passwörter stimmen nicht überein.',
+    reset_error_notFound: 'Dieser Reset-Link ist ungültig.',
+    reset_error_used:     'Dieser Reset-Link wurde bereits verwendet.',
+    reset_error_expired:  'Dieser Reset-Link ist abgelaufen. Bitte fordern Sie einen neuen an.',
 
     // Common
     loading:     'Laden…',
@@ -757,6 +812,23 @@ export const translations = {
     invite_error_used:      'Diese Einladung wurde bereits verwendet.',
     invite_error_expired:   'Diese Einladung ist abgelaufen. Bitten Sie Ihren Administrator, eine neue zu senden.',
     invite_mismatch:        'Passwörter stimmen nicht überein.',
+
+    // Profile / change password
+    nav_profile:                  'Mein Profil',
+    profile_title:                'Mein Profil',
+    profile_changePassword:       'Passwort ändern',
+    profile_currentPassword:      'Aktuelles Passwort',
+    profile_newPassword:          'Neues Passwort',
+    profile_confirmPassword:      'Neues Passwort bestätigen',
+    profile_save:                 'Passwort aktualisieren',
+    profile_saving:               'Wird aktualisiert…',
+    profile_success:              'Passwort aktualisiert.',
+    profile_currentPasswordWrong: 'Das aktuelle Passwort ist falsch.',
+
+    // Admin: reset another user's password
+    users_resetPassword:        'Reset-E-Mail senden',
+    users_resetPasswordConfirm: (email: string) => `Eine Passwort-Reset-E-Mail an ${email} senden?`,
+    users_resetPasswordSent:    'Passwort-Reset-E-Mail gesendet.',
 
     // Impersonation
     impersonation_active: 'Sie agieren als ein anderer Benutzer.',

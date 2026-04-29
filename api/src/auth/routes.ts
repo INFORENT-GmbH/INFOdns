@@ -31,6 +31,15 @@ const AcceptInviteBody = z.object({
   password: z.string().min(8),
 })
 
+const ForgotPasswordBody = z.object({
+  email: z.string().email(),
+})
+
+const ResetPasswordBody = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8),
+})
+
 type UserRow = {
   id: number
   email: string
@@ -294,6 +303,91 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     await execute('UPDATE user_invites SET used_at = NOW() WHERE id = ?', [invite.id])
+    return { ok: true }
+  })
+
+  // POST /auth/forgot-password  (public, rate-limited — always returns 200 to avoid user enumeration)
+  app.post('/auth/forgot-password', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const body = ForgotPasswordBody.safeParse(req.body)
+    if (!body.success) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: body.error.message })
+
+    type Row = { id: number; email: string; full_name: string; locale: 'en' | 'de'; is_active: number }
+    const user = await queryOne<Row>(
+      'SELECT id, email, full_name, locale, is_active FROM users WHERE email = ?',
+      [body.data.email]
+    )
+
+    if (user && user.is_active) {
+      // Invalidate any prior unused tokens for this user so only the latest link works
+      await execute('UPDATE password_resets SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL', [user.id])
+
+      const token = randomBytes(32).toString('hex')
+      const tokenHash = hashToken(token)
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+
+      await execute(
+        'INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
+        [user.id, tokenHash, expiresAt.toISOString().slice(0, 19).replace('T', ' ')]
+      )
+
+      const appUrl = process.env.APP_URL ?? 'http://localhost:5173'
+      const resetUrl = `${appUrl}/reset-password?token=${token}`
+
+      execute(
+        `INSERT INTO mail_queue (to_email, template, payload) VALUES (?, 'password_reset', ?)`,
+        [user.email, JSON.stringify({
+          _locale: user.locale,
+          email: user.email,
+          full_name: user.full_name,
+          resetUrl,
+        })]
+      ).catch(err => console.error('[auth] Failed to enqueue password reset email:', err.message))
+    }
+
+    return reply.send({ ok: true })
+  })
+
+  // GET /auth/reset-password/:token  (public — validate token before showing the form)
+  app.get<{ Params: { token: string } }>('/auth/reset-password/:token', async (req, reply) => {
+    const tokenHash = hashToken(req.params.token)
+    type Row = { email: string; expires_at: string; used_at: string | null }
+    const row = await queryOne<Row>(
+      `SELECT u.email, pr.expires_at, pr.used_at
+         FROM password_resets pr
+         JOIN users u ON u.id = pr.user_id
+        WHERE pr.token_hash = ?`,
+      [tokenHash]
+    )
+    if (!row) return reply.status(404).send({ code: 'RESET_NOT_FOUND' })
+    if (row.used_at) return reply.status(410).send({ code: 'RESET_USED' })
+    if (new Date(row.expires_at) < new Date()) return reply.status(410).send({ code: 'RESET_EXPIRED' })
+    return { email: row.email }
+  })
+
+  // POST /auth/reset-password  (public — set new password using a valid reset token)
+  app.post('/auth/reset-password', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (req, reply) => {
+    const body = ResetPasswordBody.safeParse(req.body)
+    if (!body.success) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: body.error.message })
+
+    const tokenHash = hashToken(body.data.token)
+    type Row = { id: number; user_id: number; expires_at: string; used_at: string | null }
+    const row = await queryOne<Row>(
+      'SELECT id, user_id, expires_at, used_at FROM password_resets WHERE token_hash = ?',
+      [tokenHash]
+    )
+    if (!row) return reply.status(404).send({ code: 'RESET_NOT_FOUND' })
+    if (row.used_at) return reply.status(410).send({ code: 'RESET_USED' })
+    if (new Date(row.expires_at) < new Date()) return reply.status(410).send({ code: 'RESET_EXPIRED' })
+
+    const hash = await bcrypt.hash(body.data.password, 12)
+    await execute(
+      'UPDATE users SET password_hash = ?, failed_login_count = 0, locked_until = NULL WHERE id = ?',
+      [hash, row.user_id]
+    )
+    await execute('UPDATE password_resets SET used_at = NOW() WHERE id = ?', [row.id])
+    // Invalidate any other live sessions — a reset means previous credentials are no longer trusted
+    await revokeAllForUser(row.user_id)
+
     return { ok: true }
   })
 }

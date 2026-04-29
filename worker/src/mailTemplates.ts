@@ -188,6 +188,53 @@ function userInvite(locale: Locale, p: UserInvitePayload): MailContent {
   return { subject, html: wrap(subject, bodyHtml), text }
 }
 
+// ── Password reset ───────────────────────────────────────────
+
+interface PasswordResetPayload {
+  email: string
+  full_name: string
+  resetUrl: string
+}
+
+function passwordReset(locale: Locale, p: PasswordResetPayload): MailContent {
+  const isEn = locale === 'en'
+
+  const subject = isEn
+    ? 'Reset your INFORENT Prisma password'
+    : 'Setzen Sie Ihr INFORENT Prisma-Passwort zurück'
+
+  const greeting = p.full_name
+    ? (isEn ? `Hello ${esc(p.full_name)},` : `Hallo ${esc(p.full_name)},`)
+    : (isEn ? 'Hello,' : 'Hallo,')
+
+  const intro = isEn
+    ? `Someone (hopefully you) requested a password reset for your <strong>INFORENT Prisma</strong> account (${esc(p.email)}). Click the button below to choose a new password.`
+    : `Jemand (hoffentlich Sie) hat ein Zurücksetzen des Passworts für Ihr <strong>INFORENT Prisma</strong>-Konto (${esc(p.email)}) angefordert. Klicken Sie auf die Schaltfläche, um ein neues Passwort zu wählen.`
+
+  const buttonLabel = isEn ? 'Reset password' : 'Passwort zurücksetzen'
+  const expiry = isEn ? 'This link expires in 1 hour.' : 'Dieser Link läuft in 1 Stunde ab.'
+  const ignore = isEn
+    ? 'If you did not request a password reset, you can safely ignore this email — your password will not be changed.'
+    : 'Wenn Sie kein Zurücksetzen angefordert haben, können Sie diese E-Mail ignorieren — Ihr Passwort bleibt unverändert.'
+
+  const bodyHtml = `<h2>${esc(subject)}</h2>
+<p>${greeting}</p>
+<p>${intro}</p>
+<p style="text-align:center;margin:24px 0">
+  <a href="${esc(p.resetUrl)}" style="background:#2563eb;color:#fff;padding:10px 24px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px">${esc(buttonLabel)}</a>
+</p>
+<p style="font-size:12px;color:#6b7280">${expiry}<br>${ignore}</p>`
+
+  const text = [
+    subject, '', greeting, '',
+    intro.replace(/<[^>]+>/g, ''), '',
+    `${buttonLabel}: ${p.resetUrl}`, '',
+    expiry, ignore,
+  ].join('\n')
+
+  return { subject, html: wrap(subject, bodyHtml), text }
+}
+
 // ── Ticket created ───────────────────────────────────────────
 
 interface TicketCreatedPayload {
@@ -449,6 +496,7 @@ const templates: Record<string, (locale: Locale, payload: any) => MailContent> =
   zone_deploy_success: zoneDeploySuccess,
   zone_deploy_failed: zoneDeployFailed,
   user_invite: userInvite,
+  password_reset: passwordReset,
   ticket_created: ticketCreated,
   ticket_reply: ticketReply,
   ticket_assigned: ticketAssigned,

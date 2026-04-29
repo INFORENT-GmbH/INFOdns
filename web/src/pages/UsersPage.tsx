@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getUsers, createUser, updateUser, inviteUser, getInvites, revokeInvite, getTenants, type User, type PendingInvite } from '../api/client'
+import { getUsers, createUser, updateUser, inviteUser, getInvites, revokeInvite, getTenants, adminResetUserPassword, type User, type PendingInvite } from '../api/client'
 import Select from '../components/Select'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
@@ -29,6 +29,8 @@ export default function UsersPage() {
   const [inviteError, setInviteError] = useState<string | null>(null)
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null)
 
+  const [resetSuccess, setResetSuccess] = useState<string | null>(null)
+  const [resettingId, setResettingId] = useState<number | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState({ email: '', full_name: '', role: 'tenant', locale: 'de', is_active: true, phone: '', street: '', zip: '', city: '', country: '' })
   const [editTenantIds, setEditTenantIds] = useState<number[]>([])
@@ -118,6 +120,21 @@ export default function UsersPage() {
     }
   }
 
+  async function handleResetPassword(u: User) {
+    if (!confirm(t('users_resetPasswordConfirm', u.email))) return
+    setResettingId(u.id)
+    setResetSuccess(null)
+    try {
+      await adminResetUserPassword(u.id)
+      setResetSuccess(u.email)
+    } catch {
+      // Surface a minimal error — admins are unlikely to hit it
+      setResetSuccess(null)
+    } finally {
+      setResettingId(null)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true); setError(null)
@@ -197,6 +214,12 @@ export default function UsersPage() {
       {inviteSuccess && (
         <div style={styles.successBanner}>
           {t('users_inviteSuccess')} <strong>{inviteSuccess}</strong>
+        </div>
+      )}
+
+      {resetSuccess && (
+        <div style={styles.successBanner}>
+          {t('users_resetPasswordSent')} <strong>{resetSuccess}</strong>
         </div>
       )}
 
@@ -324,6 +347,16 @@ export default function UsersPage() {
                             title={t('users_impersonate')}
                           >
                             {t('users_impersonate')}
+                          </button>
+                        )}
+                        {currentUser?.role === 'admin' && (
+                          <button
+                            onClick={() => handleResetPassword(u)}
+                            disabled={resettingId === u.id}
+                            style={styles.btnReset}
+                            title={t('users_resetPassword')}
+                          >
+                            {resettingId === u.id ? '…' : t('users_resetPassword')}
                           </button>
                         )}
                       </div>
@@ -456,5 +489,6 @@ const styles: Record<string, React.CSSProperties> = {
   btnSecondary: { padding: '.3125rem .75rem', background: '#fff', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.8125rem', cursor: 'pointer', color: '#374151' },
   btnEdit:        { padding: '.25rem .5rem', background: '#fff', border: '1px solid #2563eb', color: '#2563eb', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer', fontWeight: 500 },
   btnImpersonate: { padding: '.25rem .5rem', background: '#fbbf24', color: '#78350f', border: 'none', borderRadius: 4, fontSize: '.75rem', fontWeight: 600, cursor: 'pointer' },
+  btnReset:       { padding: '.25rem .5rem', background: '#fff', border: '1px solid #d1d5db', color: '#374151', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
   btnRevoke:      { padding: '.25rem .5rem', background: '#fff', border: '1px solid #e2e8f0', color: '#64748b', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
 }

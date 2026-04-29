@@ -209,6 +209,15 @@ export const impersonateUser = (userId: number) =>
 export const stopImpersonation = () =>
   api.post<{ accessToken: string }>('/auth/stop-impersonation')
 
+export const forgotPassword = (email: string) =>
+  api.post<{ ok: true }>('/auth/forgot-password', { email })
+
+export const validateResetToken = (token: string) =>
+  api.get<{ email: string }>(`/auth/reset-password/${token}`)
+
+export const resetPassword = (token: string, password: string) =>
+  api.post<{ ok: true }>('/auth/reset-password', { token, password })
+
 // Domains
 export interface DomainStats {
   total: number; active: number; pending: number; suspended: number; deleted: number
@@ -332,7 +341,10 @@ export const deleteTenant = (id: number) => api.delete(`/tenants/${id}`)
 // Users
 export const getUsers = () => api.get<User[]>('/users')
 export const createUser = (data: Partial<User> & { password: string }) => api.post<User>('/users', data)
-export const updateUser = (id: number, data: Partial<User>) => api.put<User>(`/users/${id}`, data)
+export const updateUser = (id: number, data: Partial<User> & { password?: string; current_password?: string }) =>
+  api.put<User>(`/users/${id}`, data)
+export const adminResetUserPassword = (id: number) =>
+  api.post<{ ok: true }>(`/users/${id}/reset-password`)
 
 // Invites
 export interface PendingInvite {
