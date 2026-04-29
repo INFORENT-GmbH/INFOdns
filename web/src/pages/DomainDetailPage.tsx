@@ -559,11 +559,15 @@ export default function DomainDetailPage() {
     const next = labels.filter(l => l.id !== id)
     patchLabelsCache(next)
     setSavingLabels(true)
-    try {
-      await updateDomainLabels(domain!.id, next)
-    } catch {
+    const invalidate = () => {
       qc.invalidateQueries({ queryKey: ['domain', name] })
       qc.invalidateQueries({ queryKey: ['label-suggestions', domain?.tenant_id] })
+    }
+    try {
+      await updateDomainLabels(domain!.id, next)
+      invalidate()
+    } catch {
+      invalidate()
     } finally {
       setSavingLabels(false)
     }
@@ -646,6 +650,7 @@ export default function DomainDetailPage() {
     try {
       await updateDomain(domain!.id, { ns_reference: v } as any)
       qc.invalidateQueries({ queryKey: ['domain', name] })
+      qc.invalidateQueries({ queryKey: ['domains'] })
     } catch (err: any) {
       alert(formatApiError(err))
     } finally {

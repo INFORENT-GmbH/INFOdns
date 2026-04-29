@@ -22,12 +22,18 @@ async function applyToDomain(
   const { match, replace_with, records, new_ttl } = payload
 
   await transaction(async (conn) => {
+    // Defense in depth: the API preview rejects match-less ops, but a
+    // corrupt or hand-crafted job in the queue could still arrive here.
+    if (['replace', 'delete', 'change_ttl'].includes(operation) && !match?.name) {
+      throw new Error('match.name is required for replace/delete/change_ttl')
+    }
+
     async function findMatches(): Promise<any[]> {
       let sql = 'SELECT * FROM dns_records WHERE domain_id = ? AND is_deleted = 0'
       const p: any[] = [domainId]
-      if (match?.name)  { sql += ' AND name = ?';      p.push(match.name) }
-      if (match?.type)  { sql += ' AND type = ?';      p.push(match.type) }
-      if (match?.value) { sql += ' AND value LIKE ?';  p.push(`%${match.value}%`) }
+      if (match?.name)  { sql += ' AND name = ?';   p.push(match.name) }
+      if (match?.type)  { sql += ' AND type = ?';   p.push(match.type) }
+      if (match?.value) { sql += ' AND value = ?';  p.push(match.value) }
       const [rows] = await conn.execute<any[]>(sql, p)
       return rows
     }

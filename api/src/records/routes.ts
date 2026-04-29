@@ -163,7 +163,7 @@ export async function recordRoutes(app: FastifyInstance) {
         [domain.id, name, type, ttl ?? null, priority ?? null, weight ?? null, port ?? null, value]
       )
       await enqueueRender(domain.id)
-      broadcast({ type: 'record_changed', domainId: domain.id })
+      broadcast({ type: 'record_changed', domainId: domain.id, tenantId: domain.tenant_id })
 
       const created = await queryOne('SELECT * FROM dns_records WHERE id = ?', [result.insertId])
       await writeAuditLog({ req, entityType: 'dns_record', entityId: result.insertId, domainId: domain.id, action: 'create', newValue: created })
@@ -194,7 +194,7 @@ export async function recordRoutes(app: FastifyInstance) {
         [name, type, ttl ?? null, priority ?? null, weight ?? null, port ?? null, value, req.params.id]
       )
       await enqueueRender(domain.id)
-      broadcast({ type: 'record_changed', domainId: domain.id })
+      broadcast({ type: 'record_changed', domainId: domain.id, tenantId: domain.tenant_id })
 
       const updated = await queryOne('SELECT * FROM dns_records WHERE id = ?', [req.params.id])
       await writeAuditLog({ req, entityType: 'dns_record', entityId: Number(req.params.id), domainId: domain.id, action: 'update', oldValue: old, newValue: updated })
@@ -218,7 +218,7 @@ export async function recordRoutes(app: FastifyInstance) {
 
       await execute('UPDATE dns_records SET is_deleted = 1 WHERE id = ?', [req.params.id])
       await enqueueRender(domain.id)
-      broadcast({ type: 'record_changed', domainId: domain.id })
+      broadcast({ type: 'record_changed', domainId: domain.id, tenantId: domain.tenant_id })
       await writeAuditLog({ req, entityType: 'dns_record', entityId: Number(req.params.id), domainId: domain.id, action: 'delete', oldValue: old })
       return { ok: true }
     }

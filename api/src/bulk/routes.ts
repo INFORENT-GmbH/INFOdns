@@ -44,14 +44,18 @@ async function computeDomainDiff(
 
   const { match, replace_with, records, new_ttl } = payload
 
-  // Helper: find matching records in a domain
+  // Helper: find matching records in a domain.
+  // `name` is required for replace/delete/change_ttl — a missing name would let
+  // a single criterion (e.g. type=A, value=1.1.1.1) silently hit unrelated
+  // records like `@` and `mail` together. `value` matches exactly to avoid
+  // substring collisions (10.0.0.1 vs 10.0.0.10).
   async function findMatches() {
     if (!match) return []
     let sql = 'SELECT * FROM dns_records WHERE domain_id = ? AND is_deleted = 0'
     const p: unknown[] = [domainId]
     if (match.name)  { sql += ' AND name = ?';  p.push(match.name) }
     if (match.type)  { sql += ' AND type = ?';  p.push(match.type) }
-    if (match.value) { sql += ' AND value LIKE ?'; p.push(`%${match.value}%`) }
+    if (match.value) { sql += ' AND value = ?'; p.push(match.value) }
     return query<any>(sql, p)
   }
 
@@ -175,6 +179,18 @@ export async function bulkRoutes(app: FastifyInstance) {
     } catch (err: any) {
       await execute("UPDATE bulk_jobs SET status = 'draft' WHERE id = ?", [job.id])
       return reply.status(422).send({ code: 'CORRUPT_JOB_PAYLOAD', message: `Stored job JSON is invalid: ${err.message}` })
+    }
+
+    // Operations that match existing records must specify a record `name` —
+    // otherwise (type=A, value=1.1.1.1) would clobber `@` and `mail` together.
+    if (['replace', 'delete', 'change_ttl'].includes(job.operation)) {
+      if (!payload?.match?.name) {
+        await execute("UPDATE bulk_jobs SET status = 'draft' WHERE id = ?", [job.id])
+        return reply.status(400).send({
+          code: 'VALIDATION_ERROR',
+          message: 'match.name is required for replace, delete, and change_ttl operations',
+        })
+      }
     }
 
     const domainIds = await resolveDomainIds(filter, req)

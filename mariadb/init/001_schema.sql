@@ -188,6 +188,7 @@ CREATE TABLE audit_logs (
   created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_domain  (domain_id),
   INDEX idx_user    (user_id),
+  INDEX idx_tenant  (tenant_id),
   INDEX idx_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
