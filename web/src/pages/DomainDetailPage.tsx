@@ -37,6 +37,13 @@ const INLINE_STYLES = `
     pointer-events: none; opacity: 0; transition: opacity 0s;
   }
   .alias-hint:hover::after { opacity: 1; }
+  .ddp-menuitem:hover:not(:disabled) { background: #f1f5f9; }
+  .ddp-issues-item-toggle { background: none; border: none; cursor: pointer; padding: 2px 6px; border-radius: 4px; color: inherit; font-size: .75rem; }
+  .ddp-issues-item-toggle:hover { background: rgba(0,0,0,.06); }
+  .ddp-row-new      > td:first-child { box-shadow: inset 4px 0 0 #22c55e; }
+  .ddp-row-dirty    > td:first-child { box-shadow: inset 4px 0 0 #f59e0b; }
+  .ddp-row-deleted  > td:first-child { box-shadow: inset 4px 0 0 #dc2626; }
+  .ddp-row-template > td:first-child { box-shadow: inset 4px 0 0 #38bdf8; }
 `
 
 const RECORD_TYPES = ['A','AAAA','CNAME','MX','NS','TXT','SRV','CAA','PTR','NAPTR','TLSA','SSHFP','DS']
@@ -85,6 +92,101 @@ function BulkEditButton({ rec }: { rec: DnsRecord }) {
   )
 }
 
+// ── Issues panel (unified banners) ────────────────────────────
+
+type IssueSeverity = 'error' | 'warning' | 'info'
+
+const ISSUE_TONE: Record<IssueSeverity, { border: string; bg: string; iconBg: string; fg: string; icon: string }> = {
+  error:   { border: '#fca5a5', bg: '#fef2f2', iconBg: '#fee2e2', fg: '#991b1b', icon: '⊗' },
+  warning: { border: '#fde68a', bg: '#fffbeb', iconBg: '#fef3c7', fg: '#92400e', icon: '⚠' },
+  info:    { border: '#bfdbfe', bg: '#eff6ff', iconBg: '#dbeafe', fg: '#1e40af', icon: 'ⓘ' },
+}
+
+function IssueRow({ severity, title, action, children }: {
+  severity: IssueSeverity
+  title: ReactNode
+  action?: { label: string; onClick: () => void; busy?: boolean }
+  children?: ReactNode
+}) {
+  const tone = ISSUE_TONE[severity]
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '.5rem', padding: '.5rem .75rem', borderLeft: `4px solid ${tone.border}`, background: tone.bg, color: tone.fg, fontSize: '.8125rem', borderBottom: `1px solid ${tone.border}` }}>
+      <span aria-hidden style={{ flexShrink: 0, width: 18, height: 18, borderRadius: '50%', background: tone.iconBg, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '.75rem', fontWeight: 700, lineHeight: 1 }}>{tone.icon}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600 }}>{title}</div>
+        {children !== undefined && children !== null && children !== false && (
+          <div style={{ marginTop: '.25rem', fontWeight: 400 }}>{children}</div>
+        )}
+      </div>
+      {action && (
+        <button
+          type="button"
+          onClick={action.onClick}
+          disabled={action.busy}
+          style={{ flexShrink: 0, padding: '.25rem .625rem', borderRadius: 4, border: `1px solid ${tone.border}`, background: '#fff', color: tone.fg, fontSize: '.75rem', fontWeight: 600, cursor: action.busy ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}
+        >{action.busy ? '…' : action.label}</button>
+      )}
+    </div>
+  )
+}
+
+// ── Header overflow menu ──────────────────────────────────────
+
+interface OverflowItem {
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  danger?: boolean
+}
+
+function HeaderOverflowMenu({ items }: { items: OverflowItem[] }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDocClick = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [open])
+
+  if (items.length === 0) return null
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title="More actions"
+        style={{ ...styles.btnSecondary, padding: '.25rem .5rem', fontWeight: 700, letterSpacing: '.05em' }}
+      >⋯</button>
+      {open && (
+        <div role="menu" style={styles.overflowMenu}>
+          {items.map((it, i) => (
+            <button
+              key={i}
+              type="button"
+              role="menuitem"
+              disabled={it.disabled}
+              onClick={() => { setOpen(false); it.onClick() }}
+              className="ddp-menuitem"
+              style={{
+                ...styles.overflowMenuItem,
+                color: it.danger ? '#b91c1c' : '#1e293b',
+                opacity: it.disabled ? 0.5 : 1,
+              }}
+            >{it.label}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────
 
 export default function DomainDetailPage() {
@@ -97,6 +199,7 @@ export default function DomainDetailPage() {
   const isOperator = user?.role === 'operator'
 
   // edits: changes to existing records keyed by record id
+  const [recordFilter, setRecordFilter] = useState('')
   const [edits, setEdits] = useState<Record<number, EditRow>>({})
   // pendingDeletes: ids of records marked for deletion
   const [pendingDeletes, setPendingDeletes] = useState<Set<number>>(new Set())
@@ -702,157 +805,174 @@ export default function DomainDetailPage() {
     <div>
       <style>{INLINE_STYLES}</style>
       <div style={styles.header}>
-        <button onClick={() => navigate('/domains')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#9ca3af', padding: '0 4px', lineHeight: 1, flexShrink: 0 }} title="Close">×</button>
-        <h2 style={{ ...styles.h2, display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
-          {domain.fqdn}
-          <a href={`https://${domain.fqdn}`} target="_blank" rel="noopener noreferrer" title={`Open ${domain.fqdn}`} style={{ color: '#9ca3af', verticalAlign: 'middle', lineHeight: 1, textDecoration: 'none' }}>
+        <button onClick={() => navigate('/domains')} style={styles.headerClose} title={t('cancel')}>×</button>
+        <div style={styles.headerTitle}>
+          <span style={styles.headerFqdn}>{domain.fqdn}</span>
+          <a href={`https://${domain.fqdn}`} target="_blank" rel="noopener noreferrer" title={`Open ${domain.fqdn}`} style={styles.headerExtLink}>
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
           </a>
           <span style={{
-            display: 'inline-block', padding: '1px 8px', borderRadius: 10, fontSize: '.75rem', fontWeight: 600,
+            ...styles.headerStatusPill,
             background: domain.status === 'active' ? '#dcfce7' : domain.status === 'suspended' ? '#fef3c7' : '#f3f4f6',
             color:      domain.status === 'active' ? '#166534' : domain.status === 'suspended' ? '#92400e' : '#6b7280',
-          }}>{domain.status === 'active' ? 'Plan: Free' : (t(`domain_status_${domain.status}` as any) ?? domain.status)}</span>
-        </h2>
-        <ZoneStatusBadge status={domain.zone_status} suspended={domain.status === 'suspended'} />
-        {(isAdmin || isOperator) && (
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '.5rem' }}>
-            {isAdmin && domain.status !== 'deleted' && (
-              <button
-                onClick={handleToggleStatus}
-                disabled={togglingStatus}
-                style={domain.status === 'suspended' ? styles.btnSuccess : styles.btnWarning}
-              >
-                {togglingStatus ? '…' : domain.status === 'suspended' ? t('domainDetail_activate') : t('domainDetail_suspend')}
+          }}>{t(`domain_status_${domain.status}` as any) ?? domain.status}</span>
+          <ZoneStatusBadge status={domain.zone_status} suspended={domain.status === 'suspended'} />
+        </div>
+        {(isAdmin || isOperator) && domain.status !== 'deleted' && (
+          <div style={styles.headerActions}>
+            {/* Primary positive action: re-activate when suspended */}
+            {isAdmin && domain.status === 'suspended' && (
+              <button onClick={handleToggleStatus} disabled={togglingStatus} style={styles.btnSuccess}>
+                {togglingStatus ? '…' : t('domainDetail_activate')}
               </button>
             )}
-            {domain.status !== 'deleted' && (
-              <button
-                onClick={domain.dnssec_enabled ? () => setShowDnssecModal(true) : handleToggleDnssec}
-                disabled={togglingDnssec}
-                style={domain.dnssec_enabled ? styles.btnWarning : styles.btnSecondary}
-              >
-                {togglingDnssec ? '…' : domain.dnssec_enabled ? t('domainDetail_dnssecBtn') : t('domainDetail_enableDnssec')}
+            {/* Always-useful diagnostic */}
+            <button onClick={() => setShowDnsCheckModal(true)} style={styles.btnSecondary}>
+              {t('domainDetail_dnsCheckBtn')}
+            </button>
+            {/* DNSSEC config is visible when enabled (modal opens DS info) */}
+            {domain.dnssec_enabled && (
+              <button onClick={() => setShowDnssecModal(true)} disabled={togglingDnssec} style={styles.btnSecondary}>
+                {togglingDnssec ? '…' : t('domainDetail_dnssecBtn')}
               </button>
             )}
-            {domain.status !== 'deleted' && (
-              <button onClick={() => setShowDnsCheckModal(true)} style={styles.btnSecondary}>
-                {t('domainDetail_dnsCheckBtn')}
-              </button>
-            )}
-            {isAdmin && (
-              <button onClick={handleDelete} disabled={deletingDomain} style={styles.btnDanger}>
-                {deletingDomain ? '…' : t('delete')}
-              </button>
-            )}
+            <HeaderOverflowMenu
+              items={[
+                !domain.dnssec_enabled && {
+                  label: t('domainDetail_enableDnssec'),
+                  onClick: handleToggleDnssec,
+                  disabled: togglingDnssec,
+                },
+                isAdmin && domain.status === 'active' && {
+                  label: t('domainDetail_suspend'),
+                  onClick: handleToggleStatus,
+                  disabled: togglingStatus,
+                },
+                isAdmin && {
+                  label: t('delete'),
+                  onClick: handleDelete,
+                  disabled: deletingDomain,
+                  danger: true,
+                },
+              ].filter(Boolean) as OverflowItem[]}
+            />
           </div>
         )}
       </div>
 
-      {conflictWarning && (
-        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.375rem .75rem', borderRadius: 6, margin: '.5rem .75rem 0', fontSize: '.8125rem', display: 'flex', alignItems: 'center', gap: '.75rem', border: '1px solid #fde68a' }}>
-          <span>⚠ {t('domainDetail_conflictWarning')}</span>
-          <button onClick={handleForceReload} style={{ flexShrink: 0, padding: '3px 10px', borderRadius: 4, border: '1px solid #f59e0b', background: '#fff', color: '#92400e', fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' }}>
-            {t('domainDetail_discardReload')}
-          </button>
-        </div>
-      )}
+      {(() => {
+        const hasZoneError = domain.zone_status === 'error'
+        const hasNsMismatch = domain.ns_ok === 0 && domain.status === 'active'
+        const hasDnssecIssue = domain.dnssec_enabled === 1 && domain.dnssec_ok === 0 && domain.status === 'active'
+        const isSuspended = domain.status === 'suspended'
+        const anyIssue = conflictWarning || hasZoneError || hasNsMismatch || hasDnssecIssue || isSuspended
+        if (!anyIssue) return null
 
-      {domain.status === 'suspended' && (
-        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.375rem .75rem', borderRadius: 6, margin: '.5rem .75rem 0', fontSize: '.8125rem', display: 'flex', alignItems: 'center', gap: '.5rem', border: '1px solid #fde68a' }}>
-          {t('domainDetail_suspendedMsg', t('domainDetail_activate'))}
-        </div>
-      )}
+        const observedNs = domain.ns_observed
+          ? domain.ns_observed.split(',').map(s => s.trim()).filter(Boolean)
+          : []
 
-      {domain.ns_ok === 0 && domain.status === 'active' && (
-        <div style={{ background: '#fee2e2', color: '#991b1b', padding: '.375rem .75rem', borderRadius: 6, margin: '.5rem .75rem 0', fontSize: '.8125rem', border: '1px solid #fca5a5' }}>
-          <strong>{t('domainDetail_nsMismatch')}</strong> — {t('domainDetail_nsMismatchDesc')}
-          {domain.ns_observed !== null && domain.ns_observed !== undefined && (() => {
-            const observed = domain.ns_observed.split(',').map(s => s.trim()).filter(Boolean)
-            return (
-              <div style={{ marginTop: '.375rem' }}>
-                {observed.length > 0 ? t('domainDetail_nsCurrent') : t('domainDetail_nsCurrentNone')}
-                {observed.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: 2 }}>
-                    {observed.map(ns => (
-                      <span key={ns} style={{ fontFamily: MONO, fontSize: '.8rem', marginTop: 2 }}>{ns}</span>
-                    ))}
+        async function recheckDnssecNow() {
+          if (!domain || recheckingDnssec) return
+          setRecheckingDnssec(true)
+          try {
+            await checkDomainDnssec(domain.id)
+            qc.invalidateQueries({ queryKey: ['domain', name] })
+          } catch (err) {
+            alert(formatApiError(err, 'DNSSEC check failed'))
+          } finally {
+            setRecheckingDnssec(false)
+          }
+        }
+
+        return (
+          <div style={styles.issuesPanel}>
+            {/* Errors first */}
+            {hasZoneError && (
+              <IssueRow
+                severity="error"
+                title={t('domainDetail_zoneFailed')}
+              >
+                {domain.zone_error && (
+                  <pre style={{ margin: 0, fontFamily: MONO, fontSize: '.8125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                    {renderZoneError(domain.zone_error, domain.id, setZoneModal)}
+                  </pre>
+                )}
+              </IssueRow>
+            )}
+            {conflictWarning && (
+              <IssueRow
+                severity="error"
+                title={t('domainDetail_conflictWarning')}
+                action={{ label: t('domainDetail_discardReload'), onClick: handleForceReload }}
+              />
+            )}
+            {hasNsMismatch && (
+              <IssueRow
+                severity="warning"
+                title={<><strong>{t('domainDetail_nsMismatch')}</strong> — {t('domainDetail_nsMismatchDesc')}</>}
+              >
+                {domain.ns_observed !== null && domain.ns_observed !== undefined && (
+                  <div>
+                    {observedNs.length > 0 ? t('domainDetail_nsCurrent') : t('domainDetail_nsCurrentNone')}
+                    {observedNs.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: 2 }}>
+                        {observedNs.map(ns => (
+                          <span key={ns} style={{ fontFamily: MONO, fontSize: '.8rem', marginTop: 2 }}>{ns}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            )
-          })()}
-          {domain.expected_ns?.length > 0 && (
-            <div style={{ marginTop: '.375rem' }}>
-              {t('domainDetail_nsSetRecords')}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: 2 }}>
-              {domain.expected_ns.map(ns => (
-                <span
-                  key={ns}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', position: 'relative', cursor: 'pointer', marginTop: 2 }}
-                  onMouseEnter={() => setHoveredNsItem(ns)}
-                  onMouseLeave={() => setHoveredNsItem(null)}
-                  onClick={() => {
-                    navigator.clipboard.writeText(ns)
-                    setCopiedNs(ns)
-                    setTimeout(() => setCopiedNs(prev => prev === ns ? null : prev), 1500)
-                  }}
-                >
-                  <span style={{ fontFamily: MONO, fontSize: '.8rem' }}>{ns}</span>
-                  {copiedNs === ns && <span style={{ color: '#16a34a', marginLeft: '.25rem', fontSize: '.7rem' }}>✓</span>}
-                  {hoveredNsItem === ns && copiedNs !== ns && (
-                    <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>{t('domainDetail_clickToCopy')}</span>
-                  )}
-                  {copiedNs === ns && hoveredNsItem === ns && (
-                    <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>{t('domainDetail_copied')}</span>
-                  )}
-                </span>
-              ))}
-              </div>
-            </div>
-          )}
-
-        </div>
-      )}
-
-      {domain.dnssec_enabled === 1 && domain.dnssec_ok === 0 && domain.status === 'active' && (
-        <div style={{ background: '#fef3c7', color: '#92400e', padding: '.375rem .75rem', borderRadius: 6, margin: '.5rem .75rem 0', fontSize: '.8125rem', border: '1px solid #fde68a', display: 'flex', alignItems: 'flex-start', gap: '.75rem' }}>
-          <div style={{ flex: 1 }}>
-            <strong>{t('domainDetail_dnssecNotVisible')}</strong> — {t('domainDetail_dnssecNotVisibleDesc')}
-            <div style={{ marginTop: '.25rem', fontSize: '.7rem', color: '#a16207' }}>{t('domainDetail_dnssecCheckedEvery')}</div>
+                {domain.expected_ns?.length > 0 && (
+                  <div style={{ marginTop: '.375rem' }}>
+                    {t('domainDetail_nsSetRecords')}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: 2 }}>
+                      {domain.expected_ns.map(ns => (
+                        <span
+                          key={ns}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', position: 'relative', cursor: 'pointer', marginTop: 2 }}
+                          onMouseEnter={() => setHoveredNsItem(ns)}
+                          onMouseLeave={() => setHoveredNsItem(null)}
+                          onClick={() => {
+                            navigator.clipboard.writeText(ns)
+                            setCopiedNs(ns)
+                            setTimeout(() => setCopiedNs(prev => prev === ns ? null : prev), 1500)
+                          }}
+                        >
+                          <span style={{ fontFamily: MONO, fontSize: '.8rem' }}>{ns}</span>
+                          {copiedNs === ns && <span style={{ color: '#16a34a', marginLeft: '.25rem', fontSize: '.7rem' }}>✓</span>}
+                          {hoveredNsItem === ns && copiedNs !== ns && (
+                            <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>{t('domainDetail_clickToCopy')}</span>
+                          )}
+                          {copiedNs === ns && hoveredNsItem === ns && (
+                            <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>{t('domainDetail_copied')}</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </IssueRow>
+            )}
+            {hasDnssecIssue && (
+              <IssueRow
+                severity="warning"
+                title={<><strong>{t('domainDetail_dnssecNotVisible')}</strong> — {t('domainDetail_dnssecNotVisibleDesc')}</>}
+                action={{ label: t('domainDetail_dnssecCheckNow'), onClick: recheckDnssecNow, busy: recheckingDnssec }}
+              >
+                <span style={{ fontSize: '.7rem', opacity: 0.85 }}>{t('domainDetail_dnssecCheckedEvery')}</span>
+              </IssueRow>
+            )}
+            {isSuspended && (
+              <IssueRow
+                severity="info"
+                title={t('domainDetail_suspendedMsg', t('domainDetail_activate'))}
+              />
+            )}
           </div>
-          <button
-            type="button"
-            disabled={recheckingDnssec}
-            onClick={async () => {
-              if (!domain || recheckingDnssec) return
-              setRecheckingDnssec(true)
-              try {
-                await checkDomainDnssec(domain.id)
-                qc.invalidateQueries({ queryKey: ['domain', name] })
-              } catch (err) {
-                alert(formatApiError(err, 'DNSSEC check failed'))
-              } finally {
-                setRecheckingDnssec(false)
-              }
-            }}
-            style={{ background: '#fff', color: '#92400e', border: '1px solid #fde68a', borderRadius: 4, padding: '.25rem .625rem', fontSize: '.75rem', fontWeight: 600, cursor: recheckingDnssec ? 'wait' : 'pointer', whiteSpace: 'nowrap' }}
-          >
-            {recheckingDnssec ? '…' : t('domainDetail_dnssecCheckNow')}
-          </button>
-        </div>
-      )}
-
-      {domain.zone_status === 'error' && (
-        <div style={styles.errorBanner}>
-          <strong>{t('domainDetail_zoneFailed')}</strong>
-          {domain.zone_error && (
-            <pre style={{ margin: '.5rem 0 0', fontFamily: MONO, fontSize: '.8125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-              {renderZoneError(domain.zone_error, domain.id, setZoneModal)}
-            </pre>
-          )}
-        </div>
-      )}
+        )
+      })()}
 
       <div style={styles.meta}>
         {isAdmin ? (
@@ -1039,16 +1159,50 @@ export default function DomainDetailPage() {
         </div>
       )}
 
-      <div style={styles.tableHeader}>
-        <h3 style={styles.h3}>{t('domainDetail_dnsRecords')}</h3>
-        {!nsRefMode && (
-          <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
-            <button onClick={() => setShowImportModal(true)} style={styles.btnSecondary}>{t('domainDetail_importZone')}</button>
-            <button onClick={() => { setShowApplyPanel(p => !p); setApplyDiff(null); setApplyTplError(null) }} style={styles.btnSecondary}>{t('templates_applyTemplate')}</button>
-            <button onClick={addNewRow} style={hasDirty ? styles.btnSecondary : styles.btnPrimary}>{t('domainDetail_addRecord')}</button>
+      {(() => {
+        const ownRecords = (records as DnsRecord[]).filter(r => !r._from_template)
+        const totalRecords = ownRecords.length + newRows.length
+        const f = recordFilter.trim().toLowerCase()
+        const matchesFilter = (name: string, type: string, value: string) =>
+          !f || name.toLowerCase().includes(f) || type.toLowerCase().includes(f) || value.toLowerCase().includes(f)
+        const visibleOwnCount = f
+          ? ownRecords.filter(r => {
+              const row = getRow(r)
+              return matchesFilter(row.name, row.type, row.value)
+            }).length
+          : ownRecords.length
+        const visibleNewCount = f
+          ? newRows.filter(r => matchesFilter(r.name, r.type, r.value)).length
+          : newRows.length
+        const visibleCount = visibleOwnCount + visibleNewCount
+
+        return (
+          <div style={styles.tableHeader}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '.5rem', flexWrap: 'wrap' }}>
+              <h3 style={styles.h3}>{t('domainDetail_dnsRecords')}</h3>
+              <span style={styles.recordCount}>
+                {f ? `${visibleCount} / ${totalRecords}` : totalRecords}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
+              <input
+                type="search"
+                value={recordFilter}
+                onChange={e => setRecordFilter(e.target.value)}
+                placeholder={t('domains_searchPlaceholder')}
+                style={styles.recordFilter}
+              />
+              {!nsRefMode && (
+                <>
+                  <button onClick={() => setShowImportModal(true)} style={styles.btnSecondary}>{t('domainDetail_importZone')}</button>
+                  <button onClick={() => { setShowApplyPanel(p => !p); setApplyDiff(null); setApplyTplError(null) }} style={styles.btnSecondary}>{t('templates_applyTemplate')}</button>
+                  <button onClick={addNewRow} style={hasDirty ? styles.btnSecondary : styles.btnPrimary}>{t('domainDetail_addRecord')}</button>
+                </>
+              )}
+            </div>
           </div>
-        )}
-      </div>
+        )
+      })()}
 
       {showApplyPanel && !nsRefMode && (
         <div style={styles.applyPanel}>
@@ -1191,7 +1345,7 @@ export default function DomainDetailPage() {
       )}
 
       {loadingRecords ? <p style={{ padding: '0 .75rem' }}>{t('domainDetail_loadingRecords')}</p> : (
-        <div style={{ overflowX: 'auto', position: 'relative', ...(nsRefMode ? { margin: '0 .75rem', border: '2px solid #f59e0b', borderRadius: 6, overflow: 'hidden' } : {}) }}>
+        <div style={{ position: 'relative', ...(nsRefMode ? { margin: '0 .75rem', border: '2px solid #f59e0b', borderRadius: 6, overflow: 'hidden' } : {}) }}>
         {(applying || pendingRefresh) && (
           <div style={styles.tableOverlay}>
             <div style={styles.spinner} />
@@ -1213,8 +1367,11 @@ export default function DomainDetailPage() {
           </thead>
           <tbody>
             {/* New (unsaved) rows at top */}
-            {newRows.map(row => (
-              <tr key={row._newId} style={{ ...styles.tr, background: '#f0fdf4', outline: '1px solid #86efac' }}>
+            {newRows.filter(row => {
+              const f = recordFilter.trim().toLowerCase()
+              return !f || row.name.toLowerCase().includes(f) || row.type.toLowerCase().includes(f) || row.value.toLowerCase().includes(f)
+            }).map(row => (
+              <tr key={row._newId} className="ddp-row-new" style={{ ...styles.tr, background: '#f0fdf4' }}>
                 <td style={styles.td}>
                   <input value={row.name} onChange={e => setNewField(row._newId, 'name', e.target.value)}
                     className="inline-field" style={{ ...styles.inlineInput, fontFamily: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }} />
@@ -1285,12 +1442,20 @@ export default function DomainDetailPage() {
             ))}
 
             {/* Existing records */}
-            {(records as DnsRecord[]).map(rec => {
+            {(records as DnsRecord[]).filter(rec => {
+              const f = recordFilter.trim().toLowerCase()
+              if (!f) return true
+              if (rec._from_template) {
+                return rec.name.toLowerCase().includes(f) || rec.type.toLowerCase().includes(f) || rec.value.toLowerCase().includes(f)
+              }
+              const r = getRow(rec)
+              return r.name.toLowerCase().includes(f) || r.type.toLowerCase().includes(f) || r.value.toLowerCase().includes(f)
+            }).map(rec => {
               // ── Template records: read-only display ──
               if (rec._from_template) {
                 const tplName = assignedTemplates.find(t => t.id === rec.template_id)?.name ?? 'TPL'
                 return (
-                  <tr key={`tpl-${rec.id}`} style={{ ...styles.tr, background: '#f0f9ff' }}>
+                  <tr key={`tpl-${rec.id}`} className="ddp-row-template" style={{ ...styles.tr, background: '#f0f9ff' }}>
                     <td style={{ ...styles.td, fontFamily: MONO, color: '#374151' }}>{rec.name}</td>
                     <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -1313,13 +1478,14 @@ export default function DomainDetailPage() {
               const row = getRow(rec)
               const dirty = !!edits[rec.id]
               const rowStyle = isDeleted
-                ? { ...styles.tr, background: '#fef2f2', outline: '1px solid #fca5a5', opacity: 0.6 }
+                ? { ...styles.tr, background: '#fef2f2', opacity: 0.6 }
                 : dirty
-                  ? { ...styles.tr, background: '#fefce8', outline: '1px solid #fde047' }
+                  ? { ...styles.tr, background: '#fefce8' }
                   : styles.tr
+              const rowClass = isDeleted ? 'ddp-row-deleted' : dirty ? 'ddp-row-dirty' : undefined
 
               return (
-                <tr key={rec.id} style={rowStyle}>
+                <tr key={rec.id} className={rowClass} style={rowStyle}>
                   <td style={styles.td}>
                     <input value={row.name} onChange={e => setField(rec.id, rec, 'name', e.target.value)}
                       disabled={isDeleted || nsRefMode} className="inline-field"
@@ -1400,9 +1566,30 @@ export default function DomainDetailPage() {
               )
             })}
 
-            {(records as DnsRecord[]).filter(r => !r._from_template).length === 0 && newRows.length === 0 && (
-              <tr><td colSpan={5 + (showPriority ? 1 : 0) + (showWeightPort ? 2 : 0)} style={{ ...styles.td, textAlign: 'center', color: '#9ca3af' }}>{t('domainDetail_noRecords')}</td></tr>
-            )}
+            {(() => {
+              const f = recordFilter.trim().toLowerCase()
+              const ownRecords = (records as DnsRecord[]).filter(r => !r._from_template)
+              const totalCount = ownRecords.length + newRows.length
+              if (totalCount === 0) {
+                return (
+                  <tr><td colSpan={5 + (showPriority ? 1 : 0) + (showWeightPort ? 2 : 0)} style={{ ...styles.td, textAlign: 'center', color: '#9ca3af' }}>{t('domainDetail_noRecords')}</td></tr>
+                )
+              }
+              if (!f) return null
+              const matches =
+                newRows.some(r => r.name.toLowerCase().includes(f) || r.type.toLowerCase().includes(f) || r.value.toLowerCase().includes(f)) ||
+                (records as DnsRecord[]).some(r => {
+                  if (r._from_template) {
+                    return r.name.toLowerCase().includes(f) || r.type.toLowerCase().includes(f) || r.value.toLowerCase().includes(f)
+                  }
+                  const row = getRow(r)
+                  return row.name.toLowerCase().includes(f) || row.type.toLowerCase().includes(f) || row.value.toLowerCase().includes(f)
+                })
+              if (matches) return null
+              return (
+                <tr><td colSpan={5 + (showPriority ? 1 : 0) + (showWeightPort ? 2 : 0)} style={{ ...styles.td, textAlign: 'center', color: '#9ca3af' }}>—</td></tr>
+              )
+            })()}
           </tbody>
         </table>
         </div>
@@ -1445,18 +1632,29 @@ export default function DomainDetailPage() {
 
 
 const styles: Record<string, React.CSSProperties> = {
-  header: { display: 'flex', alignItems: 'center', gap: '.625rem', padding: '.625rem .75rem', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', flexWrap: 'wrap' },
+  header: { display: 'flex', alignItems: 'center', gap: '.75rem', padding: '.625rem .75rem', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', flexWrap: 'wrap' },
+  headerClose: { background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.25rem', color: '#9ca3af', padding: '0 4px', lineHeight: 1, flexShrink: 0 },
+  headerTitle: { display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap', minWidth: 0, flex: 1 },
+  headerFqdn: { fontSize: '1rem', fontWeight: 700, color: '#1e293b', wordBreak: 'break-all' as const },
+  headerExtLink: { color: '#9ca3af', verticalAlign: 'middle', lineHeight: 1, textDecoration: 'none', display: 'inline-flex', alignItems: 'center' },
+  headerStatusPill: { display: 'inline-block', padding: '1px 8px', borderRadius: 10, fontSize: '.75rem', fontWeight: 600, whiteSpace: 'nowrap' as const },
+  headerActions: { display: 'flex', gap: '.375rem', alignItems: 'center', flexShrink: 0 },
+  overflowMenu: { position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 40, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,.08)', minWidth: 180, padding: '.25rem', display: 'flex', flexDirection: 'column' as const },
+  overflowMenuItem: { background: 'none', border: 'none', textAlign: 'left' as const, padding: '.4rem .625rem', borderRadius: 4, fontSize: '.8125rem', cursor: 'pointer', whiteSpace: 'nowrap' as const },
   back: { color: '#64748b', textDecoration: 'none', fontSize: '.8125rem' },
   h2: { margin: 0, fontSize: '1rem', fontWeight: 700, color: '#1e293b' },
   h3: { margin: 0, fontSize: '.875rem', fontWeight: 600, color: '#1e293b' },
   errorBanner: { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 6, margin: '.5rem .75rem 0', fontSize: '.8125rem' },
+  issuesPanel: { margin: '.5rem .75rem 0', border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden', display: 'flex', flexDirection: 'column' as const, background: '#fff' },
   meta: { display: 'flex', gap: '1rem', padding: '.375rem .75rem', fontSize: '.8125rem', color: '#374151', flexWrap: 'wrap', borderBottom: '1px solid #f1f5f9' },
   labelsSection: { padding: '.375rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
   labelsTitle: { fontSize: '.7rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' as const, whiteSpace: 'nowrap' as const },
   labelInput: { padding: '1px 5px', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.75rem', width: 110 },
   labelAddBtn: { padding: '1px 6px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
   labelNewBtn: { padding: '1px 6px', background: 'none', border: '1px dashed #cbd5e1', borderRadius: 12, fontSize: '.7rem', color: '#64748b', cursor: 'pointer' },
-  tableHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.5rem .75rem', borderBottom: '1px solid #e2e8f0' },
+  tableHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', padding: '.5rem .75rem', borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap' as const },
+  recordCount: { fontSize: '.7rem', fontWeight: 600, color: '#64748b', background: '#e2e8f0', borderRadius: 10, padding: '1px 7px' },
+  recordFilter: { padding: '.25rem .5rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.8125rem', minWidth: 160, maxWidth: 220 },
   tplBadge: { display: 'inline-block', background: '#e0f2fe', color: '#0369a1', borderRadius: 4, padding: '0 4px', fontSize: '.7rem', fontWeight: 700, letterSpacing: '.03em', flexShrink: 0 },
   applyPanel: { margin: '.5rem .75rem 0', padding: '.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, display: 'flex', flexDirection: 'column' as const, gap: '.5rem' },
   applyLabel: { display: 'flex', flexDirection: 'column' as const, gap: 2, fontSize: '.8125rem', fontWeight: 600, color: '#374151' },
@@ -1466,7 +1664,7 @@ const styles: Record<string, React.CSSProperties> = {
   applyWarn: { background: '#fef3c7', color: '#92400e', padding: '.375rem .625rem', borderRadius: 4, fontSize: '.8125rem' },
   dirtyHint: { fontSize: '.75rem', color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 12 },
   table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '.4375rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', whiteSpace: 'nowrap', letterSpacing: '.04em' },
+  th: { textAlign: 'left', padding: '.4375rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', whiteSpace: 'nowrap', letterSpacing: '.04em', position: 'sticky', top: 0, zIndex: 5 },
   tr: { borderBottom: '1px solid #f1f5f9' },
   td: { padding: '.3rem .75rem', fontSize: '.8125rem', color: '#1e293b' },
   valueCell: { minWidth: 200, position: 'relative' as const },
