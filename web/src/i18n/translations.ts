@@ -130,6 +130,7 @@ export const translations = {
     domainDetail_nsRefReadOnly:    'records on this page are read-only',
 
     // Dashboard
+    dashboard_title:          'Dashboard',
     dashboard_domainHealth:   'Domain Health',
     dashboard_technicalHealth: 'Technical Health',
     dashboard_total:          'Total',
@@ -144,6 +145,12 @@ export const translations = {
     dashboard_topTenants:     'Top Tenants',
     dashboard_tenant:         'Tenant',
     dashboard_domains:        'Domains',
+    dashboard_recentActivity: 'Recent Activity',
+    dashboard_noActivity:     'No recent activity',
+    dashboard_openTickets:    'Open Tickets',
+    dashboard_noOpenTickets:  'No open tickets',
+    dashboard_nsStatus:       'Nameserver Status',
+    dashboard_viewAll:        'View all →',
     error_generic:            'An error occurred.',
 
     // Bulk jobs
@@ -380,6 +387,7 @@ export const translations = {
     modal_ttlHint:    '(blank = zone default)',
 
     // Support tickets
+    nav_dashboard:            'Dashboard',
     nav_products:             'Products',
     nav_help:                 'Help',
     nav_support:              'Support',
@@ -575,6 +583,7 @@ export const translations = {
     domainDetail_nsRefReadOnly:    'Einträge auf dieser Seite sind schreibgeschützt',
 
     // Dashboard
+    dashboard_title:          'Dashboard',
     dashboard_domainHealth:   'Domain-Gesundheit',
     dashboard_technicalHealth: 'Technische Gesundheit',
     dashboard_total:          'Gesamt',
@@ -589,6 +598,12 @@ export const translations = {
     dashboard_topTenants:     'Top-Mandanten',
     dashboard_tenant:         'Mandant',
     dashboard_domains:        'Domains',
+    dashboard_recentActivity: 'Letzte Aktivitäten',
+    dashboard_noActivity:     'Keine Aktivitäten',
+    dashboard_openTickets:    'Offene Tickets',
+    dashboard_noOpenTickets:  'Keine offenen Tickets',
+    dashboard_nsStatus:       'Nameserver-Status',
+    dashboard_viewAll:        'Alle anzeigen →',
     error_generic:            'Ein Fehler ist aufgetreten.',
 
     // Bulk jobs
@@ -825,6 +840,7 @@ export const translations = {
     modal_ttlHint:    '(leer = Zonen-Standard)',
 
     // Support tickets
+    nav_dashboard:            'Dashboard',
     nav_products:             'Produkte',
     nav_help:                 'Hilfe',
     nav_support:              'Support',

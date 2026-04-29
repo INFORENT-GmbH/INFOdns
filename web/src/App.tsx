@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { I18nProvider } from './i18n/I18nContext'
 import Layout from './components/Layout'
 import LoginPage from './pages/LoginPage'
+import DashboardPage from './pages/DashboardPage'
 import DomainsLayout from './pages/DomainsLayout'
 import DomainDetailPage from './pages/DomainDetailPage'
 import JobsPage from './pages/JobsPage'
@@ -60,7 +61,7 @@ export default function App() {
                 </RequireAuth>
               }
             >
-              <Route index element={<Navigate to="/domains" replace />} />
+              <Route index element={<DashboardPage />} />
               <Route path="domains" element={<DomainsLayout />}>
                 <Route path=":name" element={<DomainDetailPage />} />
               </Route>
@@ -76,7 +77,7 @@ export default function App() {
               <Route path="registrars" element={<RegistrarsPage />} />
               <Route path="templates" element={<TemplatesPage />} />
             </Route>
-            <Route path="*" element={<Navigate to="/domains" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
       </AuthProvider>
       </BrowserRouter>
