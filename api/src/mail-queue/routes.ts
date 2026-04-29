@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify'
 import { query, queryOne, execute } from '../db.js'
 import { requireAdmin } from '../middleware/auth.js'
+import { renderTemplate, type Locale } from '../lib/mailTemplates.js'
 
 export async function mailQueueRoutes(app: FastifyInstance) {
   // GET /mail-queue  (admin only)
@@ -39,7 +40,7 @@ export async function mailQueueRoutes(app: FastifyInstance) {
     }
   })
 
-  // GET /mail-queue/:id  (admin only — full row incl. body)
+  // GET /mail-queue/:id  (admin only — full row + rendered preview)
   app.get<{ Params: { id: string } }>('/mail-queue/:id', { preHandler: requireAdmin }, async (req, reply) => {
     const id = Number(req.params.id)
     const mail = await queryOne<any>(
@@ -49,10 +50,27 @@ export async function mailQueueRoutes(app: FastifyInstance) {
       [id]
     )
     if (!mail) return reply.status(404).send({ code: 'NOT_FOUND' })
+
     if (typeof mail.payload === 'string') {
       try { mail.payload = JSON.parse(mail.payload) } catch { /* leave as string */ }
     }
-    return mail
+
+    // For template-based mails, the worker renders at send time. Render the same
+    // templates here so the UI can preview pending mails.
+    let renderError: string | null = null
+    if (mail.template && mail.payload && typeof mail.payload === 'object') {
+      try {
+        const locale: Locale = (mail.payload as any)._locale === 'en' ? 'en' : 'de'
+        const rendered = renderTemplate(mail.template, locale, mail.payload)
+        if (!mail.subject)   mail.subject   = rendered.subject
+        if (!mail.body_html) mail.body_html = rendered.html
+        if (!mail.body_text) mail.body_text = rendered.text
+      } catch (err: any) {
+        renderError = err?.message ?? String(err)
+      }
+    }
+
+    return { ...mail, render_error: renderError }
   })
 
   // POST /mail-queue/:id/retry  (admin only — reset a failed mail to pending)

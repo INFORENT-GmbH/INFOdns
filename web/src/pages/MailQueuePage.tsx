@@ -182,14 +182,14 @@ function MailDetail({ id }: { id: number }) {
 
   return (
     <div style={styles.detailGrid}>
+      {data.render_error && (
+        <div style={styles.renderError}>
+          {t('mailQueue_renderError')}: {data.render_error}
+        </div>
+      )}
       {data.subject && (
         <Field label={t('mailQueue_subject')}>
           <div style={styles.subjectText}>{data.subject}</div>
-        </Field>
-      )}
-      {data.payload != null && (
-        <Field label={t('mailQueue_payload')}>
-          <pre style={styles.pre}>{JSON.stringify(data.payload, null, 2)}</pre>
         </Field>
       )}
       {data.body_html && (
@@ -207,10 +207,12 @@ function MailDetail({ id }: { id: number }) {
           <pre style={styles.pre}>{data.body_text}</pre>
         </Field>
       )}
-      {!hasBody && data.template && (
-        <div style={styles.muted}>{t('mailQueue_pendingRender')}</div>
+      {data.payload != null && (
+        <Field label={t('mailQueue_payload')}>
+          <pre style={styles.pre}>{JSON.stringify(data.payload, null, 2)}</pre>
+        </Field>
       )}
-      {!hasBody && !data.template && (
+      {!hasBody && !data.payload && (
         <div style={styles.muted}>{t('mailQueue_noBody')}</div>
       )}
     </div>
@@ -251,4 +253,5 @@ const styles: Record<string, React.CSSProperties> = {
   subjectText: { fontSize: '.875rem', color: '#1e293b', fontWeight: 500 },
   pre: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, padding: '.5rem .75rem', margin: 0, fontSize: '.75rem', fontFamily: 'monospace', color: '#1e293b', overflow: 'auto', maxHeight: 240, whiteSpace: 'pre-wrap' as const, wordBreak: 'break-word' as const },
   iframe: { width: '100%', minHeight: 320, border: '1px solid #e2e8f0', borderRadius: 4, background: '#fff' },
+  renderError: { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 4, padding: '.5rem .75rem', fontSize: '.8125rem' },
 }

@@ -347,7 +347,7 @@ export const translations = {
     mailQueue_text:        'Text',
     mailQueue_noBody:      'No body content',
     mailQueue_loadingBody: 'Loading…',
-    mailQueue_pendingRender: 'Will be rendered from template at send time.',
+    mailQueue_renderError: 'Template render failed',
 
     // Import zone modal
     importZone_title:        'Import Zone File',
@@ -809,7 +809,7 @@ export const translations = {
     mailQueue_text:        'Text',
     mailQueue_noBody:      'Kein Inhalt',
     mailQueue_loadingBody: 'Wird geladen…',
-    mailQueue_pendingRender: 'Wird beim Versand aus der Vorlage gerendert.',
+    mailQueue_renderError: 'Vorlage konnte nicht gerendert werden',
 
     // Import zone modal
     importZone_title:        'Zonendatei importieren',

@@ -1,5 +1,5 @@
-// Mirrored at api/src/lib/mailTemplates.ts — keep in sync. The worker renders at send
-// time; the API renders the same templates for the mail-queue preview UI.
+// Mirrored from worker/src/mailTemplates.ts — keep in sync. The worker renders at send
+// time; the API renders here only for the mail-queue preview UI.
 
 type Locale = 'en' | 'de'
 

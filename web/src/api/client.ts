@@ -409,6 +409,7 @@ export interface MailQueueDetail extends MailQueueItem {
   subject: string | null
   body_html: string | null
   body_text: string | null
+  render_error: string | null
 }
 
 export const getMailQueue = (params?: Record<string, string>) =>
