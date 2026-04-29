@@ -339,6 +339,15 @@ export const translations = {
     mailQueue_retrying:    'Retrying…',
     mailQueue_page:        'Page',
     mailQueue_of:          'of',
+    mailQueue_view:        'View',
+    mailQueue_hide:        'Hide',
+    mailQueue_subject:     'Subject',
+    mailQueue_payload:     'Payload',
+    mailQueue_html:        'HTML',
+    mailQueue_text:        'Text',
+    mailQueue_noBody:      'No body content',
+    mailQueue_loadingBody: 'Loading…',
+    mailQueue_pendingRender: 'Will be rendered from template at send time.',
 
     // Import zone modal
     importZone_title:        'Import Zone File',
@@ -792,6 +801,15 @@ export const translations = {
     mailQueue_retrying:    'Wird erneut gesendet…',
     mailQueue_page:        'Seite',
     mailQueue_of:          'von',
+    mailQueue_view:        'Anzeigen',
+    mailQueue_hide:        'Ausblenden',
+    mailQueue_subject:     'Betreff',
+    mailQueue_payload:     'Payload',
+    mailQueue_html:        'HTML',
+    mailQueue_text:        'Text',
+    mailQueue_noBody:      'Kein Inhalt',
+    mailQueue_loadingBody: 'Wird geladen…',
+    mailQueue_pendingRender: 'Wird beim Versand aus der Vorlage gerendert.',
 
     // Import zone modal
     importZone_title:        'Zonendatei importieren',

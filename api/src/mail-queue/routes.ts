@@ -39,6 +39,22 @@ export async function mailQueueRoutes(app: FastifyInstance) {
     }
   })
 
+  // GET /mail-queue/:id  (admin only — full row incl. body)
+  app.get<{ Params: { id: string } }>('/mail-queue/:id', { preHandler: requireAdmin }, async (req, reply) => {
+    const id = Number(req.params.id)
+    const mail = await queryOne<any>(
+      `SELECT id, to_email, template, payload, subject, body_html, body_text,
+              status, retries, max_retries, error, created_at, updated_at
+         FROM mail_queue WHERE id = ?`,
+      [id]
+    )
+    if (!mail) return reply.status(404).send({ code: 'NOT_FOUND' })
+    if (typeof mail.payload === 'string') {
+      try { mail.payload = JSON.parse(mail.payload) } catch { /* leave as string */ }
+    }
+    return mail
+  })
+
   // POST /mail-queue/:id/retry  (admin only — reset a failed mail to pending)
   app.post<{ Params: { id: string } }>('/mail-queue/:id/retry', { preHandler: requireAdmin }, async (req, reply) => {
     const id = Number(req.params.id)

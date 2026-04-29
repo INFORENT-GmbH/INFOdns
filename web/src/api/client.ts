@@ -404,8 +404,17 @@ export interface MailQueuePage {
   pages: number
 }
 
+export interface MailQueueDetail extends MailQueueItem {
+  payload: unknown | null
+  subject: string | null
+  body_html: string | null
+  body_text: string | null
+}
+
 export const getMailQueue = (params?: Record<string, string>) =>
   api.get<MailQueuePage>('/mail-queue', { params })
+export const getMailQueueItem = (id: number) =>
+  api.get<MailQueueDetail>(`/mail-queue/${id}`)
 export const retryMail = (id: number) => api.post(`/mail-queue/${id}/retry`)
 
 // Tickets

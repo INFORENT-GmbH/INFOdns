@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getMailQueue, retryMail, type MailQueueItem } from '../api/client'
+import { getMailQueue, getMailQueueItem, retryMail, type MailQueueItem } from '../api/client'
 import Select from '../components/Select'
 import { useI18n } from '../i18n/I18nContext'
 
@@ -13,6 +13,7 @@ export default function MailQueuePage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
   const [acting, setActing] = useState<number | null>(null)
+  const [expanded, setExpanded] = useState<number | null>(null)
 
   const params: Record<string, string> = {
     page: String(page),
@@ -95,30 +96,15 @@ export default function MailQueuePage() {
           </thead>
           <tbody>
             {items.map((m) => (
-              <tr key={m.id} style={styles.tr}>
-                <td style={styles.td}>{m.id}</td>
-                <td style={styles.td}>{m.to_email}</td>
-                <td style={styles.td}><code style={styles.code}>{m.template ?? '—'}</code></td>
-                <td style={styles.td}>{statusBadge(m.status)}</td>
-                <td style={styles.td}>{m.retries}/{m.max_retries}</td>
-                <td style={styles.td}>{new Date(m.created_at).toLocaleString()}</td>
-                <td style={styles.td}>
-                  {m.error && <span style={styles.errorText} title={m.error}>{m.error.slice(0, 60)}{m.error.length > 60 ? '…' : ''}</span>}
-                </td>
-                <td style={styles.td}>
-                  <div style={styles.actions}>
-                    {m.status === 'failed' && (
-                      <button
-                        onClick={() => handleRetry(m.id)}
-                        disabled={acting === m.id}
-                        style={styles.btnRetry}
-                      >
-                        {acting === m.id ? t('mailQueue_retrying') : t('mailQueue_retry')}
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
+              <MailRow
+                key={m.id}
+                m={m}
+                expanded={expanded === m.id}
+                onToggle={() => setExpanded(expanded === m.id ? null : m.id)}
+                onRetry={() => handleRetry(m.id)}
+                acting={acting === m.id}
+                statusBadge={statusBadge}
+              />
             ))}
           </tbody>
         </table></div>
@@ -131,6 +117,111 @@ export default function MailQueuePage() {
           <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={styles.pageBtn}>→</button>
         </div>
       )}
+    </div>
+  )
+}
+
+function MailRow({
+  m, expanded, onToggle, onRetry, acting, statusBadge,
+}: {
+  m: MailQueueItem
+  expanded: boolean
+  onToggle: () => void
+  onRetry: () => void
+  acting: boolean
+  statusBadge: (s: string) => React.ReactNode
+}) {
+  const { t } = useI18n()
+  return (
+    <>
+      <tr style={styles.tr}>
+        <td style={styles.td}>{m.id}</td>
+        <td style={styles.td}>{m.to_email}</td>
+        <td style={styles.td}><code style={styles.code}>{m.template ?? '—'}</code></td>
+        <td style={styles.td}>{statusBadge(m.status)}</td>
+        <td style={styles.td}>{m.retries}/{m.max_retries}</td>
+        <td style={styles.td}>{new Date(m.created_at).toLocaleString()}</td>
+        <td style={styles.td}>
+          {m.error && <span style={styles.errorText} title={m.error}>{m.error.slice(0, 60)}{m.error.length > 60 ? '…' : ''}</span>}
+        </td>
+        <td style={styles.td}>
+          <div style={styles.actions}>
+            <button onClick={onToggle} style={styles.btnView}>
+              {expanded ? t('mailQueue_hide') : t('mailQueue_view')}
+            </button>
+            {m.status === 'failed' && (
+              <button onClick={onRetry} disabled={acting} style={styles.btnRetry}>
+                {acting ? t('mailQueue_retrying') : t('mailQueue_retry')}
+              </button>
+            )}
+          </div>
+        </td>
+      </tr>
+      {expanded && (
+        <tr>
+          <td colSpan={8} style={styles.detailCell}>
+            <MailDetail id={m.id} />
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
+function MailDetail({ id }: { id: number }) {
+  const { t } = useI18n()
+  const { data, isLoading } = useQuery({
+    queryKey: ['mail-queue', id],
+    queryFn: () => getMailQueueItem(id).then(r => r.data),
+  })
+
+  if (isLoading) return <div style={styles.muted}>{t('mailQueue_loadingBody')}</div>
+  if (!data) return null
+
+  const hasBody = data.body_html || data.body_text
+
+  return (
+    <div style={styles.detailGrid}>
+      {data.subject && (
+        <Field label={t('mailQueue_subject')}>
+          <div style={styles.subjectText}>{data.subject}</div>
+        </Field>
+      )}
+      {data.payload != null && (
+        <Field label={t('mailQueue_payload')}>
+          <pre style={styles.pre}>{JSON.stringify(data.payload, null, 2)}</pre>
+        </Field>
+      )}
+      {data.body_html && (
+        <Field label={t('mailQueue_html')}>
+          <iframe
+            srcDoc={data.body_html}
+            sandbox=""
+            style={styles.iframe}
+            title={`mail-${id}-html`}
+          />
+        </Field>
+      )}
+      {data.body_text && (
+        <Field label={t('mailQueue_text')}>
+          <pre style={styles.pre}>{data.body_text}</pre>
+        </Field>
+      )}
+      {!hasBody && data.template && (
+        <div style={styles.muted}>{t('mailQueue_pendingRender')}</div>
+      )}
+      {!hasBody && !data.template && (
+        <div style={styles.muted}>{t('mailQueue_noBody')}</div>
+      )}
+    </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div style={styles.fieldLabel}>{label}</div>
+      {children}
     </div>
   )
 }
@@ -150,7 +241,14 @@ const styles: Record<string, React.CSSProperties> = {
   errorText: { color: '#b91c1c', fontSize: '.8rem' },
   actions: { display: 'flex', gap: '.35rem' },
   btnRetry: { padding: '.25rem .5rem', background: '#fbbf24', color: '#78350f', border: 'none', borderRadius: 4, fontSize: '.75rem', fontWeight: 600, cursor: 'pointer' },
+  btnView: { padding: '.25rem .5rem', background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.75rem', fontWeight: 500, cursor: 'pointer' },
   pagination: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.75rem', marginTop: '1rem' },
   pageBtn: { padding: '.25rem .5rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, cursor: 'pointer', fontSize: '.8125rem', color: '#374151' },
   pageInfo: { fontSize: '.8125rem', color: '#64748b' },
+  detailCell: { padding: '.75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
+  detailGrid: { display: 'flex', flexDirection: 'column', gap: '.75rem' },
+  fieldLabel: { fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '.04em', marginBottom: 4 },
+  subjectText: { fontSize: '.875rem', color: '#1e293b', fontWeight: 500 },
+  pre: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, padding: '.5rem .75rem', margin: 0, fontSize: '.75rem', fontFamily: 'monospace', color: '#1e293b', overflow: 'auto', maxHeight: 240, whiteSpace: 'pre-wrap' as const, wordBreak: 'break-word' as const },
+  iframe: { width: '100%', minHeight: 320, border: '1px solid #e2e8f0', borderRadius: 4, background: '#fff' },
 }
