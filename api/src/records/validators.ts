@@ -4,8 +4,14 @@ import { isIPv4, isIPv6 } from 'net'
 const HOSTNAME_RE = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.?$/i
 const isHostname = (v: string) => HOSTNAME_RE.test(v)
 
+// Record name: "@", a single "*", "*.foo.bar", or labels of [a-z0-9-] (with
+// optional leading "_" for service prefixes like _dmarc, _acme-challenge).
+// A strict regex here is the only thing keeping zone-file metacharacters
+// (newline, ;, $, parens, quotes) out of the worker's BIND zone renderer.
+const LABEL_RE = /^(?:@|\*|(?:\*\.)?(?:_?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:_?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*)$/i
+
 const fqdn = z.string().max(253).refine(isHostname, 'Invalid hostname')
-const label = z.string().max(253)  // record name (relative or "@")
+const label = z.string().min(1).max(253).regex(LABEL_RE, 'Invalid record name')
 
 const typeValidators: Record<string, z.ZodTypeAny> = {
   A: z.object({

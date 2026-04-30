@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
-import { api, login as apiLogin, logout as apiLogout, setAccessToken, impersonateUser as apiImpersonate, stopImpersonation as apiStopImpersonate } from '../api/client'
+import { api, login as apiLogin, logout as apiLogout, setAccessToken, onAccessTokenChange, impersonateUser as apiImpersonate, stopImpersonation as apiStopImpersonate } from '../api/client'
 
 interface AuthUser {
   sub: number
@@ -37,7 +37,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // On mount: attempt a silent token refresh using the httpOnly cookie.
   // If it succeeds the user is still logged in; if it fails they need to log in again.
+  // Also subscribe to token changes from the axios interceptor: when a 401 triggers
+  // a silent refresh inside client.ts, that path doesn't go through `applyToken`,
+  // so without this subscription the React state (and `useWs`) would stay stale.
   useEffect(() => {
+    const unsub = onAccessTokenChange((t) => {
+      setToken(t)
+      setUser(t ? parseJwt(t) : null)
+    })
     api.post<{ accessToken: string }>('/auth/refresh')
       .then(res => {
         applyToken(res.data.accessToken)
@@ -47,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // No valid session — user will be redirected to /login by RequireAuth
       })
       .finally(() => setReady(true))
+    return unsub
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {

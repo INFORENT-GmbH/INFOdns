@@ -35,8 +35,14 @@ export async function rotateRefreshToken(
   )
   if (!row || row.revoked || new Date(row.expires_at) < new Date()) return null
 
-  // Revoke the used token
-  await execute('UPDATE refresh_tokens SET revoked = 1 WHERE id = ?', [row.id])
+  // Atomic claim: only the request that flips revoked 0→1 wins. Without the
+  // `AND revoked = 0` predicate, two concurrent refresh calls with the same
+  // token could both pass the check above and both mint new access tokens.
+  const result = await execute(
+    'UPDATE refresh_tokens SET revoked = 1 WHERE id = ? AND revoked = 0',
+    [row.id]
+  )
+  if (result.affectedRows === 0) return null
   return { userId: row.user_id }
 }
 

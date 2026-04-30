@@ -35,14 +35,18 @@ function fqdn(v: string): string {
 
 /**
  * Splits a TXT string into 255-byte chunks and wraps each in double quotes.
- * BIND requires TXT rdata strings ≤ 255 bytes per segment.
+ * BIND requires TXT rdata strings ≤ 255 bytes per segment. Backslash and
+ * double-quote inside the string are escaped per RFC 1035 / BIND zone-file
+ * rules so a value like `v=spf1 "evil"` cannot break out of the quoted form.
  */
 function formatTxt(raw: string): string {
-  // Remove surrounding quotes if the stored value already has them
   const stripped = raw.replace(/^"|"$/g, '')
   const chunks: string[] = []
   for (let i = 0; i < stripped.length; i += 255) {
-    chunks.push(`"${stripped.slice(i, i + 255)}"`)
+    const piece = stripped.slice(i, i + 255)
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+    chunks.push(`"${piece}"`)
   }
   return chunks.join(' ')
 }

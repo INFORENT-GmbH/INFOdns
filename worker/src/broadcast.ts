@@ -17,9 +17,16 @@ export type WsEvent =
 
 export function broadcastEvent(event: WsEvent): void {
   if (!INTERNAL_SECRET) return
+  // 5 s cap so a slow/hung API can't wedge the worker — fetch() has no
+  // built-in timeout, so without AbortController these promises pile up.
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 5000)
   fetch(`${API_URL}/internal/broadcast`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-internal-secret': INTERNAL_SECRET },
     body: JSON.stringify(event),
-  }).catch(err => console.warn('[worker] broadcast failed:', err.message))
+    signal: ctrl.signal,
+  })
+    .catch(err => console.warn('[worker] broadcast failed:', err.message))
+    .finally(() => clearTimeout(timer))
 }

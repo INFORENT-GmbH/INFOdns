@@ -12,12 +12,27 @@ export const api = axios.create({
 // In-memory access token (never in localStorage)
 let accessToken: string | null = null
 
+type TokenListener = (t: string | null) => void
+const tokenListeners = new Set<TokenListener>()
+
 export function setAccessToken(token: string | null) {
   accessToken = token
+  tokenListeners.forEach(l => l(token))
 }
 
 export function getAccessToken() {
   return accessToken
+}
+
+/**
+ * Subscribe to access-token changes. Used by AuthContext so React state
+ * (and `useWs`) stay in sync when the response interceptor silently refreshes
+ * the token after a 401 — the interceptor lives outside React, so without
+ * this notification the WebSocket would keep running on the stale token.
+ */
+export function onAccessTokenChange(listener: TokenListener): () => void {
+  tokenListeners.add(listener)
+  return () => { tokenListeners.delete(listener) }
 }
 
 // Attach access token to every request
@@ -43,11 +58,11 @@ api.interceptors.response.use(
         refreshing = api
           .post<{ accessToken: string }>('/auth/refresh')
           .then((r) => {
-            accessToken = r.data.accessToken
-            return accessToken
+            setAccessToken(r.data.accessToken)
+            return r.data.accessToken
           })
           .catch(() => {
-            accessToken = null
+            setAccessToken(null)
             return null
           })
           .finally(() => { refreshing = null })

@@ -379,12 +379,20 @@ export async function authRoutes(app: FastifyInstance) {
     if (row.used_at) return reply.status(410).send({ code: 'RESET_USED' })
     if (new Date(row.expires_at) < new Date()) return reply.status(410).send({ code: 'RESET_EXPIRED' })
 
+    // Atomic claim: only the request that flips used_at NULL→NOW() is allowed
+    // to proceed. Two parallel resets with the same token would otherwise both
+    // pass the `if (row.used_at)` check above before either marked the row used.
+    const claim = await execute(
+      'UPDATE password_resets SET used_at = NOW() WHERE id = ? AND used_at IS NULL',
+      [row.id]
+    )
+    if (claim.affectedRows === 0) return reply.status(410).send({ code: 'RESET_USED' })
+
     const hash = await bcrypt.hash(body.data.password, 12)
     await execute(
       'UPDATE users SET password_hash = ?, failed_login_count = 0, locked_until = NULL WHERE id = ?',
       [hash, row.user_id]
     )
-    await execute('UPDATE password_resets SET used_at = NOW() WHERE id = ?', [row.id])
     // Invalidate any other live sessions — a reset means previous credentials are no longer trusted
     await revokeAllForUser(row.user_id)
 
