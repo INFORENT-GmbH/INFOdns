@@ -28,6 +28,18 @@ interface Props {
 type SortKey = 'fqdn' | 'zone_status' | 'ns_ok' | 'dnssec_enabled' | 'status' | 'tenant_name'
 type SortDir = 'asc' | 'desc'
 
+type ColumnKey = 'zone' | 'ns' | 'dnssec' | 'status' | 'tenant' | 'lastRendered' | 'nsChecked' | 'created' | 'labels'
+
+const COLUMN_KEYS: ColumnKey[] = [
+  'zone', 'ns', 'dnssec', 'status', 'tenant',
+  'lastRendered', 'nsChecked', 'created', 'labels',
+]
+
+const COLUMN_DEFAULTS: Record<ColumnKey, boolean> = {
+  zone: true, ns: true, dnssec: true, status: true, tenant: true,
+  lastRendered: true, nsChecked: true, created: true, labels: true,
+}
+
 const ZONE_STATUS_ORDER: Record<string, number> = { error: 0, dirty: 1, clean: 2 }
 
 const INLINE_STYLES = `
@@ -136,6 +148,35 @@ export default function DomainsTableView({
   const [tenantDropdownOpen, setTenantDropdownOpen] = useState(false)
   const [tenantSearch, setTenantSearch] = useState('')
   const tenantDropdownRef = useRef<HTMLDivElement>(null)
+  const [columnsOpen, setColumnsOpen] = useState(false)
+  const columnsRef = useRef<HTMLDivElement>(null)
+
+  const [visible, setVisible] = useState<Record<ColumnKey, boolean>>(() => {
+    try {
+      const stored = localStorage.getItem('domainsDashboard.columns')
+      if (stored) return { ...COLUMN_DEFAULTS, ...JSON.parse(stored) }
+    } catch { /* ignore */ }
+    return COLUMN_DEFAULTS
+  })
+  useEffect(() => {
+    localStorage.setItem('domainsDashboard.columns', JSON.stringify(visible))
+  }, [visible])
+  function toggleColumn(key: ColumnKey) {
+    setVisible(v => ({ ...v, [key]: !v[key] }))
+  }
+
+  const columnLabels: Record<ColumnKey, string> = {
+    zone:         t('domains_zone'),
+    ns:           'NS',
+    dnssec:       t('dashboard_dnssec'),
+    status:       t('status'),
+    tenant:       t('tenant'),
+    lastRendered: t('domains_lastRendered'),
+    nsChecked:    t('domains_nsChecked'),
+    created:      t('created'),
+    labels:       t('domains_labels'),
+  }
+  const visibleColCount = 2 /* checkbox + domain */ + COLUMN_KEYS.filter(k => visible[k]).length
 
   function toggleTenant(id: number) {
     setTenantFilter(tenantFilter.includes(id) ? tenantFilter.filter(x => x !== id) : [...tenantFilter, id])
@@ -171,6 +212,15 @@ export default function DomainsTableView({
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
   }, [tenantDropdownOpen])
+
+  useEffect(() => {
+    if (!columnsOpen) return
+    const onDoc = (e: MouseEvent) => {
+      if (!columnsRef.current?.contains(e.target as Node)) setColumnsOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [columnsOpen])
 
   const { data: stats } = useQuery({
     queryKey: ['domain-stats'],
@@ -357,6 +407,33 @@ export default function DomainsTableView({
             )}
           </div>
         )}
+
+        <div ref={columnsRef} style={{ position: 'relative', marginLeft: 'auto' }}>
+          <button
+            type="button"
+            onClick={() => setColumnsOpen(v => !v)}
+            title={t('domains_displayOptions')}
+            aria-label={t('domains_displayOptions')}
+            style={{ padding: '.25rem .5rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 3, cursor: 'pointer', fontSize: '.875rem', color: '#64748b', lineHeight: 1 }}
+          >
+            ⚙
+          </button>
+          {columnsOpen && (
+            <div style={{ ...filterStyles.labelDropdown, left: 'auto', right: 0, minWidth: 200 }}>
+              {COLUMN_KEYS.map(key => (
+                <button
+                  key={key}
+                  type="button"
+                  onMouseDown={e => { e.preventDefault(); toggleColumn(key) }}
+                  style={{ ...filterStyles.labelDropdownItem, gap: '.5rem' }}
+                >
+                  <input type="checkbox" checked={visible[key]} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
+                  {columnLabels[key]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -372,15 +449,15 @@ export default function DomainsTableView({
             <colgroup>
               <col style={{ width: 36 }} />
               <col />
-              <col style={{ width: 110 }} />
-              <col style={{ width: 60 }} />
-              <col style={{ width: 80 }} />
-              <col style={{ width: 90 }} />
-              <col style={{ width: 130 }} />
-              <col style={{ width: 100 }} />
-              <col style={{ width: 100 }} />
-              <col style={{ width: 100 }} />
-              <col />
+              {visible.zone         && <col style={{ width: 110 }} />}
+              {visible.ns           && <col style={{ width: 60 }} />}
+              {visible.dnssec       && <col style={{ width: 80 }} />}
+              {visible.status       && <col style={{ width: 90 }} />}
+              {visible.tenant       && <col style={{ width: 130 }} />}
+              {visible.lastRendered && <col style={{ width: 100 }} />}
+              {visible.nsChecked    && <col style={{ width: 100 }} />}
+              {visible.created      && <col style={{ width: 100 }} />}
+              {visible.labels       && <col />}
             </colgroup>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr>
@@ -395,20 +472,20 @@ export default function DomainsTableView({
                   />
                 </th>
                 <SortTh label={t('domain')} col="fqdn" sort={sort} setSort={setSort} />
-                <SortTh label={t('domains_zone')} col="zone_status" sort={sort} setSort={setSort} />
-                <SortTh label="NS" col="ns_ok" sort={sort} setSort={setSort} />
-                <SortTh label={t('dashboard_dnssec')} col="dnssec_enabled" sort={sort} setSort={setSort} />
-                <SortTh label={t('status')} col="status" sort={sort} setSort={setSort} />
-                <SortTh label={t('tenant')} col="tenant_name" sort={sort} setSort={setSort} />
-                <th style={{ ...s.th, color: '#64748b', whiteSpace: 'nowrap' }}>{t('domains_lastRendered')}</th>
-                <th style={{ ...s.th, color: '#64748b', whiteSpace: 'nowrap' }}>{t('domains_nsChecked')}</th>
-                <th style={{ ...s.th, color: '#64748b', whiteSpace: 'nowrap' }}>{t('created')}</th>
-                <th style={s.th}>{t('domains_labels')}</th>
+                {visible.zone         && <SortTh label={t('domains_zone')} col="zone_status" sort={sort} setSort={setSort} />}
+                {visible.ns           && <SortTh label="NS" col="ns_ok" sort={sort} setSort={setSort} />}
+                {visible.dnssec       && <SortTh label={t('dashboard_dnssec')} col="dnssec_enabled" sort={sort} setSort={setSort} />}
+                {visible.status       && <SortTh label={t('status')} col="status" sort={sort} setSort={setSort} />}
+                {visible.tenant       && <SortTh label={t('tenant')} col="tenant_name" sort={sort} setSort={setSort} />}
+                {visible.lastRendered && <th style={{ ...s.th, color: '#64748b', whiteSpace: 'nowrap' }}>{t('domains_lastRendered')}</th>}
+                {visible.nsChecked    && <th style={{ ...s.th, color: '#64748b', whiteSpace: 'nowrap' }}>{t('domains_nsChecked')}</th>}
+                {visible.created      && <th style={{ ...s.th, color: '#64748b', whiteSpace: 'nowrap' }}>{t('created')}</th>}
+                {visible.labels       && <th style={s.th}>{t('domains_labels')}</th>}
               </tr>
             </thead>
             <tbody>
               {paddingTop > 0 && (
-                <tr><td colSpan={11} style={{ height: paddingTop, padding: 0, border: 0 }} /></tr>
+                <tr><td colSpan={visibleColCount} style={{ height: paddingTop, padding: 0, border: 0 }} /></tr>
               )}
               {virtualItems.map(vi => {
                 const d = sorted[vi.index]
@@ -445,51 +522,64 @@ export default function DomainsTableView({
                         </span>
                       )}
                     </td>
-                    <td style={s.td}>
-                      <ZoneBadge status={d.zone_status} suspended={suspended} t={t} />
-                    </td>
-                    <td style={s.td}>
-                      {d.ns_ok === 0
-                        ? <span style={{ color: '#dc2626', fontWeight: 600, fontSize: '.8125rem' }}>⚠</span>
-                        : d.ns_ok === null
-                          ? <span style={{ color: '#9ca3af', fontSize: '.8125rem' }}>—</span>
-                          : <span style={{ color: '#16a34a', fontSize: '.875rem' }}>✓</span>}
-                    </td>
-                    <td style={s.td}>
-                      {d.dnssec_enabled
-                        ? <span style={{ color: '#16a34a', fontSize: '.875rem' }}>✓</span>
-                        : <span style={{ color: '#9ca3af', fontSize: '.8125rem' }}>—</span>}
-                    </td>
-                    <td style={s.td}>
-                      {suspended
-                        ? <span style={{ fontSize: '.75rem', fontWeight: 500, color: '#92400e', background: '#fef3c7', borderRadius: 3, padding: '1px 6px' }}>{t('domains_suspended')}</span>
-                        : <span style={{ color: '#6b7280', fontSize: '.8125rem' }}>{t('active').toLowerCase()}</span>}
-                    </td>
-                    <td style={{ ...s.td, color: '#6b7280' }}>{d.tenant_name ?? '—'}</td>
-                    {(() => {
-                      const lr = formatRelative(d.last_rendered_at, t)
-                      const ns = formatRelative(d.ns_checked_at, t)
-                      const cr = formatRelative(d.created_at, t)
+                    {visible.zone && (
+                      <td style={s.td}>
+                        <ZoneBadge status={d.zone_status} suspended={suspended} t={t} />
+                      </td>
+                    )}
+                    {visible.ns && (
+                      <td style={s.td}>
+                        {d.ns_ok === 0
+                          ? <span style={{ color: '#dc2626', fontWeight: 600, fontSize: '.8125rem' }}>⚠</span>
+                          : d.ns_ok === null
+                            ? <span style={{ color: '#9ca3af', fontSize: '.8125rem' }}>—</span>
+                            : <span style={{ color: '#16a34a', fontSize: '.875rem' }}>✓</span>}
+                      </td>
+                    )}
+                    {visible.dnssec && (
+                      <td style={s.td}>
+                        {d.dnssec_enabled
+                          ? <span style={{ color: '#16a34a', fontSize: '.875rem' }}>✓</span>
+                          : <span style={{ color: '#9ca3af', fontSize: '.8125rem' }}>—</span>}
+                      </td>
+                    )}
+                    {visible.status && (
+                      <td style={s.td}>
+                        {suspended
+                          ? <span style={{ fontSize: '.75rem', fontWeight: 500, color: '#92400e', background: '#fef3c7', borderRadius: 3, padding: '1px 6px' }}>{t('domains_suspended')}</span>
+                          : <span style={{ color: '#6b7280', fontSize: '.8125rem' }}>{t('active').toLowerCase()}</span>}
+                      </td>
+                    )}
+                    {visible.tenant && (
+                      <td style={{ ...s.td, color: '#6b7280' }}>{d.tenant_name ?? '—'}</td>
+                    )}
+                    {(visible.lastRendered || visible.nsChecked || visible.created) && (() => {
                       const cell = { ...s.td, color: '#6b7280', fontSize: '.8125rem', whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis' as const }
                       const inner = { display: 'inline-block', cursor: 'default' as const }
+                      const renderCell = (iso: string | null | undefined) => {
+                        const r = formatRelative(iso, t)
+                        return r.absolute ? <Tooltip tip={r.absolute} style={inner}>{r.label}</Tooltip> : r.label
+                      }
                       return (
                         <>
-                          <td style={cell}>{lr.absolute ? <Tooltip tip={lr.absolute} style={inner}>{lr.label}</Tooltip> : lr.label}</td>
-                          <td style={cell}>{ns.absolute ? <Tooltip tip={ns.absolute} style={inner}>{ns.label}</Tooltip> : ns.label}</td>
-                          <td style={cell}>{cr.absolute ? <Tooltip tip={cr.absolute} style={inner}>{cr.label}</Tooltip> : cr.label}</td>
+                          {visible.lastRendered && <td style={cell}>{renderCell(d.last_rendered_at)}</td>}
+                          {visible.nsChecked    && <td style={cell}>{renderCell(d.ns_checked_at)}</td>}
+                          {visible.created      && <td style={cell}>{renderCell(d.created_at)}</td>}
                         </>
                       )
                     })()}
-                    <td style={s.td}>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                        {d.labels?.map(l => <LabelChip key={l.id} label={l} />)}
-                      </div>
-                    </td>
+                    {visible.labels && (
+                      <td style={s.td}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                          {d.labels?.map(l => <LabelChip key={l.id} label={l} />)}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 )
               })}
               {paddingBottom > 0 && (
-                <tr><td colSpan={11} style={{ height: paddingBottom, padding: 0, border: 0 }} /></tr>
+                <tr><td colSpan={visibleColCount} style={{ height: paddingBottom, padding: 0, border: 0 }} /></tr>
               )}
             </tbody>
           </table>
