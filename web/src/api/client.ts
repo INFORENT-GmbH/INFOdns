@@ -383,6 +383,19 @@ export const acceptInvite = (data: { token: string; password: string }) =>
   api.post('/auth/accept-invite', data)
 
 // Bulk jobs
+export interface RecordSearchResult {
+  id: number
+  fqdn: string
+  tenant_id: number
+  tenant_name: string
+  record_id: number
+  record_name: string
+  record_type: string
+  ttl: number
+  priority: number | null
+  value: string
+}
+
 export const getZoneRenderQueue = () => api.get<ZoneRenderJob[]>('/zone-render-queue').then(r => r.data)
 export const getBulkJobs = () => api.get<BulkJob[]>('/bulk-jobs')
 export const createBulkJob = (data: object) => api.post<BulkJob>('/bulk-jobs', data)
@@ -391,7 +404,7 @@ export const approveBulkJob = (id: number) => api.post(`/bulk-jobs/${id}/approve
 export const getBulkJob = (id: number) => api.get(`/bulk-jobs/${id}`)
 export const getBulkJobDomains = (id: number) => api.get(`/bulk-jobs/${id}/domains`)
 export const searchByRecord = (params: { type: string; name?: string; value?: string }) =>
-  api.get('/domains/search-by-record', { params })
+  api.get<RecordSearchResult[]>('/domains/search-by-record', { params })
 
 // NS Status
 export interface NsStatusEntry { ok: boolean; latencyMs: number | null; checkedAt: string }

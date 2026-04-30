@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useMatch } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getDomains, getLabelSuggestions, getTenants, type Domain, type LabelSuggestion, type Tenant } from '../api/client'
@@ -7,6 +7,10 @@ import DomainsPage from './DomainsPage'
 import DomainsTableView from './DomainsDashboard'
 import { getDirtyDomainFqdns } from '../hooks/domainEditCache'
 import { useIsMobile } from '../hooks/useIsMobile'
+import BulkEditDrawer from '../components/bulk/BulkEditDrawer'
+import BulkSelectionBar from '../components/bulk/BulkSelectionBar'
+import RecordSearchModal from '../components/bulk/RecordSearchModal'
+import type { BulkPayloadSeed, BulkOperation } from '../components/bulk/BulkPayloadForm'
 
 export default function DomainsLayout() {
   const { user } = useAuth()
@@ -15,6 +19,49 @@ export default function DomainsLayout() {
   const [search, setSearch] = useState('')
   const [labelFilter, setLabelFilter] = useState('')
   const [tenantFilter, setTenantFilter] = useState<number[]>([])
+
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [bulkOpen, setBulkOpen]       = useState(false)
+  const [searchOpen, setSearchOpen]   = useState(false)
+  const [bulkSeed, setBulkSeed]               = useState<BulkPayloadSeed | undefined>(undefined)
+  const [bulkInitialOp, setBulkInitialOp]     = useState<BulkOperation | undefined>(undefined)
+
+  function toggleSelected(id: number) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function setSelectionFromIds(ids: number[]) {
+    setSelectedIds(new Set(ids))
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set())
+  }
+
+  function handleRecordSearchApply({ ids, seed }: { ids: number[]; seed: BulkPayloadSeed }) {
+    setSelectedIds(new Set(ids))
+    setBulkSeed(seed)
+    setBulkInitialOp('replace')
+    setSearchOpen(false)
+    setBulkOpen(true)
+  }
+
+  function handleBulkClose() {
+    setBulkOpen(false)
+    setBulkSeed(undefined)
+    setBulkInitialOp(undefined)
+  }
+
+  function handleBulkApproved() {
+    clearSelection()
+    setBulkSeed(undefined)
+    setBulkInitialOp(undefined)
+  }
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -60,6 +107,11 @@ export default function DomainsLayout() {
   const match = useMatch('/domains/:name')
   const detailOpen = !!match
 
+  const selectedDomains = useMemo(
+    () => domains.filter(d => selectedIds.has(d.id)),
+    [domains, selectedIds],
+  )
+
   const sidebar = (
     <DomainsPage
       domains={domains}
@@ -73,6 +125,7 @@ export default function DomainsLayout() {
       setTenantFilter={setTenantFilter}
       tenants={tenants}
       totalCount={totalCount}
+      selectedCount={selectedIds.size}
     />
   )
 
@@ -88,6 +141,10 @@ export default function DomainsLayout() {
       tenantFilter={tenantFilter}
       setTenantFilter={setTenantFilter}
       tenants={tenants}
+      selectedIds={selectedIds}
+      onToggleSelected={toggleSelected}
+      onSelectAll={() => setSelectionFromIds(domains.map(d => d.id))}
+      onClearSelection={clearSelection}
     />
   )
 
@@ -143,17 +200,44 @@ export default function DomainsLayout() {
         flex: 1,
         display: isMobile && !detailOpen ? 'none' : 'flex',
         flexDirection: 'column',
-        overflowY: 'auto',
+        minHeight: 0,
         background: '#fff',
       }}>
         {detailOpen
-          ? <div key="detail" style={{ animation: 'domainPaneFadeIn 200ms ease-out' }}><Outlet /></div>
+          ? <div key="detail" style={{ flex: 1, minHeight: 0, overflowY: 'auto', animation: 'domainPaneFadeIn 200ms ease-out' }}><Outlet /></div>
           : !isMobile && (
-              <div key="dashboard" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, animation: 'domainPaneFadeIn 200ms ease-out' }}>
-                {dashboard}
-              </div>
+              <>
+                <div key="dashboard" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, animation: 'domainPaneFadeIn 200ms ease-out' }}>
+                  {dashboard}
+                </div>
+                <BulkSelectionBar
+                  selectedCount={selectedIds.size}
+                  visibleCount={selectedDomains.length}
+                  onOpen={() => setBulkOpen(true)}
+                  onClear={clearSelection}
+                  onFindByRecord={() => setSearchOpen(true)}
+                />
+              </>
             )}
       </div>
+
+      {bulkOpen && (
+        <BulkEditDrawer
+          selectedIds={Array.from(selectedIds)}
+          visibleSelected={selectedDomains}
+          seed={bulkSeed}
+          initialOperation={bulkInitialOp}
+          onClose={handleBulkClose}
+          onApproved={handleBulkApproved}
+        />
+      )}
+
+      {searchOpen && (
+        <RecordSearchModal
+          onClose={() => setSearchOpen(false)}
+          onApply={handleRecordSearchApply}
+        />
+      )}
     </div>
   )
 }

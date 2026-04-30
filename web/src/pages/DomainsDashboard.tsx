@@ -18,6 +18,10 @@ interface Props {
   tenantFilter: number[]
   setTenantFilter: (v: number[]) => void
   tenants: Tenant[]
+  selectedIds: Set<number>
+  onToggleSelected: (id: number) => void
+  onSelectAll: () => void
+  onClearSelection: () => void
 }
 
 type SortKey = 'fqdn' | 'zone_status' | 'ns_ok' | 'dnssec_enabled' | 'status' | 'tenant_name'
@@ -97,6 +101,7 @@ export default function DomainsTableView({
   search, setSearch,
   labelFilter, setLabelFilter, labelSuggestions,
   tenantFilter, setTenantFilter, tenants,
+  selectedIds, onToggleSelected, onSelectAll, onClearSelection,
 }: Props) {
   const { t } = useI18n()
   const navigate = useNavigate()
@@ -176,6 +181,23 @@ export default function DomainsTableView({
     overscan: 10,
     getItemKey: (i) => sorted[i].id,
   })
+
+  const visibleSelectedCount = useMemo(
+    () => sorted.reduce((n, d) => n + (selectedIds.has(d.id) ? 1 : 0), 0),
+    [sorted, selectedIds],
+  )
+  const headerChecked       = sorted.length > 0 && visibleSelectedCount === sorted.length
+  const headerIndeterminate = visibleSelectedCount > 0 && visibleSelectedCount < sorted.length
+
+  const headerCheckboxRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (headerCheckboxRef.current) headerCheckboxRef.current.indeterminate = headerIndeterminate
+  }, [headerIndeterminate])
+
+  function onHeaderCheckboxChange() {
+    if (headerChecked || headerIndeterminate) onClearSelection()
+    else onSelectAll()
+  }
   const virtualItems = virtualizer.getVirtualItems()
   const totalSize = virtualizer.getTotalSize()
   const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0
@@ -324,6 +346,7 @@ export default function DomainsTableView({
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
             <colgroup>
+              <col style={{ width: 36 }} />
               <col />
               <col style={{ width: 110 }} />
               <col style={{ width: 60 }} />
@@ -334,6 +357,16 @@ export default function DomainsTableView({
             </colgroup>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
               <tr>
+                <th style={{ ...s.th, padding: '.4rem .5rem' }}>
+                  <input
+                    ref={headerCheckboxRef}
+                    type="checkbox"
+                    checked={headerChecked}
+                    onChange={onHeaderCheckboxChange}
+                    aria-label={t('bulk_selectAll')}
+                    style={{ cursor: 'pointer' }}
+                  />
+                </th>
                 <SortTh label={t('domain')} col="fqdn" sort={sort} setSort={setSort} />
                 <SortTh label={t('domains_zone')} col="zone_status" sort={sort} setSort={setSort} />
                 <SortTh label="NS" col="ns_ok" sort={sort} setSort={setSort} />
@@ -345,11 +378,12 @@ export default function DomainsTableView({
             </thead>
             <tbody>
               {paddingTop > 0 && (
-                <tr><td colSpan={7} style={{ height: paddingTop, padding: 0, border: 0 }} /></tr>
+                <tr><td colSpan={8} style={{ height: paddingTop, padding: 0, border: 0 }} /></tr>
               )}
               {virtualItems.map(vi => {
                 const d = sorted[vi.index]
                 const suspended = d.status === 'suspended'
+                const isSelected = selectedIds.has(d.id)
                 return (
                   <tr
                     key={vi.key}
@@ -357,7 +391,21 @@ export default function DomainsTableView({
                     ref={virtualizer.measureElement}
                     className="dtv-row"
                     onClick={() => navigate(`/domains/${d.fqdn}`)}
+                    style={isSelected ? { background: '#eff6ff' } : undefined}
                   >
+                    <td
+                      style={{ ...s.td, padding: '.4rem .5rem' }}
+                      onClick={e => { e.stopPropagation(); onToggleSelected(d.id) }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => onToggleSelected(d.id)}
+                        onClick={e => e.stopPropagation()}
+                        aria-label={`Select ${d.fqdn}`}
+                        style={{ cursor: 'pointer' }}
+                      />
+                    </td>
                     <td style={{ ...s.td, fontWeight: 500 }}>
                       {d.fqdn}
                       {d.ns_reference && (
@@ -397,7 +445,7 @@ export default function DomainsTableView({
                 )
               })}
               {paddingBottom > 0 && (
-                <tr><td colSpan={7} style={{ height: paddingBottom, padding: 0, border: 0 }} /></tr>
+                <tr><td colSpan={8} style={{ height: paddingBottom, padding: 0, border: 0 }} /></tr>
               )}
             </tbody>
           </table>
