@@ -28,3 +28,6 @@ dist/
 .DS_Store
 
 uploads/
+
+# Gource-generated visualisation videos (built during CI; not committed)
+web/src/assets/gource-*
