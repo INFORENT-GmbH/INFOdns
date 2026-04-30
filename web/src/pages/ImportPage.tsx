@@ -413,7 +413,7 @@ const styles: Record<string, React.CSSProperties> = {
   code:         { background: '#f1f5f9', padding: '1px 5px', borderRadius: 3, fontSize: '.78rem', fontFamily: 'monospace' },
   typeTag:      { background: '#ede9fe', color: '#5b21b6', padding: '1px 6px', borderRadius: 3, fontSize: '.72rem', fontWeight: 700, fontFamily: 'monospace' },
   valueCell:    { maxWidth: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, fontFamily: 'monospace', fontSize: '.75rem' },
-  footer:       { marginTop: '1.25rem', borderTop: '1px solid #e2e8f0', paddingTop: '1rem' },
+  footer:       { position: 'sticky', bottom: 0, marginTop: '1.25rem', background: '#fff', borderTop: '2px solid #2563eb', padding: '.6rem .75rem', zIndex: 50, boxShadow: '0 -2px 12px rgba(0,0,0,.08)' },
   footerRow:    { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '.5rem' },
   muted:        { fontSize: '.8rem', color: '#94a3b8' },
   errorText:    { color: '#b91c1c', fontSize: '.875rem', marginBottom: '.5rem' },
