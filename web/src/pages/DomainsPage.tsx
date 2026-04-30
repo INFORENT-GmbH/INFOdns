@@ -116,11 +116,61 @@ export default function DomainsPage({
       <div style={{ padding: '.5rem .625rem .375rem', borderBottom: '1px solid #e2e8f0', background: '#fafafa', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.375rem' }}>
           <h2 style={{ margin: 0, fontSize: '.875rem', fontWeight: 700, color: '#1e293b' }}>{t('domains_title')}</h2>
-          {!isLoading && (
-            <span style={{ fontSize: '.7rem', fontWeight: 600, color: '#64748b', background: '#e2e8f0', borderRadius: 10, padding: '1px 7px' }}>
-              {domains.length}
-            </span>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.375rem' }}>
+            <div ref={displayOptionsRef} style={{ position: 'relative', display: 'flex' }}>
+              <button
+                type="button"
+                onClick={() => setDisplayOptionsOpen(v => !v)}
+                onBlur={e => { if (!displayOptionsRef.current?.contains(e.relatedTarget as Node)) setDisplayOptionsOpen(false) }}
+                title={t('domains_displayOptions')}
+                aria-label={t('domains_displayOptions')}
+                style={{ padding: '.05rem .3rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 3, cursor: 'pointer', fontSize: '.8rem', color: '#64748b', lineHeight: 1 }}
+              >
+                ⚙
+              </button>
+              {displayOptionsOpen && (
+                <div style={{ ...styles.labelDropdown, left: 'auto', right: 0, minWidth: 170 }}>
+                  <button
+                    type="button"
+                    onMouseDown={e => { e.preventDefault(); setShowStatus(v => !v) }}
+                    style={{ ...styles.labelDropdownItem, gap: '.5rem' }}
+                  >
+                    <input type="checkbox" checked={showStatus} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
+                    {t('domains_showStatus')}
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={e => { e.preventDefault(); setShowTenant(v => !v) }}
+                    style={{ ...styles.labelDropdownItem, gap: '.5rem' }}
+                  >
+                    <input type="checkbox" checked={showTenant} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
+                    {t('domains_showTenant')}
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={e => { e.preventDefault(); setShowNsRef(v => !v) }}
+                    style={{ ...styles.labelDropdownItem, gap: '.5rem' }}
+                  >
+                    <input type="checkbox" checked={showNsRef} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
+                    {t('domains_showNsRef')}
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={e => { e.preventDefault(); setShowLabels(v => !v) }}
+                    style={{ ...styles.labelDropdownItem, gap: '.5rem' }}
+                  >
+                    <input type="checkbox" checked={showLabels} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
+                    {t('domains_showLabels')}
+                  </button>
+                </div>
+              )}
+            </div>
+            {!isLoading && (
+              <span style={{ fontSize: '.7rem', fontWeight: 600, color: '#64748b', background: '#e2e8f0', borderRadius: 10, padding: '1px 7px' }}>
+                {domains.length}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Search */}
@@ -236,55 +286,6 @@ export default function DomainsPage({
           </div>
         )}
 
-        {/* Display options (gear) */}
-        <div ref={displayOptionsRef} style={{ position: 'relative', marginTop: '.375rem', display: 'flex', justifyContent: 'flex-end' }}>
-          <button
-            type="button"
-            onClick={() => setDisplayOptionsOpen(v => !v)}
-            onBlur={e => { if (!displayOptionsRef.current?.contains(e.relatedTarget as Node)) setDisplayOptionsOpen(false) }}
-            title={t('domains_displayOptions')}
-            aria-label={t('domains_displayOptions')}
-            style={{ padding: '.15rem .35rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 3, cursor: 'pointer', fontSize: '.85rem', color: '#64748b', lineHeight: 1 }}
-          >
-            ⚙
-          </button>
-          {displayOptionsOpen && (
-            <div style={{ ...styles.labelDropdown, left: 'auto', right: 0, minWidth: 170 }}>
-              <button
-                type="button"
-                onMouseDown={e => { e.preventDefault(); setShowStatus(v => !v) }}
-                style={{ ...styles.labelDropdownItem, gap: '.5rem' }}
-              >
-                <input type="checkbox" checked={showStatus} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
-                {t('domains_showStatus')}
-              </button>
-              <button
-                type="button"
-                onMouseDown={e => { e.preventDefault(); setShowTenant(v => !v) }}
-                style={{ ...styles.labelDropdownItem, gap: '.5rem' }}
-              >
-                <input type="checkbox" checked={showTenant} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
-                {t('domains_showTenant')}
-              </button>
-              <button
-                type="button"
-                onMouseDown={e => { e.preventDefault(); setShowNsRef(v => !v) }}
-                style={{ ...styles.labelDropdownItem, gap: '.5rem' }}
-              >
-                <input type="checkbox" checked={showNsRef} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
-                {t('domains_showNsRef')}
-              </button>
-              <button
-                type="button"
-                onMouseDown={e => { e.preventDefault(); setShowLabels(v => !v) }}
-                style={{ ...styles.labelDropdownItem, gap: '.5rem' }}
-              >
-                <input type="checkbox" checked={showLabels} readOnly style={{ pointerEvents: 'none' as const, flexShrink: 0 }} />
-                {t('domains_showLabels')}
-              </button>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Domain rows (virtualized) */}
