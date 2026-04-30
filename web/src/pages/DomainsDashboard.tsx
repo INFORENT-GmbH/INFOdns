@@ -414,9 +414,10 @@ export default function DomainsTableView({
             onClick={() => setColumnsOpen(v => !v)}
             title={t('domains_displayOptions')}
             aria-label={t('domains_displayOptions')}
-            style={{ padding: '.25rem .5rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 3, cursor: 'pointer', fontSize: '.875rem', color: '#64748b', lineHeight: 1 }}
+            style={{ padding: '.3125rem .5rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 3, cursor: 'pointer', fontSize: '.8125rem', color: '#64748b', lineHeight: 1, display: 'inline-flex', alignItems: 'center', gap: '.375rem' }}
           >
-            ⚙
+            <span style={{ fontSize: '.95rem' }}>⚙</span>
+            {t('domains_columns')}
           </button>
           {columnsOpen && (
             <div style={{ ...filterStyles.labelDropdown, left: 'auto', right: 0, minWidth: 200 }}>
