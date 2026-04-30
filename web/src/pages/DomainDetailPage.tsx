@@ -865,21 +865,6 @@ export default function DomainDetailPage() {
         <span>{t('serial')}: <code>{domain.last_serial || '—'}</code></span>
         <span>{t('domainDetail_added')}: {new Date(domain.created_at).toLocaleDateString()}</span>
         <span>{t('domainDetail_lastRendered')} {domain.last_rendered_at ? new Date(domain.last_rendered_at).toLocaleString() : t('never')}</span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
-            NS-Ref:
-            <Select
-              value={domain.ns_reference ?? ''}
-              onChange={handleSaveNsRef}
-              disabled={savingNsRef}
-              variant="ghost"
-              style={{ fontFamily: MONO }}
-              options={[
-                { value: '', label: '— none —' },
-                ...allDomains.filter(d => d.fqdn !== name).map(d => ({ value: d.fqdn, label: d.fqdn })),
-              ]}
-            />
-            {savingNsRef && <span style={{ color: '#9ca3af' }}>…</span>}
-          </span>
       </div>
 
       {showDnssecModal && (
@@ -966,17 +951,40 @@ export default function DomainDetailPage() {
         </div>
       </div>
 
-      {nsRefMode && (
-        <div style={{ margin: '.5rem .75rem 0', padding: '.3rem .75rem', background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 6, display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.8125rem', color: '#92400e' }}>
-          <span style={{ fontWeight: 600 }}>NS-Ref:</span>
-          <span>{t('domainDetail_nsRefBanner')}</span>
-          {nsRefDomain
-            ? <button onClick={() => navigate(`/domains/${nsRefDomain.fqdn}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b45309', fontWeight: 600, textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}>{nsRef}</button>
-            : <span style={{ fontWeight: 600 }}>{nsRef}</span>
-          }
-          <span style={{ color: '#a16207' }}>— {t('domainDetail_nsRefReadOnly')}</span>
-        </div>
-      )}
+      <div style={{
+        margin: nsRefMode ? '.5rem .75rem 0' : 0,
+        padding: nsRefMode ? '.3rem .75rem' : '.375rem .75rem',
+        background: nsRefMode ? '#fffbeb' : '#f8fafc',
+        border: nsRefMode ? '1px solid #f59e0b' : 'none',
+        borderBottom: nsRefMode ? '1px solid #f59e0b' : '1px solid #e2e8f0',
+        borderRadius: nsRefMode ? 6 : 0,
+        display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' as const,
+        fontSize: '.8125rem',
+        color: nsRefMode ? '#92400e' : '#475569',
+      }}>
+        <span style={{ fontWeight: 600 }}>NS-Ref:</span>
+        <Select
+          value={domain.ns_reference ?? ''}
+          onChange={handleSaveNsRef}
+          disabled={savingNsRef}
+          variant="ghost"
+          style={{ fontFamily: MONO }}
+          options={[
+            { value: '', label: '— none —' },
+            ...allDomains.filter(d => d.fqdn !== name).map(d => ({ value: d.fqdn, label: d.fqdn })),
+          ]}
+        />
+        {savingNsRef && <span style={{ color: '#9ca3af' }}>…</span>}
+        {nsRefMode && (
+          <>
+            <span>— {t('domainDetail_nsRefBanner')}</span>
+            {nsRefDomain && (
+              <button onClick={() => navigate(`/domains/${nsRefDomain.fqdn}`)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#b45309', fontWeight: 600, textDecoration: 'underline', padding: 0, fontSize: 'inherit' }}>{nsRef}</button>
+            )}
+            <span style={{ color: '#a16207' }}>— {t('domainDetail_nsRefReadOnly')}</span>
+          </>
+        )}
+      </div>
 
       {(() => {
         const hasZoneError = domain.zone_status === 'error'
