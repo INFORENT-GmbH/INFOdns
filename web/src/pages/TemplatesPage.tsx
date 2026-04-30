@@ -252,10 +252,15 @@ export default function TemplatesPage() {
                 style={styles.formInput}
               />
               {isAdmin && (
-                <select value={newTenantId} onChange={e => setNewTenantId(e.target.value === '' ? '' : Number(e.target.value) as any)} style={styles.formInput}>
-                  <option value="">{t('templates_global')}</option>
-                  {tenants.map(ten => <option key={ten.id} value={ten.id}>{ten.name}</option>)}
-                </select>
+                <Select
+                  value={newTenantId === '' ? '__global__' : String(newTenantId)}
+                  onChange={v => setNewTenantId(v === '__global__' ? '' : Number(v))}
+                  options={[
+                    { value: '__global__', label: t('templates_global') },
+                    ...tenants.map(ten => ({ value: String(ten.id), label: ten.name })),
+                  ]}
+                  style={{ width: '100%' }}
+                />
               )}
               <div style={styles.actions}>
                 <button type="button" onClick={() => setShowNewForm(false)} style={styles.btnSecondary}>{t('cancel')}</button>

@@ -1039,16 +1039,15 @@ export default function DomainDetailPage() {
             </span>
           ))}
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <select
-              value={addingTplId}
-              onChange={e => setAddingTplId(e.target.value === '' ? '' : Number(e.target.value) as any)}
-              style={{ fontSize: '.75rem', border: '1px solid #d1d5db', borderRadius: 4, padding: '1px 4px', color: '#374151', background: '#fff' }}
-            >
-              <option value="">+ add template…</option>
-              {(tplList as any[]).filter(t => !assignedTemplates.some(a => a.id === t.id)).map((t: any) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
+            <Select
+              variant="ghost"
+              value={addingTplId === '' ? '' : String(addingTplId)}
+              onChange={v => setAddingTplId(v === '' ? '' : Number(v))}
+              options={(tplList as { id: number; name: string }[])
+                .filter(tpl => !assignedTemplates.some(a => a.id === tpl.id))
+                .map(tpl => ({ value: String(tpl.id), label: tpl.name }))}
+              placeholder="+ add template…"
+            />
             {addingTplId !== '' && (
               <button
                 onClick={handleAssignTemplate}
@@ -1212,30 +1211,30 @@ export default function DomainDetailPage() {
           </div>
 
           {/* Step 1: template */}
-          <label style={styles.applyLabel}>
-            {t('templates_selectTemplate')}
-            <select
-              value={applyTplId}
-              onChange={e => setApplyTplId(e.target.value === '' ? '' : Number(e.target.value) as any)}
-              style={styles.applySelect}
-            >
-              <option value="">— {t('templates_selectTemplate')} —</option>
-              {tplList.filter((tpl: any) => tpl.tenant_id === null).length > 0 && (
-                <optgroup label={t('templates_optGlobal')}>
-                  {tplList.filter((tpl: any) => tpl.tenant_id === null).map((tpl: any) => (
-                    <option key={tpl.id} value={tpl.id}>{tpl.name} ({tpl.record_count})</option>
-                  ))}
-                </optgroup>
-              )}
-              {tplList.filter((tpl: any) => tpl.tenant_id !== null).length > 0 && (
-                <optgroup label={t('templates_optTenant')}>
-                  {tplList.filter((tpl: any) => tpl.tenant_id !== null).map((tpl: any) => (
-                    <option key={tpl.id} value={tpl.id}>{tpl.name} ({tpl.record_count})</option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-          </label>
+          {(() => {
+            type Tpl = { id: number; name: string; tenant_id: number | null; record_count: number }
+            const tpls = tplList as Tpl[]
+            const globalTpls = tpls.filter(tpl => tpl.tenant_id === null)
+            const tenantTpls = tpls.filter(tpl => tpl.tenant_id !== null)
+            const toOpt = (tpl: Tpl) => ({ value: String(tpl.id), label: `${tpl.name} (${tpl.record_count})` })
+            return (
+              <label style={styles.applyLabel}>
+                {t('templates_selectTemplate')}
+                <div style={{ marginTop: 4, minWidth: 200 }}>
+                  <Select
+                    value={applyTplId === '' ? '' : String(applyTplId)}
+                    onChange={v => setApplyTplId(v === '' ? '' : Number(v))}
+                    options={[
+                      ...(globalTpls.length > 0 ? [{ label: t('templates_optGlobal'), options: globalTpls.map(toOpt) }] : []),
+                      ...(tenantTpls.length > 0 ? [{ label: t('templates_optTenant'), options: tenantTpls.map(toOpt) }] : []),
+                    ]}
+                    placeholder={`— ${t('templates_selectTemplate')} —`}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </label>
+            )
+          })()}
 
           {/* Step 2: mode — only shown once a template is picked */}
           {applyTplId !== '' && (

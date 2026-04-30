@@ -1,19 +1,39 @@
-import ReactSelect, { type StylesConfig } from 'react-select'
+import ReactSelect, { type GroupBase, type StylesConfig } from 'react-select'
 
 export interface SelectOption {
   value: string
   label: string
 }
 
+export interface SelectGroup {
+  label: string
+  options: SelectOption[]
+}
+
+type AnyOption = SelectOption | SelectGroup
+
 interface Props {
   value: string
   onChange: (value: string) => void
-  options: SelectOption[]
+  options: ReadonlyArray<AnyOption>
   placeholder?: string
   disabled?: boolean
   /** 'default' — standard form field (bordered); 'ghost' — transparent, blends into text */
   variant?: 'default' | 'ghost'
   style?: React.CSSProperties
+}
+
+function isGroup(o: AnyOption): o is SelectGroup {
+  return Array.isArray((o as SelectGroup).options)
+}
+
+function flatten(options: ReadonlyArray<AnyOption>): SelectOption[] {
+  const out: SelectOption[] = []
+  for (const o of options) {
+    if (isGroup(o)) out.push(...o.options)
+    else out.push(o)
+  }
+  return out
 }
 
 // Defined outside the component so references are stable across renders.
@@ -22,7 +42,7 @@ const sharedStyles = {
   menuPortal: (base: object) => ({ ...base, zIndex: 9999 }),
 }
 
-const defaultStyles: StylesConfig<SelectOption, false> = {
+const defaultStyles: StylesConfig<SelectOption, false, GroupBase<SelectOption>> = {
   ...sharedStyles,
   control: (base, state) => ({
     ...base,
@@ -59,9 +79,19 @@ const defaultStyles: StylesConfig<SelectOption, false> = {
   indicatorSeparator: () => ({ display: 'none' }),
   dropdownIndicator: base => ({ ...base, padding: '0 6px', color: '#9ca3af' }),
   valueContainer: base => ({ ...base, padding: '0 8px', flexWrap: 'nowrap' }),
+  groupHeading: base => ({
+    ...base,
+    fontSize: '.6875rem',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '.04em',
+    color: '#6b7280',
+    padding: '6px 10px 4px',
+    margin: 0,
+  }),
 }
 
-const ghostStyles: StylesConfig<SelectOption, false> = {
+const ghostStyles: StylesConfig<SelectOption, false, GroupBase<SelectOption>> = {
   ...sharedStyles,
   control: (base, state) => ({
     ...base,
@@ -101,20 +131,30 @@ const ghostStyles: StylesConfig<SelectOption, false> = {
   indicatorSeparator: () => ({ display: 'none' }),
   dropdownIndicator: base => ({ ...base, padding: '0 3px', color: '#9ca3af' }),
   valueContainer: base => ({ ...base, padding: '0 2px', flexWrap: 'nowrap' }),
+  groupHeading: base => ({
+    ...base,
+    fontSize: '.6875rem',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '.04em',
+    color: '#6b7280',
+    padding: '6px 10px 4px',
+    margin: 0,
+  }),
 }
 
 export default function Select({
   value, onChange, options, placeholder = '—', disabled,
   variant = 'default', style,
 }: Props) {
-  const current = options.find(o => o.value === value) ?? null
+  const current = flatten(options).find(o => o.value === value) ?? null
 
   return (
     <div style={{ display: 'inline-block', ...style }}>
-      <ReactSelect<SelectOption, false>
+      <ReactSelect<SelectOption, false, GroupBase<SelectOption>>
         value={current}
         onChange={opt => onChange(opt?.value ?? '')}
-        options={options}
+        options={options as ReadonlyArray<SelectOption | GroupBase<SelectOption>>}
         placeholder={placeholder}
         isDisabled={disabled}
         isSearchable
