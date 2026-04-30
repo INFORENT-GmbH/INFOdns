@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Parse host and path from SSH_PATH_NS1
         id: parse
@@ -37,6 +39,35 @@ jobs:
           install -m 600 -D /dev/null ~/.ssh/id_ed25519
           echo "${{ secrets.SSH_KEY_NS1 }}" > ~/.ssh/id_ed25519
           ssh-keyscan -H "${{ steps.parse.outputs.hostname }}" >> ~/.ssh/known_hosts
+
+      - name: Generate gource visualisation video
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gource ffmpeg xvfb
+          DATE=$(date +%Y%m%d)
+          FIRST=$(git log --reverse --format="%at" | head -1)
+          LAST=$(git log --format="%at" | head -1)
+          DAYS=$(( (LAST - FIRST) / 86400 + 1 ))
+          [ "$DAYS" -lt 1 ] && DAYS=1
+          SPD=$(echo "scale=6; 180.0 / $DAYS" | bc)
+          mkdir -p web/src/assets
+          xvfb-run -a --server-args="-screen 0 1280x720x24" \
+            gource \
+              --seconds-per-day "$SPD" \
+              --auto-skip-seconds 0.5 \
+              --max-files 0 \
+              --hide filenames \
+              --multi-sampling \
+              --stop-at-end \
+              -1280x720 \
+              -r 25 \
+              -o - \
+            | ffmpeg -y -r 25 -f image2pipe -vcodec ppm -i - \
+                -vcodec libx264 -preset fast -pix_fmt yuv420p -crf 28 \
+                -movflags +faststart \
+                web/src/assets/gource-${DATE}.mp4
+          [ -s "web/src/assets/gource-${DATE}.mp4" ] || { echo "ERROR: gource video was not created or is empty"; exit 1; }
+          echo "GOURCE_FILE=web/src/assets/gource-${DATE}.mp4" >> $GITHUB_ENV
 
       - name: Sync repository to ns1
         run: |
@@ -55,7 +86,14 @@ jobs:
             --exclude='worker/node_modules/' \
             --exclude='bind/primary/zones/' \
             --exclude='bind/primary/keys-dnssec/' \
+            --exclude='web/src/assets/gource-*' \
             ./ ${{ vars.SSH_PATH_NS1 }}/
+
+      - name: Copy gource video to ns1
+        run: |
+          rsync -az \
+            "$GOURCE_FILE" \
+            ${{ vars.SSH_PATH_NS1 }}/web/src/assets/
 
       - name: Parse ns2 and ns3 hosts
         id: parse-secondaries
