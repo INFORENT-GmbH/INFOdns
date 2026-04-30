@@ -56,12 +56,18 @@ export async function checkNsDelegation(
       }
     }
 
+    const nsCheckedAt = new Date().toISOString()
     await execute(
       'UPDATE domains SET ns_ok = ?, ns_checked_at = NOW(), ns_observed = ? WHERE id = ?',
       [newOk, observed === null ? null : observed.join(','), domain.id]
     )
 
     if (newOk !== domain.ns_ok) {
+      // Only broadcast on actual flips. Per-check broadcasts would flood clients
+      // (every 15s for pending + every 5min for OK domains × N domains).
+      // The UI's "X time ago" cell ticks via setInterval, and ns_checked_at
+      // refreshes on the next list refetch (any other domain_status event,
+      // user navigation, or WS reconnect).
       broadcastEvent({
         type: 'domain_status',
         domainId: domain.id,
@@ -69,6 +75,7 @@ export async function checkNsDelegation(
         zone_status: domain.zone_status,
         tenantId: domain.tenant_id,
         ns_ok: newOk,
+        ns_checked_at: nsCheckedAt,
       })
 
       const template = newOk === 1 ? 'ns_delegation_ok' : 'ns_delegation_broken'

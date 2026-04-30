@@ -1,8 +1,7 @@
 import { query, queryOne, execute } from '../db.js'
 import { broadcast } from '../ws/hub.js'
 
-/** Enqueue a zone render job for a domain (upsert — one pending job per domain) */
-export async function enqueueRender(domainId: number): Promise<void> {
+async function enqueueOne(domainId: number): Promise<void> {
   await execute(
     `INSERT INTO zone_render_queue (domain_id, status) VALUES (?, 'pending')
      ON DUPLICATE KEY UPDATE status = IF(status = 'processing', status, 'pending'), updated_at = NOW()`,
@@ -25,6 +24,25 @@ export async function enqueueRender(domainId: number): Promise<void> {
       tenantId: row.tenant_id,
     })
   }
+}
+
+/**
+ * Enqueue a zone render job for a domain (upsert — one pending job per domain).
+ * Cascades to direct ns_reference dependents: domains that mirror this one
+ * pull their records from `dns_records WHERE domain_id = source.id`, so any
+ * change here must also dirty their zones. Single-level only — chained
+ * ns_reference is not supported by the renderer.
+ */
+export async function enqueueRender(domainId: number): Promise<void> {
+  await enqueueOne(domainId)
+
+  const self = await queryOne<{ fqdn: string }>('SELECT fqdn FROM domains WHERE id = ?', [domainId])
+  if (!self) return
+  const dependents = await query<{ id: number }>(
+    "SELECT id FROM domains WHERE ns_reference = ? AND status = 'active' AND id <> ?",
+    [self.fqdn, domainId]
+  )
+  for (const d of dependents) await enqueueOne(d.id)
 }
 
 /** Enqueue zone renders for every domain that uses a given template */

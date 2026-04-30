@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { getDomainStats, type Domain, type LabelSuggestion, type Tenant } from '../api/client'
 import LabelChip from '../components/LabelChip'
+import Tooltip from '../components/Tooltip'
 import { useI18n } from '../i18n/I18nContext'
 import * as s from '../styles/shell'
 
@@ -35,6 +36,21 @@ const INLINE_STYLES = `
   .dtv-row:hover td { background: #f1f5f9; }
   .dtv-sort:hover { color: #1d4ed8; }
 `
+
+function formatRelative(iso: string | null | undefined, t: (k: any, ...args: any[]) => string): { label: string; absolute: string } {
+  if (!iso) return { label: '—', absolute: '' }
+  const date = new Date(iso)
+  const ms = Date.now() - date.getTime()
+  const s = Math.max(0, Math.floor(ms / 1000))
+  let short: string
+  if (s < 60)         short = `${s}s`
+  else if (s < 3600)  short = `${Math.floor(s / 60)}m`
+  else if (s < 86400) short = `${Math.floor(s / 3600)}h`
+  else if (s < 86400 * 30)  short = `${Math.floor(s / 86400)}d`
+  else if (s < 86400 * 365) short = `${Math.floor(s / 86400 / 30)}mo`
+  else                      short = `${Math.floor(s / 86400 / 365)}y`
+  return { label: t('time_ago', short), absolute: date.toLocaleString() }
+}
 
 function StatPill({ label, value, warn }: { label: string; value: number | undefined; warn?: boolean }) {
   if (value === undefined) return null
@@ -106,6 +122,14 @@ export default function DomainsTableView({
   const { t } = useI18n()
   const navigate = useNavigate()
   const [sort, setSort] = useState<[SortKey, SortDir]>(['fqdn', 'asc'])
+
+  // Tick once a minute so "X time ago" cells stay accurate without a refetch.
+  // Frequent NS-check broadcasts patch the underlying timestamps via setQueriesData.
+  const [, setNow] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setNow(n => n + 1), 60_000)
+    return () => clearInterval(id)
+  }, [])
 
   const [labelDropdownOpen, setLabelDropdownOpen] = useState(false)
   const labelDropdownRef = useRef<HTMLDivElement>(null)
@@ -352,7 +376,10 @@ export default function DomainsTableView({
               <col style={{ width: 60 }} />
               <col style={{ width: 80 }} />
               <col style={{ width: 90 }} />
-              <col style={{ width: 160 }} />
+              <col style={{ width: 130 }} />
+              <col style={{ width: 100 }} />
+              <col style={{ width: 100 }} />
+              <col style={{ width: 100 }} />
               <col />
             </colgroup>
             <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
@@ -373,12 +400,15 @@ export default function DomainsTableView({
                 <SortTh label={t('dashboard_dnssec')} col="dnssec_enabled" sort={sort} setSort={setSort} />
                 <SortTh label={t('status')} col="status" sort={sort} setSort={setSort} />
                 <SortTh label={t('tenant')} col="tenant_name" sort={sort} setSort={setSort} />
+                <th style={{ ...s.th, color: '#64748b', whiteSpace: 'nowrap' }}>{t('domains_lastRendered')}</th>
+                <th style={{ ...s.th, color: '#64748b', whiteSpace: 'nowrap' }}>{t('domains_nsChecked')}</th>
+                <th style={{ ...s.th, color: '#64748b', whiteSpace: 'nowrap' }}>{t('created')}</th>
                 <th style={s.th}>{t('domains_labels')}</th>
               </tr>
             </thead>
             <tbody>
               {paddingTop > 0 && (
-                <tr><td colSpan={8} style={{ height: paddingTop, padding: 0, border: 0 }} /></tr>
+                <tr><td colSpan={11} style={{ height: paddingTop, padding: 0, border: 0 }} /></tr>
               )}
               {virtualItems.map(vi => {
                 const d = sorted[vi.index]
@@ -436,6 +466,20 @@ export default function DomainsTableView({
                         : <span style={{ color: '#6b7280', fontSize: '.8125rem' }}>{t('active').toLowerCase()}</span>}
                     </td>
                     <td style={{ ...s.td, color: '#6b7280' }}>{d.tenant_name ?? '—'}</td>
+                    {(() => {
+                      const lr = formatRelative(d.last_rendered_at, t)
+                      const ns = formatRelative(d.ns_checked_at, t)
+                      const cr = formatRelative(d.created_at, t)
+                      const cell = { ...s.td, color: '#6b7280', fontSize: '.8125rem', whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis' as const }
+                      const inner = { display: 'inline-block', cursor: 'default' as const }
+                      return (
+                        <>
+                          <td style={cell}>{lr.absolute ? <Tooltip tip={lr.absolute} style={inner}>{lr.label}</Tooltip> : lr.label}</td>
+                          <td style={cell}>{ns.absolute ? <Tooltip tip={ns.absolute} style={inner}>{ns.label}</Tooltip> : ns.label}</td>
+                          <td style={cell}>{cr.absolute ? <Tooltip tip={cr.absolute} style={inner}>{cr.label}</Tooltip> : cr.label}</td>
+                        </>
+                      )
+                    })()}
                     <td style={s.td}>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                         {d.labels?.map(l => <LabelChip key={l.id} label={l} />)}
@@ -445,7 +489,7 @@ export default function DomainsTableView({
                 )
               })}
               {paddingBottom > 0 && (
-                <tr><td colSpan={8} style={{ height: paddingBottom, padding: 0, border: 0 }} /></tr>
+                <tr><td colSpan={11} style={{ height: paddingBottom, padding: 0, border: 0 }} /></tr>
               )}
             </tbody>
           </table>

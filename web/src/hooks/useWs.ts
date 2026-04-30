@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 type WsEvent =
-  | { type: 'domain_status'; domainId: number; fqdn: string; zone_status: string; last_serial?: number; last_rendered_at?: string | null; zone_error?: string | null; ns_ok?: number | null; dnssec_ok?: number | null }
+  | { type: 'domain_status'; domainId: number; fqdn: string; zone_status: string; last_serial?: number; last_rendered_at?: string | null; zone_error?: string | null; ns_ok?: number | null; ns_checked_at?: string | null; dnssec_ok?: number | null }
   | { type: 'bulk_job_progress'; jobId: number; status: string; processed_domains: number; affected_domains: number }
   | { type: 'record_changed'; domainId: number }
   | { type: 'ns_status'; status: Record<string, { ok: boolean; latencyMs: number | null; checkedAt: string }> }
@@ -70,6 +70,7 @@ export function useWs(token: string | null): WsStatus {
                 last_rendered_at: event.last_rendered_at ?? old.last_rendered_at,
                 zone_error: event.zone_error ?? old.zone_error,
                 ...(event.ns_ok !== undefined && { ns_ok: event.ns_ok }),
+                ...(event.ns_checked_at !== undefined && { ns_checked_at: event.ns_checked_at }),
                 ...(event.dnssec_ok !== undefined && { dnssec_ok: event.dnssec_ok }),
               }
             }
@@ -77,8 +78,20 @@ export function useWs(token: string | null): WsStatus {
             // Patch both so neither variant becomes stale.
             qc.setQueryData(['domain', event.fqdn], patch)
             qc.setQueryData(['domain', event.domainId], patch)
-            qc.invalidateQueries({ queryKey: ['domain'] })
-            qc.invalidateQueries({ queryKey: ['domains'] })
+            // Surgically patch each cached domains list (one entry per filter combo)
+            // instead of invalidating, so frequent NS-check broadcasts don't trigger
+            // a full refetch storm. Each list entry is an array of Domain objects.
+            qc.setQueriesData<any[]>({ queryKey: ['domains'] }, (old) => {
+              if (!Array.isArray(old)) return old
+              let changed = false
+              const next = old.map(d => {
+                if (d?.id !== event.domainId) return d
+                changed = true
+                return patch(d)
+              })
+              return changed ? next : old
+            })
+            qc.invalidateQueries({ queryKey: ['domain-stats'] })
             break
           }
 

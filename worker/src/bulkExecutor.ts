@@ -95,13 +95,26 @@ async function applyToDomain(
 
 // ── Enqueue a zone render for a domain ────────────────────────
 
-async function enqueueRender(domainId: number): Promise<void> {
+async function enqueueOne(domainId: number): Promise<void> {
   await execute(
     `INSERT INTO zone_render_queue (domain_id, status) VALUES (?, 'pending')
      ON DUPLICATE KEY UPDATE status = IF(status = 'processing', status, 'pending'), updated_at = NOW()`,
     [domainId]
   )
   await execute("UPDATE domains SET zone_status = 'dirty' WHERE id = ?", [domainId])
+}
+
+// Mirrors api/src/lib/queue.ts enqueueRender: cascades to direct ns_reference
+// dependents so a bulk record change on a parent re-renders all child zones.
+async function enqueueRender(domainId: number): Promise<void> {
+  await enqueueOne(domainId)
+  const self = await queryOne<{ fqdn: string }>('SELECT fqdn FROM domains WHERE id = ?', [domainId])
+  if (!self) return
+  const dependents = await query<{ id: number }>(
+    "SELECT id FROM domains WHERE ns_reference = ? AND status = 'active' AND id <> ?",
+    [self.fqdn, domainId]
+  )
+  for (const d of dependents) await enqueueOne(d.id)
 }
 
 // ── Process one running bulk job ──────────────────────────────
