@@ -1,11 +1,15 @@
 import { FastifyInstance } from 'fastify'
 import { z } from 'zod'
-import { promises as dns, Resolver } from 'dns'
+import { promises as dns } from 'dns'
+import { execFile } from 'child_process'
+import { promisify } from 'util'
 import { query, queryOne, execute } from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
 import { writeAuditLog } from '../audit/middleware.js'
 import { enqueueRender } from '../lib/queue.js'
 import { broadcast } from '../ws/hub.js'
+
+const execFileAsync = promisify(execFile)
 
 async function queueMail(to: string, template: string, payload: unknown): Promise<void> {
   await execute(
@@ -342,15 +346,15 @@ export async function domainRoutes(app: FastifyInstance) {
       if (!row) return reply.status(404).send({ code: 'NOT_FOUND' })
       if (!row.dnssec_enabled) return reply.status(400).send({ code: 'DNSSEC_NOT_ENABLED' })
 
-      const resolver = new Resolver()
-      resolver.setServers(['8.8.8.8'])
-      const ok = await new Promise<boolean>((resolve) => {
-        const t = setTimeout(() => resolve(false), 5000)
-        resolver.resolve(row.fqdn, 'DNSKEY', (err, addresses) => {
-          clearTimeout(t)
-          resolve(!err && Array.isArray(addresses) && addresses.length > 0)
-        })
-      })
+      // Validate end-to-end chain of trust against a validating resolver (1.1.1.1).
+      // The AD flag is only set when the resolver verified the DS-DNSKEY chain.
+      const ok = await execFileAsync('dig', [
+        '+dnssec', '+timeout=5', '+tries=2', '+noshort',
+        'SOA', row.fqdn, '@1.1.1.1',
+      ]).then(({ stdout }) => {
+        if (!/->>HEADER<<-.*status:\s*NOERROR/i.test(stdout)) return false
+        return /;;\s*flags:[^;]*\bad\b/i.test(stdout)
+      }).catch(() => false)
 
       const newOk = ok ? 1 : 0
       await execute(

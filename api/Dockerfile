@@ -7,6 +7,8 @@ COPY src ./src
 RUN npm run build
 
 FROM node:22-alpine AS runner
+# bind-tools = dig, used by /domains/:id/check-dnssec to verify chain of trust
+RUN apk add --no-cache bind-tools
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package*.json ./

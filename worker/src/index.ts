@@ -2,7 +2,7 @@ import { query, queryOne, execute, transaction, pool } from './db.js'
 import { claimSerial } from './serialNumber.js'
 import { renderZone } from './renderZone.js'
 import { validateZone } from './validateZone.js'
-import { deployZone } from './deployZone.js'
+import { deployZone, rndcDnssecStatus, cleanupDnssecArtifacts, rndcReload } from './deployZone.js'
 import { regenerateNamedConf } from './namedConf.js'
 import { pollBulkJobs } from './bulkExecutor.js'
 import { checkNsDelegation } from './nsDelegation.js'
@@ -84,25 +84,97 @@ function extractDnskeyFromKeyFile(content: string): string | null {
   return null
 }
 
+interface DnssecKeyStatus {
+  keytag: number
+  dnskeyOmnipresent: boolean
+}
+
+/**
+ * Parse `rndc dnssec -status <fqdn>` output. Each key block looks like:
+ *
+ *   key: 25839 (ECDSAP256SHA256), CSK
+ *     ...
+ *     - dnskey:         omnipresent
+ *     - ds:             rumoured
+ *     ...
+ */
+function parseRndcDnssecStatus(output: string): DnssecKeyStatus[] {
+  const keys: DnssecKeyStatus[] = []
+  const blocks = output.split(/\n(?=key:\s)/)
+  for (const block of blocks) {
+    const keyMatch = block.match(/^key:\s+(\d+)\s+\(/m)
+    if (!keyMatch) continue
+    const dnskeyMatch = block.match(/-\s+dnskey:\s+(\S+)/)
+    keys.push({
+      keytag: Number(keyMatch[1]),
+      dnskeyOmnipresent: dnskeyMatch?.[1] === 'omnipresent',
+    })
+  }
+  return keys
+}
+
+/**
+ * Wait for BIND to finish KASP key generation, then read the active DNSKEY
+ * out of the matching K<fqdn>.+<algo>+<keytag>.key file.
+ *
+ * Polls `rndc dnssec -status` for up to ~60s. Prefers a key with
+ * DNSKEYState=omnipresent; falls back to whichever key is present at the
+ * end if none has reached omnipresent yet (initial publication can be slow).
+ */
 async function extractDsRecords(fqdn: string): Promise<string | null> {
-  // BIND writes key files asynchronously — retry a few times
-  for (let attempt = 1; attempt <= 5; attempt++) {
-    await new Promise(r => setTimeout(r, 2000))
+  const ATTEMPTS = 12
+  const INTERVAL_MS = 5000
+  let activeKeytag: number | null = null
+
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    if (attempt > 0) await new Promise(r => setTimeout(r, INTERVAL_MS))
     try {
-      const files = await readdir(BIND_KEYS_DIR)
-      const prefix = `K${fqdn}.`
-      const keyFiles = files.filter(f => f.startsWith(prefix) && f.endsWith('.key'))
-      if (keyFiles.length === 0) continue
-      for (const kf of keyFiles) {
-        const content = await readFile(join(BIND_KEYS_DIR, kf), 'utf8')
-        const dnskey = extractDnskeyFromKeyFile(content)
-        if (dnskey) return dnskey
-      }
+      const status = await rndcDnssecStatus(fqdn)
+      const keys = parseRndcDnssecStatus(status)
+      const omnipresent = keys.find(k => k.dnskeyOmnipresent)
+      if (omnipresent) { activeKeytag = omnipresent.keytag; break }
+      // No omnipresent key yet — accept any key on the final attempt so
+      // freshly-published zones don't get stuck waiting for state convergence.
+      if (attempt === ATTEMPTS - 1 && keys.length > 0) activeKeytag = keys[0].keytag
     } catch (err: any) {
-      console.warn(`[worker] DNSKEY extraction attempt ${attempt}/5:`, err.message)
+      console.warn(`[worker] rndc dnssec -status ${fqdn} attempt ${attempt + 1}/${ATTEMPTS}: ${err.message}`)
     }
   }
-  return null
+
+  if (activeKeytag === null) {
+    console.warn(`[worker] no DNSSEC key reported by BIND for ${fqdn} after ${(ATTEMPTS * INTERVAL_MS) / 1000}s`)
+    return null
+  }
+
+  try {
+    const files = await readdir(BIND_KEYS_DIR)
+    // Filenames are K<fqdn>.+<NNN>+<NNNNN>.key (3-digit algo, 5-digit keytag)
+    const tagSuffix = `+${String(activeKeytag).padStart(5, '0')}.key`
+    const keyFile = files.find(f => f.startsWith(`K${fqdn}.+`) && f.endsWith(tagSuffix))
+    if (!keyFile) {
+      console.warn(`[worker] DNSKEY file for keytag ${activeKeytag} not found in ${BIND_KEYS_DIR} for ${fqdn}`)
+      return null
+    }
+    const content = await readFile(join(BIND_KEYS_DIR, keyFile), 'utf8')
+    return extractDnskeyFromKeyFile(content)
+  } catch (err: any) {
+    console.warn(`[worker] reading DNSKEY file for ${fqdn} failed: ${err.message}`)
+    return null
+  }
+}
+
+/**
+ * Run extraction in the background and update the DB once a key is available.
+ * Used by both processJob (post-deploy) and the periodic retry task.
+ * Broadcasts a domain_status event on success so the UI re-fetches.
+ */
+function extractAndStoreDsAsync(domainId: number, fqdn: string, tenantId: number, zoneStatus: string): void {
+  extractDsRecords(fqdn).then(async ds => {
+    if (ds === null) return
+    await execute('UPDATE domains SET dnssec_ds = ? WHERE id = ?', [ds, domainId])
+    broadcastEvent({ type: 'domain_status', domainId, fqdn, zone_status: zoneStatus, tenantId })
+    console.log(`[worker] DNSSEC DS extracted for ${fqdn}`)
+  }).catch(err => console.warn(`[worker] DS extraction for ${fqdn} failed: ${err.message}`))
 }
 
 // ── Core render pipeline ─────────────────────────────────────
@@ -202,17 +274,26 @@ async function processJob(job: QueueRow): Promise<void> {
   // Step 7: Atomic file replace + rndc reload
   await deployZone(domain.fqdn, content)
 
-  // Step 7b: Extract DS records for DNSSEC-enabled domains (best-effort, non-fatal)
+  // Step 7b: Extract DS records for DNSSEC-enabled domains (fire-and-forget,
+  // can take up to 60s while BIND finishes KASP key generation; the periodic
+  // retryDnssecExtraction task picks up anything that misses the window).
   const dnssecRow = await queryOne<{ dnssec_enabled: number }>(
     'SELECT dnssec_enabled FROM domains WHERE id = ?', [domainId]
   )
   if (dnssecRow?.dnssec_enabled) {
-    const ds = await extractDsRecords(domain.fqdn)
-    if (ds !== null) {
-      await execute('UPDATE domains SET dnssec_ds = ? WHERE id = ?', [ds, domainId])
-    }
+    extractAndStoreDsAsync(domainId, domain.fqdn, domain.tenant_id, 'clean')
   } else {
     await execute('UPDATE domains SET dnssec_ds = NULL, dnssec_ok = NULL, dnssec_checked_at = NULL WHERE id = ?', [domainId])
+    // Drop BIND's inline-signing artifacts so a stale signed copy can't be
+    // resurrected on re-enable. Only reload BIND if there was something to
+    // clean — most zones never had DNSSEC and don't need the extra reload.
+    const signedPath = join(ZONE_DIR, `${domain.fqdn}.zone.signed`)
+    if (existsSync(signedPath)) {
+      await cleanupDnssecArtifacts(domain.fqdn)
+      await rndcReload(domain.fqdn).catch(err =>
+        console.warn(`[worker] rndc reload after DNSSEC disable for ${domain.fqdn}: ${err.message}`)
+      )
+    }
   }
 
   // Step 8: Mark domain clean
@@ -445,6 +526,24 @@ async function requeueAliasZones(): Promise<void> {
   }
 }
 
+// ── DNSSEC DS retry: re-extract for zones still missing DS ───
+// Initial extraction in processJob is fire-and-forget with a 60s ceiling; on
+// cold BIND containers KASP can take longer. This sweeper closes that gap.
+
+async function retryDnssecExtraction(): Promise<void> {
+  try {
+    const rows = await query<{ id: number; fqdn: string; tenant_id: number; zone_status: string }>(
+      `SELECT id, fqdn, tenant_id, zone_status FROM domains
+       WHERE status = 'active' AND publish = 1 AND dnssec_enabled = 1 AND dnssec_ds IS NULL`
+    )
+    for (const row of rows) {
+      extractAndStoreDsAsync(row.id, row.fqdn, row.tenant_id, row.zone_status)
+    }
+  } catch (err: any) {
+    console.error('[worker] retryDnssecExtraction failed:', err.message)
+  }
+}
+
 // ── Entry point ───────────────────────────────────────────────
 
 console.log('[worker] Starting INFORENT Prisma Worker')
@@ -485,6 +584,10 @@ await checkDnssec('all')
 safeInterval(() => checkDnssec('pending'), 30_000, 'checkDnssec (pending)')
 // Ok domains: every 10 minutes (steady-state confirmation)
 safeInterval(() => checkDnssec('ok'), 10 * 60 * 1000, 'checkDnssec (ok)')
+
+// DNSSEC DS extraction retry: catches zones where KASP took longer than
+// processJob's fire-and-forget window
+safeInterval(retryDnssecExtraction, 30_000, 'retryDnssecExtraction')
 
 // Graceful shutdown plumbing — declared before the loop so the loop's sleep can register wakeups.
 const shutdownWakeups: Array<() => void> = []

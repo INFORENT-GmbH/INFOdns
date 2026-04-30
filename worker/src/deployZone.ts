@@ -43,13 +43,14 @@ export async function deployZone(fqdn: string, content: string): Promise<void> {
   assertFqdn(fqdn)
   const zonePath = join(ZONE_DIR, `${fqdn}.zone`)
 
-  // Delete stale BIND journal files before replacing the zone file.
-  // A full zone file replacement invalidates any existing journal (serial mismatch).
-  // With inline-signing, BIND also maintains signed-zone journals — delete those too.
+  // Delete stale unsigned-zone journals before replacing the zone file —
+  // a full zone file replacement invalidates them (serial mismatch). The
+  // signed-zone journals (.signed.jnl/.jbk) are intentionally NOT deleted
+  // here: BIND's inline-signing uses them for incremental re-signing on
+  // edits. Wiping them would force a full re-sign every render. Disable
+  // cleanup is handled separately in cleanupDnssecArtifacts().
   await unlink(`${zonePath}.jnl`).catch(() => {})
   await unlink(`${zonePath}.jbk`).catch(() => {})
-  await unlink(`${zonePath}.signed.jnl`).catch(() => {})
-  await unlink(`${zonePath}.signed.jbk`).catch(() => {})
 
   await writeAtomic(zonePath, content)
   await rndcReconfig(RNDC_HOST, RNDC_PORT)
@@ -93,6 +94,20 @@ export async function rndcReconfig(host: string, port = RNDC_PORT): Promise<void
     '-k', RNDC_KEY_FILE,
     'reconfig',
   ])
+}
+
+/**
+ * Remove BIND's inline-signing artifacts for a zone. Called when DNSSEC is
+ * disabled so a stale signed zone file doesn't get resurrected if DNSSEC is
+ * later re-enabled. Caller should issue rndc reload <fqdn> afterward to
+ * make BIND drop in-memory signed state.
+ */
+export async function cleanupDnssecArtifacts(fqdn: string): Promise<void> {
+  assertFqdn(fqdn)
+  const zonePath = join(ZONE_DIR, `${fqdn}.zone`)
+  await unlink(`${zonePath}.signed`).catch(() => {})
+  await unlink(`${zonePath}.signed.jnl`).catch(() => {})
+  await unlink(`${zonePath}.signed.jbk`).catch(() => {})
 }
 
 export async function rndcDnssecStatus(fqdn: string): Promise<string> {

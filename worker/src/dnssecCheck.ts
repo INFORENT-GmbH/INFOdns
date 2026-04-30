@@ -15,18 +15,25 @@ interface DomainRow {
 }
 
 const FILTER_SQL: Record<string, string> = {
-  all:     "status = 'active' AND dnssec_enabled = 1",
-  pending: "status = 'active' AND dnssec_enabled = 1 AND (dnssec_ok IS NULL OR dnssec_ok = 0)",
-  ok:      "status = 'active' AND dnssec_enabled = 1 AND dnssec_ok = 1",
+  all:     "status = 'active' AND publish = 1 AND dnssec_enabled = 1",
+  pending: "status = 'active' AND publish = 1 AND dnssec_enabled = 1 AND (dnssec_ok IS NULL OR dnssec_ok = 0)",
+  ok:      "status = 'active' AND publish = 1 AND dnssec_enabled = 1 AND dnssec_ok = 1",
 }
 
-async function isDnskeyVisible(fqdn: string): Promise<boolean> {
+/**
+ * Check end-to-end DNSSEC validation by querying a validating resolver and
+ * looking for the AD (Authenticated Data) flag in the response. NOERROR
+ * without AD means the resolver returned data but couldn't validate the
+ * chain of trust — typically because no DS exists at the parent registry.
+ */
+export async function isDnssecValidated(fqdn: string): Promise<boolean> {
   try {
     const { stdout } = await execFileAsync('dig', [
-      '+short', '+timeout=5', '+tries=2',
-      'DNSKEY', fqdn, '@8.8.8.8',
+      '+dnssec', '+timeout=5', '+tries=2', '+noshort',
+      'SOA', fqdn, '@1.1.1.1',
     ])
-    return stdout.trim().length > 0
+    if (!/->>HEADER<<-.*status:\s*NOERROR/i.test(stdout)) return false
+    return /;;\s*flags:[^;]*\bad\b/i.test(stdout)
   } catch {
     return false
   }
@@ -41,7 +48,7 @@ export async function checkDnssec(filter: 'all' | 'pending' | 'ok' = 'all'): Pro
     let newOk: number
 
     try {
-      newOk = (await isDnskeyVisible(domain.fqdn)) ? 1 : 0
+      newOk = (await isDnssecValidated(domain.fqdn)) ? 1 : 0
     } catch (err: any) {
       console.warn(`[dnssecCheck] dig failed for ${domain.fqdn}: ${err.message}`)
       continue
