@@ -49,6 +49,14 @@ export default function DomainsLayout() {
     },
   })
 
+  const filtersActive = !!(search || labelFilter || tenantFilter.length > 0)
+  const { data: totalDomains } = useQuery<Domain[]>({
+    queryKey: ['domains', 'total'],
+    queryFn: () => getDomains({ limit: '9999' }).then(r => r.data),
+    enabled: filtersActive,
+  })
+  const totalCount = filtersActive ? totalDomains?.length : domains.length
+
   const match = useMatch('/domains/:name')
   const detailOpen = !!match
 
@@ -64,6 +72,7 @@ export default function DomainsLayout() {
       tenantFilter={tenantFilter}
       setTenantFilter={setTenantFilter}
       tenants={tenants}
+      totalCount={totalCount}
     />
   )
 

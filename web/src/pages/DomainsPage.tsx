@@ -18,6 +18,7 @@ interface Props {
   tenantFilter: number[]
   setTenantFilter: (v: number[]) => void
   tenants: Tenant[]
+  totalCount?: number
 }
 
 const zoneStatusDotColors: Record<string, string> = {
@@ -59,6 +60,7 @@ export default function DomainsPage({
   search, setSearch,
   labelFilter, setLabelFilter, labelSuggestions,
   tenantFilter, setTenantFilter, tenants,
+  totalCount,
 }: Props) {
   const { t } = useI18n()
   const navigate = useNavigate()
@@ -165,11 +167,18 @@ export default function DomainsPage({
                 </div>
               )}
             </div>
-            {!isLoading && (
-              <span style={{ fontSize: '.7rem', fontWeight: 600, color: '#64748b', background: '#e2e8f0', borderRadius: 10, padding: '1px 7px' }}>
-                {domains.length}
-              </span>
-            )}
+            {!isLoading && (() => {
+              const filtersActive = !!(search || labelFilter || tenantFilter.length > 0)
+              const showFiltered = filtersActive && totalCount !== undefined && totalCount !== domains.length
+              return (
+                <span
+                  style={{ fontSize: '.7rem', fontWeight: 600, color: '#64748b', background: '#e2e8f0', borderRadius: 10, padding: '1px 7px' }}
+                  title={showFiltered ? t('domains_filteredCount', domains.length, totalCount) : undefined}
+                >
+                  {showFiltered ? t('domains_filteredCount', domains.length, totalCount) : domains.length}
+                </span>
+              )
+            })()}
           </div>
         </div>
 
