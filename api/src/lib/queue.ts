@@ -1,4 +1,5 @@
-import { query, execute } from '../db.js'
+import { query, queryOne, execute } from '../db.js'
+import { broadcast } from '../ws/hub.js'
 
 /** Enqueue a zone render job for a domain (upsert — one pending job per domain) */
 export async function enqueueRender(domainId: number): Promise<void> {
@@ -8,6 +9,22 @@ export async function enqueueRender(domainId: number): Promise<void> {
     [domainId]
   )
   await execute("UPDATE domains SET zone_status = 'dirty' WHERE id = ?", [domainId])
+
+  // Broadcast so connected UIs see the dirty transition immediately, not only
+  // after the worker finishes rendering.
+  const row = await queryOne<{ fqdn: string; tenant_id: number }>(
+    'SELECT fqdn, tenant_id FROM domains WHERE id = ?',
+    [domainId]
+  )
+  if (row) {
+    broadcast({
+      type: 'domain_status',
+      domainId,
+      fqdn: row.fqdn,
+      zone_status: 'dirty',
+      tenantId: row.tenant_id,
+    })
+  }
 }
 
 /** Enqueue zone renders for every domain that uses a given template */

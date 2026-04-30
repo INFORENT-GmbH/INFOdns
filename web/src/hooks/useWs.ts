@@ -60,8 +60,8 @@ export function useWs(token: string | null): WsStatus {
         try { event = JSON.parse(e.data) } catch { return }
 
         switch (event.type) {
-          case 'domain_status':
-            qc.setQueryData(['domain', event.domainId], (old: any) => {
+          case 'domain_status': {
+            const patch = (old: any) => {
               if (!old) return old
               return {
                 ...old,
@@ -72,9 +72,15 @@ export function useWs(token: string | null): WsStatus {
                 ...(event.ns_ok !== undefined && { ns_ok: event.ns_ok }),
                 ...(event.dnssec_ok !== undefined && { dnssec_ok: event.dnssec_ok }),
               }
-            })
+            }
+            // DomainDetailPage keys by FQDN string; older code paths used numeric id.
+            // Patch both so neither variant becomes stale.
+            qc.setQueryData(['domain', event.fqdn], patch)
+            qc.setQueryData(['domain', event.domainId], patch)
+            qc.invalidateQueries({ queryKey: ['domain'] })
             qc.invalidateQueries({ queryKey: ['domains'] })
             break
+          }
 
           case 'record_changed':
             qc.invalidateQueries({ queryKey: ['records', event.domainId] })
