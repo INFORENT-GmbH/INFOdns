@@ -860,120 +860,6 @@ export default function DomainDetailPage() {
         )}
       </div>
 
-      {(() => {
-        const hasZoneError = domain.zone_status === 'error'
-        const hasNsMismatch = domain.ns_ok === 0 && domain.status === 'active'
-        const hasDnssecIssue = domain.dnssec_enabled === 1 && domain.dnssec_ok === 0 && domain.status === 'active'
-        const isSuspended = domain.status === 'suspended'
-        const anyIssue = conflictWarning || hasZoneError || hasNsMismatch || hasDnssecIssue || isSuspended
-        if (!anyIssue) return null
-
-        const observedNs = domain.ns_observed
-          ? domain.ns_observed.split(',').map(s => s.trim()).filter(Boolean)
-          : []
-
-        async function recheckDnssecNow() {
-          if (!domain || recheckingDnssec) return
-          setRecheckingDnssec(true)
-          try {
-            await checkDomainDnssec(domain.id)
-            qc.invalidateQueries({ queryKey: ['domain', name] })
-          } catch (err) {
-            alert(formatApiError(err, 'DNSSEC check failed'))
-          } finally {
-            setRecheckingDnssec(false)
-          }
-        }
-
-        return (
-          <div style={styles.issuesPanel}>
-            {/* Errors first */}
-            {hasZoneError && (
-              <IssueRow
-                severity="error"
-                title={t('domainDetail_zoneFailed')}
-              >
-                {domain.zone_error && (
-                  <pre style={{ margin: 0, fontFamily: MONO, fontSize: '.8125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                    {renderZoneError(domain.zone_error, domain.id, setZoneModal)}
-                  </pre>
-                )}
-              </IssueRow>
-            )}
-            {conflictWarning && (
-              <IssueRow
-                severity="error"
-                title={t('domainDetail_conflictWarning')}
-                action={{ label: t('domainDetail_discardReload'), onClick: handleForceReload }}
-              />
-            )}
-            {hasNsMismatch && (
-              <IssueRow
-                severity="warning"
-                title={<><strong>{t('domainDetail_nsMismatch')}</strong> — {t('domainDetail_nsMismatchDesc')}</>}
-              >
-                {domain.ns_observed !== null && domain.ns_observed !== undefined && (
-                  <div>
-                    {observedNs.length > 0 ? t('domainDetail_nsCurrent') : t('domainDetail_nsCurrentNone')}
-                    {observedNs.length > 0 && (
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: 2 }}>
-                        {observedNs.map(ns => (
-                          <span key={ns} style={{ fontFamily: MONO, fontSize: '.8rem', marginTop: 2 }}>{ns}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {domain.expected_ns?.length > 0 && (
-                  <div style={{ marginTop: '.375rem' }}>
-                    {t('domainDetail_nsSetRecords')}
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: 2 }}>
-                      {domain.expected_ns.map(ns => (
-                        <span
-                          key={ns}
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', position: 'relative', cursor: 'pointer', marginTop: 2 }}
-                          onMouseEnter={() => setHoveredNsItem(ns)}
-                          onMouseLeave={() => setHoveredNsItem(null)}
-                          onClick={() => {
-                            navigator.clipboard.writeText(ns)
-                            setCopiedNs(ns)
-                            setTimeout(() => setCopiedNs(prev => prev === ns ? null : prev), 1500)
-                          }}
-                        >
-                          <span style={{ fontFamily: MONO, fontSize: '.8rem' }}>{ns}</span>
-                          {copiedNs === ns && <span style={{ color: '#16a34a', marginLeft: '.25rem', fontSize: '.7rem' }}>✓</span>}
-                          {hoveredNsItem === ns && copiedNs !== ns && (
-                            <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>{t('domainDetail_clickToCopy')}</span>
-                          )}
-                          {copiedNs === ns && hoveredNsItem === ns && (
-                            <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>{t('domainDetail_copied')}</span>
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </IssueRow>
-            )}
-            {hasDnssecIssue && (
-              <IssueRow
-                severity="warning"
-                title={<><strong>{t('domainDetail_dnssecNotVisible')}</strong> — {t('domainDetail_dnssecNotVisibleDesc')}</>}
-                action={{ label: t('domainDetail_dnssecCheckNow'), onClick: recheckDnssecNow, busy: recheckingDnssec }}
-              >
-                <span style={{ fontSize: '.7rem', opacity: 0.85 }}>{t('domainDetail_dnssecCheckedEvery')}</span>
-              </IssueRow>
-            )}
-            {isSuspended && (
-              <IssueRow
-                severity="info"
-                title={t('domainDetail_suspendedMsg', t('domainDetail_activate'))}
-              />
-            )}
-          </div>
-        )
-      })()}
-
       <div style={styles.meta}>
         {isAdmin ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}>
@@ -1157,6 +1043,120 @@ export default function DomainDetailPage() {
           <span style={{ color: '#a16207' }}>— {t('domainDetail_nsRefReadOnly')}</span>
         </div>
       )}
+
+      {(() => {
+        const hasZoneError = domain.zone_status === 'error'
+        const hasNsMismatch = domain.ns_ok === 0 && domain.status === 'active'
+        const hasDnssecIssue = domain.dnssec_enabled === 1 && domain.dnssec_ok === 0 && domain.status === 'active'
+        const isSuspended = domain.status === 'suspended'
+        const anyIssue = conflictWarning || hasZoneError || hasNsMismatch || hasDnssecIssue || isSuspended
+        if (!anyIssue) return null
+
+        const observedNs = domain.ns_observed
+          ? domain.ns_observed.split(',').map(s => s.trim()).filter(Boolean)
+          : []
+
+        async function recheckDnssecNow() {
+          if (!domain || recheckingDnssec) return
+          setRecheckingDnssec(true)
+          try {
+            await checkDomainDnssec(domain.id)
+            qc.invalidateQueries({ queryKey: ['domain', name] })
+          } catch (err) {
+            alert(formatApiError(err, 'DNSSEC check failed'))
+          } finally {
+            setRecheckingDnssec(false)
+          }
+        }
+
+        return (
+          <div style={styles.issuesPanel}>
+            {/* Errors first */}
+            {hasZoneError && (
+              <IssueRow
+                severity="error"
+                title={t('domainDetail_zoneFailed')}
+              >
+                {domain.zone_error && (
+                  <pre style={{ margin: 0, fontFamily: MONO, fontSize: '.8125rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                    {renderZoneError(domain.zone_error, domain.id, setZoneModal)}
+                  </pre>
+                )}
+              </IssueRow>
+            )}
+            {conflictWarning && (
+              <IssueRow
+                severity="error"
+                title={t('domainDetail_conflictWarning')}
+                action={{ label: t('domainDetail_discardReload'), onClick: handleForceReload }}
+              />
+            )}
+            {hasNsMismatch && (
+              <IssueRow
+                severity="warning"
+                title={<><strong>{t('domainDetail_nsMismatch')}</strong> — {t('domainDetail_nsMismatchDesc')}</>}
+              >
+                {domain.ns_observed !== null && domain.ns_observed !== undefined && (
+                  <div>
+                    {observedNs.length > 0 ? t('domainDetail_nsCurrent') : t('domainDetail_nsCurrentNone')}
+                    {observedNs.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: 2 }}>
+                        {observedNs.map(ns => (
+                          <span key={ns} style={{ fontFamily: MONO, fontSize: '.8rem', marginTop: 2 }}>{ns}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {domain.expected_ns?.length > 0 && (
+                  <div style={{ marginTop: '.375rem' }}>
+                    {t('domainDetail_nsSetRecords')}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', marginTop: 2 }}>
+                      {domain.expected_ns.map(ns => (
+                        <span
+                          key={ns}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', position: 'relative', cursor: 'pointer', marginTop: 2 }}
+                          onMouseEnter={() => setHoveredNsItem(ns)}
+                          onMouseLeave={() => setHoveredNsItem(null)}
+                          onClick={() => {
+                            navigator.clipboard.writeText(ns)
+                            setCopiedNs(ns)
+                            setTimeout(() => setCopiedNs(prev => prev === ns ? null : prev), 1500)
+                          }}
+                        >
+                          <span style={{ fontFamily: MONO, fontSize: '.8rem' }}>{ns}</span>
+                          {copiedNs === ns && <span style={{ color: '#16a34a', marginLeft: '.25rem', fontSize: '.7rem' }}>✓</span>}
+                          {hoveredNsItem === ns && copiedNs !== ns && (
+                            <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>{t('domainDetail_clickToCopy')}</span>
+                          )}
+                          {copiedNs === ns && hoveredNsItem === ns && (
+                            <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>{t('domainDetail_copied')}</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </IssueRow>
+            )}
+            {hasDnssecIssue && (
+              <IssueRow
+                severity="warning"
+                title={<><strong>{t('domainDetail_dnssecNotVisible')}</strong> — {t('domainDetail_dnssecNotVisibleDesc')}</>}
+                action={{ label: t('domainDetail_dnssecCheckNow'), onClick: recheckDnssecNow, busy: recheckingDnssec }}
+              >
+                <span style={{ fontSize: '.7rem', opacity: 0.85 }}>{t('domainDetail_dnssecCheckedEvery')}</span>
+              </IssueRow>
+            )}
+            {isSuspended && (
+              <IssueRow
+                severity="info"
+                title={t('domainDetail_suspendedMsg', t('domainDetail_activate'))}
+              />
+            )}
+          </div>
+        )
+      })()}
 
       {(() => {
         const ownRecords = (records as DnsRecord[]).filter(r => !r._from_template)
