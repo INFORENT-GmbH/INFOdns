@@ -73,8 +73,8 @@ function loginNotification(locale: Locale, p: LoginPayload): MailContent {
     ? `A new sign-in to your account (<strong>${esc(p.email)}</strong>) was detected.`
     : `Es wurde eine neue Anmeldung in Ihrem Konto (<strong>${esc(p.email)}</strong>) festgestellt.`
   const outro = isEn
-    ? 'If this was you, no action is needed. If you did not sign in, please change your password immediately and contact your administrator.'
-    : 'Wenn Sie sich selbst angemeldet haben, ist keine weitere Aktion erforderlich. Falls nicht, ändern Sie bitte umgehend Ihr Passwort und kontaktieren Sie Ihren Administrator.'
+    ? 'If this was you, no action is needed. If you did not sign in, please change your password immediately and contact support.'
+    : 'Wenn Sie sich selbst angemeldet haben, ist keine weitere Aktion erforderlich. Falls nicht, ändern Sie bitte umgehend Ihr Passwort und kontaktieren Sie den Support.'
 
   const labels: Record<string, [string, string]> = {
     ip:        [isEn ? 'IP address'  : 'IP-Adresse',  p.ip],
