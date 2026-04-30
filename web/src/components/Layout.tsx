@@ -89,11 +89,6 @@ export default function Layout() {
       <NavLink to="/templates" className="sb-item" style={subNavItemStyle} onClick={closeSidebar}>
         {t('nav_templates')}
       </NavLink>
-      {user?.role === 'admin' && (
-        <NavLink to="/import" className="sb-item" style={subNavItemStyle} onClick={closeSidebar}>
-          INFOease Import
-        </NavLink>
-      )}
 
       <div style={styles.sectionHeader}>{t('nav_help')}</div>
       <NavLink to="/tickets" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
@@ -124,6 +119,9 @@ export default function Layout() {
         </NavLink>
         <NavLink to="/registrars" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
           Registrars
+        </NavLink>
+        <NavLink to="/import" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
+          INFOease Import
         </NavLink>
       </>)}
     </div>
