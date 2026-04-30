@@ -8,7 +8,7 @@ import {
   createBulkJob, previewBulkJob, approveBulkJob, searchByRecord,
   updateDomainLabels, getLabelSuggestions, updateDomain, deleteDomain, getZoneText,
   getTenants, getTemplates, previewApplyTemplate, applyTemplate,
-  getDomainTemplates, assignDomainTemplate, unassignDomainTemplate,
+  getDomainTemplates,
   type DnsRecord, type Label, type Domain, type LabelSuggestion, type Tenant,
   type ApplyMode, type ApplyTemplateDiff, type AssignedTemplate,
 } from '../api/client'
@@ -250,11 +250,6 @@ export default function DomainDetailPage() {
   const [applyingTpl, setApplyingTpl] = useState(false)
   const [applyTplError, setApplyTplError] = useState<string | null>(null)
 
-  // Multi-template manager
-  const [addingTplId, setAddingTplId] = useState<number | ''>('')
-  const [savingTplAssign, setSavingTplAssign] = useState(false)
-  const [tplManagerError, setTplManagerError] = useState<string | null>(null)
-
   const { data: domain, isLoading: loadingDomain } = useQuery<Domain>({
     queryKey: ['domain', name],
     queryFn: () => getDomain(name!).then(r => r.data),
@@ -289,7 +284,7 @@ export default function DomainDetailPage() {
     queryFn: () => getTemplates().then(r => r.data),
   })
 
-  const { data: assignedTemplates = [], refetch: refetchAssignedTemplates } = useQuery<AssignedTemplate[]>({
+  const { data: assignedTemplates = [] } = useQuery<AssignedTemplate[]>({
     queryKey: ['domain-templates', domain?.id],
     queryFn: () => getDomainTemplates(domain!.id).then(r => r.data),
     enabled: !!domain,
@@ -574,33 +569,6 @@ export default function DomainDetailPage() {
       setApplyTplError(formatApiError(err))
     } finally {
       setApplyingTpl(false)
-    }
-  }
-
-  async function handleAssignTemplate() {
-    if (!domain || addingTplId === '') return
-    setSavingTplAssign(true); setTplManagerError(null)
-    try {
-      await assignDomainTemplate(domain.id, Number(addingTplId))
-      await refetchAssignedTemplates()
-      qc.invalidateQueries({ queryKey: ['records', recordSourceId] })
-      setAddingTplId('')
-    } catch (err: any) {
-      setTplManagerError(formatApiError(err))
-    } finally {
-      setSavingTplAssign(false)
-    }
-  }
-
-  async function handleUnassignTemplate(templateId: number) {
-    if (!domain) return
-    setTplManagerError(null)
-    try {
-      await unassignDomainTemplate(domain.id, templateId)
-      await refetchAssignedTemplates()
-      qc.invalidateQueries({ queryKey: ['records', recordSourceId] })
-    } catch (err: any) {
-      setTplManagerError(formatApiError(err))
     }
   }
 
@@ -912,40 +880,6 @@ export default function DomainDetailPage() {
             />
             {savingNsRef && <span style={{ color: '#9ca3af' }}>…</span>}
           </span>
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '.4rem', fontSize: '.8125rem' }}>
-          <span style={{ color: '#64748b', fontWeight: 500 }}>Templates:</span>
-          {assignedTemplates.map(t => (
-            <span key={t.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: '#e0f2fe', color: '#0369a1', borderRadius: 4, padding: '1px 6px', fontSize: '.75rem', fontWeight: 600 }}>
-              {t.name}
-              <button
-                onClick={() => handleUnassignTemplate(t.id)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0369a1', padding: '0 0 0 2px', lineHeight: 1, fontSize: '.75rem' }}
-                title="Remove template"
-              >✕</button>
-            </span>
-          ))}
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <Select
-              variant="ghost"
-              value={addingTplId === '' ? '' : String(addingTplId)}
-              onChange={v => setAddingTplId(v === '' ? '' : Number(v))}
-              options={(tplList as { id: number; name: string }[])
-                .filter(tpl => !assignedTemplates.some(a => a.id === tpl.id))
-                .map(tpl => ({ value: String(tpl.id), label: tpl.name }))}
-              placeholder="+ add template…"
-            />
-            {addingTplId !== '' && (
-              <button
-                onClick={handleAssignTemplate}
-                disabled={savingTplAssign}
-                style={{ ...styles.btnPrimary, fontSize: '.75rem', padding: '2px 8px' }}
-              >
-                {savingTplAssign ? '…' : 'Add'}
-              </button>
-            )}
-          </span>
-          {tplManagerError && <span style={{ color: '#b91c1c', fontSize: '.75rem' }}>{tplManagerError}</span>}
-        </div>
       </div>
 
       {showDnssecModal && (
