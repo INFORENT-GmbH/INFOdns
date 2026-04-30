@@ -210,13 +210,16 @@ export async function domainRoutes(app: FastifyInstance) {
       }
     }
     if (search) {
-      // Glob-style: `*` → `%`, `?` → `_`, anchored on both ends.
+      // Glob-style: `*` → `%`, `?` → `_`. Anchored when the user supplies a glob
+      // char (so `*.example.com` keeps its end-anchor); otherwise substring match.
       // Escape LIKE specials in raw input first so user-typed `%`/`_`/`\` are literal.
-      const pattern = search
+      const hasGlob = /[*?]/.test(search)
+      const escaped = search
         .replace(/\\/g, '\\\\')
         .replace(/[%_]/g, '\\$&')
         .replace(/\*/g, '%')
         .replace(/\?/g, '_')
+      const pattern = hasGlob ? escaped : `%${escaped}%`
       where += ` AND d.fqdn LIKE ?`
       params.push(pattern)
     }

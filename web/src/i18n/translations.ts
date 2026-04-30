@@ -67,7 +67,7 @@ export const translations = {
 
     // Domains page
     domains_title:               'Domains',
-    domains_searchPlaceholder:   'FQDN (use * or ? to match)…',
+    domains_searchPlaceholder:   'Search FQDN (substring; use * / ? for glob)…',
     domains_labelFilterPlaceholder: 'Filter by label…',
     domains_addDomain:           '+ Add Domain',
     domains_fqdnPlaceholder:     'FQDN (e.g. example.com)',
@@ -569,7 +569,7 @@ export const translations = {
 
     // Domains page
     domains_title:               'Domains',
-    domains_searchPlaceholder:   'FQDN (mit * oder ? suchen)…',
+    domains_searchPlaceholder:   'FQDN suchen (Teilstring; * / ? für Glob)…',
     domains_labelFilterPlaceholder: 'Nach Label filtern…',
     domains_addDomain:           '+ Domain hinzufügen',
     domains_fqdnPlaceholder:     'FQDN (z.B. example.com)',
