@@ -163,6 +163,7 @@ export interface User {
   city: string | null
   country: string | null
   created_at: string
+  deleted_at?: string | null
 }
 
 export interface BulkJob {
@@ -354,10 +355,13 @@ export const updateTenant = (id: number, data: Partial<Tenant>) => api.put<Tenan
 export const deleteTenant = (id: number) => api.delete(`/tenants/${id}`)
 
 // Users
-export const getUsers = () => api.get<User[]>('/users')
+export const getUsers = (opts?: { deleted?: boolean }) =>
+  api.get<User[]>('/users', { params: opts?.deleted ? { deleted: 1 } : undefined })
 export const createUser = (data: Partial<User> & { password: string }) => api.post<User>('/users', data)
 export const updateUser = (id: number, data: Partial<User> & { password?: string; current_password?: string }) =>
   api.put<User>(`/users/${id}`, data)
+export const deleteUser = (id: number) => api.delete<{ ok: true }>(`/users/${id}`)
+export const restoreUser = (id: number) => api.post<User>(`/users/${id}/restore`)
 export const adminResetUserPassword = (id: number) =>
   api.post<{ ok: true }>(`/users/${id}/reset-password`)
 

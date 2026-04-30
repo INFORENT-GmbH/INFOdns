@@ -3,7 +3,7 @@ import { z } from 'zod'
 import bcrypt from 'bcrypt'
 import { randomBytes } from 'crypto'
 import { query, queryOne, execute } from '../db.js'
-import { hashToken } from '../auth/jwt.js'
+import { hashToken, revokeAllForUser } from '../auth/jwt.js'
 import { requireAuth, requireAdmin } from '../middleware/auth.js'
 import { writeAuditLog } from '../audit/middleware.js'
 
@@ -40,8 +40,11 @@ const UpdateUserBody = z.object({
 
 export async function userRoutes(app: FastifyInstance) {
   // GET /users  (admin only)
+  // ?deleted=1 → list soft-deleted users only; otherwise list active ones.
   app.get('/users', { preHandler: requireAdmin }, async (req) => {
-    const users = await query('SELECT id, email, full_name, role, tenant_id, is_active, locale, phone, street, zip, city, country, created_at FROM users ORDER BY email') as any[]
+    const showDeleted = (req.query as any)?.deleted === '1'
+    const where = showDeleted ? 'WHERE deleted_at IS NOT NULL' : 'WHERE deleted_at IS NULL'
+    const users = await query(`SELECT id, email, full_name, role, tenant_id, is_active, locale, phone, street, zip, city, country, created_at, deleted_at FROM users ${where} ORDER BY email`) as any[]
     const ucRows = await query('SELECT user_id, tenant_id FROM user_tenants ORDER BY user_id, tenant_id') as any[]
     const ucMap = new Map<number, number[]>()
     for (const r of ucRows) {
@@ -98,8 +101,9 @@ export async function userRoutes(app: FastifyInstance) {
       return reply.status(403).send({ code: 'FORBIDDEN' })
     }
 
-    const old = await queryOne('SELECT * FROM users WHERE id = ?', [targetId])
+    const old = await queryOne<any>('SELECT * FROM users WHERE id = ?', [targetId])
     if (!old) return reply.status(404).send({ code: 'NOT_FOUND' })
+    if (old.deleted_at) return reply.status(409).send({ code: 'USER_DELETED', message: 'Restore the user before editing' })
 
     const body = UpdateUserBody.safeParse(req.body)
     if (!body.success) return reply.status(400).send({ code: 'VALIDATION_ERROR', message: body.error.message })
@@ -160,11 +164,11 @@ export async function userRoutes(app: FastifyInstance) {
     if (!Number.isInteger(targetId) || targetId <= 0) return reply.status(400).send({ code: 'INVALID_ID' })
 
     type Row = { id: number; email: string; full_name: string; locale: 'en' | 'de'; is_active: number }
-    const user = await queryOne<Row>(
-      'SELECT id, email, full_name, locale, is_active FROM users WHERE id = ?',
+    const user = await queryOne<Row & { deleted_at: string | null }>(
+      'SELECT id, email, full_name, locale, is_active, deleted_at FROM users WHERE id = ?',
       [targetId]
     )
-    if (!user) return reply.status(404).send({ code: 'NOT_FOUND' })
+    if (!user || user.deleted_at) return reply.status(404).send({ code: 'NOT_FOUND' })
     if (!user.is_active) return reply.status(400).send({ code: 'USER_INACTIVE' })
 
     await execute('UPDATE password_resets SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL', [user.id])
@@ -194,5 +198,44 @@ export async function userRoutes(app: FastifyInstance) {
     await writeAuditLog({ req, entityType: 'user', entityId: user.id, action: 'reset_password', newValue: { email: user.email } })
 
     return reply.send({ ok: true })
+  })
+
+  // DELETE /users/:id  (soft delete — admin only)
+  app.delete<{ Params: { id: string } }>('/users/:id', { preHandler: requireAdmin }, async (req: any, reply) => {
+    const targetId = Number(req.params.id)
+    if (!Number.isInteger(targetId) || targetId <= 0) return reply.status(400).send({ code: 'INVALID_ID' })
+    if (targetId === Number(req.user.sub)) return reply.status(409).send({ code: 'CANNOT_DELETE_SELF' })
+
+    const old = await queryOne<any>('SELECT * FROM users WHERE id = ? AND deleted_at IS NULL', [targetId])
+    if (!old) return reply.status(404).send({ code: 'NOT_FOUND' })
+
+    await execute(
+      'UPDATE users SET deleted_at = NOW(), is_active = 0 WHERE id = ?',
+      [targetId]
+    )
+    await revokeAllForUser(targetId)
+    await writeAuditLog({ req, entityType: 'user', entityId: targetId, action: 'delete', oldValue: { email: old.email, full_name: old.full_name, role: old.role } })
+    return { ok: true }
+  })
+
+  // POST /users/:id/restore  (admin only)
+  app.post<{ Params: { id: string } }>('/users/:id/restore', { preHandler: requireAdmin }, async (req: any, reply) => {
+    const targetId = Number(req.params.id)
+    if (!Number.isInteger(targetId) || targetId <= 0) return reply.status(400).send({ code: 'INVALID_ID' })
+
+    const old = await queryOne<any>('SELECT * FROM users WHERE id = ? AND deleted_at IS NOT NULL', [targetId])
+    if (!old) return reply.status(404).send({ code: 'NOT_FOUND' })
+
+    await execute(
+      'UPDATE users SET deleted_at = NULL, is_active = 1 WHERE id = ?',
+      [targetId]
+    )
+    const restored = await queryOne(
+      'SELECT id, email, full_name, role, tenant_id, is_active, locale, phone, street, zip, city, country, created_at, deleted_at FROM users WHERE id = ?',
+      [targetId]
+    )
+    const cids = (await query('SELECT tenant_id FROM user_tenants WHERE user_id = ? ORDER BY tenant_id', [targetId]) as any[]).map(r => r.tenant_id)
+    await writeAuditLog({ req, entityType: 'user', entityId: targetId, action: 'restore', newValue: { email: old.email } })
+    return { ...(restored as any), tenant_ids: cids }
   })
 }

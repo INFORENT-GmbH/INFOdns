@@ -22,6 +22,7 @@ CREATE TABLE users (
   role          ENUM('admin','operator','tenant') NOT NULL DEFAULT 'tenant',
   full_name     VARCHAR(255) NOT NULL,
   is_active     TINYINT(1)   NOT NULL DEFAULT 1,
+  deleted_at    DATETIME     NULL,
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_email (email),

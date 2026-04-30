@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getUsers, createUser, updateUser, inviteUser, getInvites, revokeInvite, getTenants, adminResetUserPassword, type User, type PendingInvite } from '../api/client'
+import { getUsers, createUser, updateUser, deleteUser, restoreUser, inviteUser, getInvites, revokeInvite, getTenants, adminResetUserPassword, type User, type PendingInvite } from '../api/client'
 import Select from '../components/Select'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
@@ -31,6 +31,8 @@ export default function UsersPage() {
 
   const [resetSuccess, setResetSuccess] = useState<string | null>(null)
   const [resettingId, setResettingId] = useState<number | null>(null)
+  const [busyId, setBusyId] = useState<number | null>(null)
+  const [showDeleted, setShowDeleted] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editForm, setEditForm] = useState({ email: '', full_name: '', role: 'tenant', locale: 'de', is_active: true, phone: '', street: '', zip: '', city: '', country: '' })
   const [editTenantIds, setEditTenantIds] = useState<number[]>([])
@@ -38,13 +40,14 @@ export default function UsersPage() {
   const [editError, setEditError] = useState<string | null>(null)
 
   const { data: users = [], isLoading } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => getUsers().then(r => r.data),
+    queryKey: ['users', showDeleted ? 'deleted' : 'active'],
+    queryFn: () => getUsers({ deleted: showDeleted }).then(r => r.data),
   })
 
   const { data: invites = [] } = useQuery({
     queryKey: ['invites'],
     queryFn: () => getInvites().then(r => r.data),
+    enabled: !showDeleted,
   })
 
   const { data: tenants = [] } = useQuery({
@@ -135,6 +138,28 @@ export default function UsersPage() {
     }
   }
 
+  async function handleDelete(u: User) {
+    if (!confirm(t('users_deleteConfirm', u.email))) return
+    setBusyId(u.id)
+    try {
+      await deleteUser(u.id)
+      qc.invalidateQueries({ queryKey: ['users'] })
+      if (editingId === u.id) setEditingId(null)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function handleRestore(u: User) {
+    setBusyId(u.id)
+    try {
+      await restoreUser(u.id)
+      qc.invalidateQueries({ queryKey: ['users'] })
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true); setError(null)
@@ -202,14 +227,28 @@ export default function UsersPage() {
         <h2 style={styles.h2}>{t('users_title')}</h2>
         <div style={{ display: 'flex', gap: '.5rem' }}>
           <button
-            onClick={() => { setShowInviteForm(v => !v); setShowForm(false); setInviteSuccess(null) }}
+            onClick={() => { setShowDeleted(v => !v); setEditingId(null); setShowForm(false); setShowInviteForm(false) }}
             style={styles.btnSecondary}
           >
-            {t('users_invite')}
+            {showDeleted ? t('users_showActive') : t('users_showDeleted')}
           </button>
-          <button onClick={() => { setShowForm(v => !v); setShowInviteForm(false) }} style={styles.btnPrimary}>{t('users_add')}</button>
+          {!showDeleted && (
+            <>
+              <button
+                onClick={() => { setShowInviteForm(v => !v); setShowForm(false); setInviteSuccess(null) }}
+                style={styles.btnSecondary}
+              >
+                {t('users_invite')}
+              </button>
+              <button onClick={() => { setShowForm(v => !v); setShowInviteForm(false) }} style={styles.btnPrimary}>{t('users_add')}</button>
+            </>
+          )}
         </div>
       </div>
+
+      {showDeleted && (
+        <div style={styles.infoBanner}>{t('users_deletedBanner')}</div>
+      )}
 
       {inviteSuccess && (
         <div style={styles.successBanner}>
@@ -223,7 +262,7 @@ export default function UsersPage() {
         </div>
       )}
 
-      {showInviteForm && (
+      {!showDeleted && showInviteForm && (
         <div style={styles.formCard}>
           <div style={styles.formHeader}>
             <h4 style={styles.formTitle}>{t('users_inviteTitle')}</h4>
@@ -255,7 +294,7 @@ export default function UsersPage() {
         </div>
       )}
 
-      {showForm && (
+      {!showDeleted && showForm && (
         <div style={styles.formCard}>
           <div style={styles.formHeader}>
             <h4 style={styles.formTitle}>{t('users_newTitle')}</h4>
@@ -311,7 +350,7 @@ export default function UsersPage() {
                 <th style={styles.th}>{t('users_tenants')}</th>
                 <th style={styles.th}>{t('active')}</th>
                 <th style={styles.th}>{t('users_locale')}</th>
-                <th style={styles.th}>{t('created')}</th>
+                <th style={styles.th}>{showDeleted ? t('users_deletedAt') : t('created')}</th>
                 <th style={{ ...styles.th, width: 1 }}></th>
               </tr>
             </thead>
@@ -331,38 +370,64 @@ export default function UsersPage() {
                         : <span style={styles.badgeInactive}>Inactive</span>}
                     </td>
                     <td style={styles.tdMuted}>{u.locale === 'en' ? t('locale_en') : t('locale_de')}</td>
-                    <td style={styles.tdMuted}>{new Date(u.created_at).toLocaleDateString()}</td>
+                    <td style={styles.tdMuted}>
+                      {showDeleted
+                        ? (u.deleted_at ? new Date(u.deleted_at).toLocaleDateString() : '—')
+                        : new Date(u.created_at).toLocaleDateString()}
+                    </td>
                     <td style={{ ...styles.td, whiteSpace: 'nowrap' }}>
                       <div style={{ display: 'flex', gap: '.375rem' }}>
-                        <button
-                          onClick={() => editingId === u.id ? setEditingId(null) : startEdit(u)}
-                          style={editingId === u.id ? styles.btnSecondary : styles.btnEdit}
-                        >
-                          {editingId === u.id ? t('cancel') : t('edit')}
-                        </button>
-                        {currentUser?.role === 'admin' && u.id !== currentUser.sub && (
+                        {showDeleted ? (
                           <button
-                            onClick={() => impersonate(u.id)}
-                            style={styles.btnImpersonate}
-                            title={t('users_impersonate')}
+                            onClick={() => handleRestore(u)}
+                            disabled={busyId === u.id}
+                            style={styles.btnPrimary}
                           >
-                            {t('users_impersonate')}
+                            {busyId === u.id ? '…' : t('users_restore')}
                           </button>
-                        )}
-                        {currentUser?.role === 'admin' && (
-                          <button
-                            onClick={() => handleResetPassword(u)}
-                            disabled={resettingId === u.id}
-                            style={styles.btnReset}
-                            title={t('users_resetPassword')}
-                          >
-                            {resettingId === u.id ? '…' : t('users_resetPassword')}
-                          </button>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => editingId === u.id ? setEditingId(null) : startEdit(u)}
+                              style={editingId === u.id ? styles.btnSecondary : styles.btnEdit}
+                            >
+                              {editingId === u.id ? t('cancel') : t('edit')}
+                            </button>
+                            {currentUser?.role === 'admin' && u.id !== currentUser.sub && (
+                              <button
+                                onClick={() => impersonate(u.id)}
+                                style={styles.btnImpersonate}
+                                title={t('users_impersonate')}
+                              >
+                                {t('users_impersonate')}
+                              </button>
+                            )}
+                            {currentUser?.role === 'admin' && (
+                              <button
+                                onClick={() => handleResetPassword(u)}
+                                disabled={resettingId === u.id}
+                                style={styles.btnReset}
+                                title={t('users_resetPassword')}
+                              >
+                                {resettingId === u.id ? '…' : t('users_resetPassword')}
+                              </button>
+                            )}
+                            {currentUser?.role === 'admin' && u.id !== currentUser.sub && (
+                              <button
+                                onClick={() => handleDelete(u)}
+                                disabled={busyId === u.id}
+                                style={styles.btnDelete}
+                                title={t('users_delete')}
+                              >
+                                {busyId === u.id ? '…' : t('users_delete')}
+                              </button>
+                            )}
+                          </>
                         )}
                       </div>
                     </td>
                   </tr>
-                  {editingId === u.id && (
+                  {!showDeleted && editingId === u.id && (
                     <tr key={`${u.id}-edit`}>
                       <td colSpan={8} style={styles.editPanel}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem', maxWidth: 600 }}>
@@ -410,7 +475,7 @@ export default function UsersPage() {
                   )}
                 </React.Fragment>
               ))}
-              {invites.map((inv: PendingInvite) => (
+              {!showDeleted && invites.map((inv: PendingInvite) => (
                 <tr key={`invite-${inv.id}`} style={{ opacity: 0.7 }}>
                   <td style={styles.td}>{inv.email}</td>
                   <td style={styles.tdMuted}>{inv.full_name || <span style={styles.muted}>—</span>}</td>
@@ -433,8 +498,10 @@ export default function UsersPage() {
                   </td>
                 </tr>
               ))}
-              {users.length === 0 && invites.length === 0 && (
-                <tr><td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '.8125rem' }}>No users yet</td></tr>
+              {users.length === 0 && (showDeleted || invites.length === 0) && (
+                <tr><td colSpan={8} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '.8125rem' }}>
+                  {showDeleted ? t('users_noDeletedUsers') : 'No users yet'}
+                </td></tr>
               )}
             </tbody>
           </table>
@@ -491,4 +558,8 @@ const styles: Record<string, React.CSSProperties> = {
   btnImpersonate: { padding: '.25rem .5rem', background: '#fbbf24', color: '#78350f', border: 'none', borderRadius: 4, fontSize: '.75rem', fontWeight: 600, cursor: 'pointer' },
   btnReset:       { padding: '.25rem .5rem', background: '#fff', border: '1px solid #d1d5db', color: '#374151', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
   btnRevoke:      { padding: '.25rem .5rem', background: '#fff', border: '1px solid #e2e8f0', color: '#64748b', borderRadius: 4, fontSize: '.75rem', cursor: 'pointer' },
+  btnDelete:      { padding: '.25rem .5rem', background: '#fff', border: '1px solid #fca5a5', color: '#b91c1c', borderRadius: 4, fontSize: '.75rem', fontWeight: 500, cursor: 'pointer' },
+
+  // Info banner (e.g. "viewing deleted users")
+  infoBanner: { background: '#fef3c7', color: '#92400e', padding: '.5rem .75rem', borderRadius: 6, fontSize: '.8125rem', marginBottom: '.75rem', border: '1px solid #fde68a' },
 }

@@ -359,6 +359,16 @@ export const translations = {
     users_resetPasswordConfirm: (email: string) => `Send a password-reset email to ${email}?`,
     users_resetPasswordSent:    'Password-reset email sent.',
 
+    // Soft-delete / restore
+    users_delete:           'Delete',
+    users_deleteConfirm:    (email: string) => `Delete user ${email}? They can be restored later from the deleted users list.`,
+    users_restore:          'Restore',
+    users_showDeleted:      'Show deleted users',
+    users_showActive:       'Show active users',
+    users_deletedAt:        'Deleted',
+    users_noDeletedUsers:   'No deleted users',
+    users_deletedBanner:    'Viewing deleted users. Edits and password resets are disabled until restored.',
+
     // Impersonation
     impersonation_active: 'You are impersonating another user.',
     impersonation_stop:   'Stop impersonating',
@@ -891,6 +901,16 @@ export const translations = {
     users_resetPassword:        'Reset-E-Mail senden',
     users_resetPasswordConfirm: (email: string) => `Eine Passwort-Reset-E-Mail an ${email} senden?`,
     users_resetPasswordSent:    'Passwort-Reset-E-Mail gesendet.',
+
+    // Soft-Delete / Wiederherstellen
+    users_delete:           'Löschen',
+    users_deleteConfirm:    (email: string) => `Benutzer ${email} löschen? Er kann später aus der Liste gelöschter Benutzer wiederhergestellt werden.`,
+    users_restore:          'Wiederherstellen',
+    users_showDeleted:      'Gelöschte Benutzer anzeigen',
+    users_showActive:       'Aktive Benutzer anzeigen',
+    users_deletedAt:        'Gelöscht',
+    users_noDeletedUsers:   'Keine gelöschten Benutzer',
+    users_deletedBanner:    'Ansicht gelöschter Benutzer. Bearbeiten und Passwort-Reset sind erst nach Wiederherstellung möglich.',
 
     // Impersonation
     impersonation_active: 'Sie agieren als ein anderer Benutzer.',
