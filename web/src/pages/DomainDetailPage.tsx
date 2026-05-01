@@ -34,7 +34,7 @@ const INLINE_STYLES = `
     position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
     background: #1f2937; color: #f9fafb; font-size: .75rem; font-weight: 400;
     padding: 5px 8px; border-radius: 5px; white-space: normal; width: max-content; max-width: 220px;
-    pointer-events: none; opacity: 0; transition: opacity 0s;
+    pointer-events: none; opacity: 0; transition: opacity 0s; z-index: 100;
   }
   .alias-hint:hover::after { opacity: 1; }
   .ddp-menuitem:hover:not(:disabled) { background: #f1f5f9; }
