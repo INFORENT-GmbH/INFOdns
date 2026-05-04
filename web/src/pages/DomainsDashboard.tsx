@@ -30,6 +30,7 @@ interface Props {
   setZoneStatus: (v: string) => void
   nsIssues: boolean
   setNsIssues: (v: boolean) => void
+  totalCount?: number
   sort: [string, 'asc' | 'desc']
   setSort: (v: [string, 'asc' | 'desc']) => void
   selectedIds: Set<number>
@@ -157,6 +158,7 @@ export default function DomainsTableView({
   status, setStatus,
   zoneStatus, setZoneStatus,
   nsIssues, setNsIssues,
+  totalCount,
   sort: sortProp, setSort: setSortProp,
   selectedIds, onToggleSelected, onSelectAll, onClearSelection,
   filtersPersist, setFiltersPersist, clearFilters, filtersHasActive,
@@ -351,7 +353,18 @@ export default function DomainsTableView({
 
       {/* Stats bar */}
       <div style={{ ...s.filterBar, gap: '.5rem', flexShrink: 0 }}>
-        <StatPill label={t('dashboard_domains').toLowerCase()} value={stats?.total} />
+        {(() => {
+          const filtersActive = !!(search || labelFilter || tenantFilter.length > 0 || status || zoneStatus || nsIssues)
+          const showFiltered = filtersActive && totalCount !== undefined && totalCount !== sorted.length
+          if (showFiltered) {
+            return (
+              <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: '.8125rem', color: '#475569', background: '#e2e8f0', borderRadius: 4, padding: '1px 8px' }}>
+                {t('domains_filteredCount', sorted.length, totalCount)}
+              </span>
+            )
+          }
+          return <StatPill label={t('dashboard_domains').toLowerCase()} value={totalCount ?? stats?.total} />
+        })()}
         {stats && stats.active > 0 && (
           <span style={{ fontSize: '.8125rem', color: '#64748b' }}>{stats.active} {t('dashboard_active').toLowerCase()}</span>
         )}

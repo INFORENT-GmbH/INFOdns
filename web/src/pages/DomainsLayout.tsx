@@ -194,6 +194,7 @@ export default function DomainsLayout() {
       setZoneStatus={setZoneStatus}
       nsIssues={nsIssues}
       setNsIssues={setNsIssues}
+      totalCount={totalCount}
       sort={sort}
       setSort={setSort}
       selectedIds={selectedIds}
