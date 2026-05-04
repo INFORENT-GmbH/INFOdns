@@ -331,6 +331,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: '.8rem',
     flexShrink: 0,
+    textDecoration: 'none',
   },
   body: {
     display: 'flex',

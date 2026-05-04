@@ -110,13 +110,15 @@ export default function DomainsLayout() {
     enabled: !!user,
   })
 
+  const showDeleted = status === 'deleted'
   const { data: domains = [], isLoading } = useQuery<Domain[]>({
-    queryKey: ['domains', search, labelFilter, tenantFilter.join(',')],
+    queryKey: ['domains', search, labelFilter, tenantFilter.join(','), showDeleted],
     queryFn: () => {
       const params: Record<string, string> = { limit: '9999' }
       if (search) params.search = search
       if (labelFilter) params.label = labelFilter
       if (tenantFilter.length > 0) params.tenant_id = tenantFilter.join(',')
+      if (showDeleted) params.show_deleted = 'true'
       return getDomains(params).then(r => r.data)
     },
   })

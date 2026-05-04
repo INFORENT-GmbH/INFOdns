@@ -714,10 +714,10 @@ export default function DomainsTableView({
                     {visible.ns && (
                       <td style={s.td}>
                         {d.ns_ok === 0
-                          ? <span style={{ color: '#dc2626', fontWeight: 600, fontSize: '.8125rem' }}>⚠</span>
+                          ? <Tooltip tip={t('domains_nsWarning')} style={{ color: '#dc2626', fontWeight: 600, fontSize: '.8125rem', cursor: 'default' }}>⚠</Tooltip>
                           : d.ns_ok === null
-                            ? <span style={{ color: '#9ca3af', fontSize: '.8125rem' }}>—</span>
-                            : <span style={{ color: '#16a34a', fontSize: '.875rem' }}>✓</span>}
+                            ? <Tooltip tip={t('domains_nsUnknown')} style={{ color: '#9ca3af', fontSize: '.8125rem', cursor: 'default' }}>—</Tooltip>
+                            : <Tooltip tip={t('domains_nsOk')} style={{ color: '#16a34a', fontSize: '.875rem', cursor: 'default' }}>✓</Tooltip>}
                       </td>
                     )}
                     {visible.dnssec && (
