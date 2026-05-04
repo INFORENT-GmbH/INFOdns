@@ -1069,10 +1069,10 @@ export default function DomainDetailPage() {
                           <span style={{ fontFamily: MONO, fontSize: '.8rem' }}>{ns}</span>
                           {copiedNs === ns && <span style={{ color: '#16a34a', marginLeft: '.25rem', fontSize: '.7rem' }}>✓</span>}
                           {hoveredNsItem === ns && copiedNs !== ns && (
-                            <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>{t('domainDetail_clickToCopy')}</span>
+                            <span style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 100, pointerEvents: 'none' as const }}>{t('domainDetail_clickToCopy')}</span>
                           )}
                           {copiedNs === ns && hoveredNsItem === ns && (
-                            <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', marginTop: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 20, pointerEvents: 'none' as const }}>{t('domainDetail_copied')}</span>
+                            <span style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', marginBottom: 4, background: '#1e293b', color: '#f8fafc', padding: '.25rem .5rem', borderRadius: 4, fontSize: '.7rem', whiteSpace: 'nowrap' as const, zIndex: 100, pointerEvents: 'none' as const }}>{t('domainDetail_copied')}</span>
                           )}
                         </span>
                       ))}
