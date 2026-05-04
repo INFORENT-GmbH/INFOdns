@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react'
+import React, { useMemo, useState, useEffect, Fragment } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import {
@@ -8,8 +8,18 @@ import {
 } from '../api/client'
 import { useI18n } from '../i18n/I18nContext'
 import Select from '../components/Select'
+import Dropdown, { DropdownItem } from '../components/Dropdown'
+import FilterBar from '../components/FilterBar'
+import FilterPersistControls from '../components/FilterPersistControls'
 import { useAuth } from '../context/AuthContext'
+import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import { formatApiError } from '../lib/formError'
+import * as s from '../styles/shell'
+
+const JOB_STATUS_OPTIONS = ['draft', 'previewing', 'approved', 'running', 'done', 'failed']
+const RENDER_STATUS_OPTIONS = ['pending', 'processing', 'done', 'failed']
+const JOB_FILTER_DEFAULTS = { status: '' }
+const RENDER_FILTER_DEFAULTS = { status: '' }
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -308,6 +318,17 @@ export default function JobsPage() {
   const [showWizard, setShowWizard] = useState(false)
   const [step, setStep]             = useState<Step>('search')
 
+  const {
+    filters: jobFilters, setFilter: setJobFilter,
+    persist: jobsPersist, setPersist: setJobsPersist,
+    clear: clearJobFilters, hasActive: jobFiltersActive,
+  } = usePersistedFilters('jobs', JOB_FILTER_DEFAULTS)
+  const {
+    filters: renderFilters, setFilter: setRenderFilter,
+    persist: renderPersist, setPersist: setRenderPersist,
+    clear: clearRenderFilters, hasActive: renderFiltersActive,
+  } = usePersistedFilters('render-queue', RENDER_FILTER_DEFAULTS)
+
   // Search state — seed from URL params when navigated from DomainDetailPage
   const [searchType, setSearchType]   = useState(searchParams.get('type') || 'A')
   const [searchName, setSearchName]   = useState(searchParams.get('name') || '')
@@ -382,6 +403,18 @@ export default function JobsPage() {
   )
 
   const activeJobs = (jobs as BulkJob[]).filter(j => j.status === 'running' || j.status === 'previewing')
+  const filteredJobs = useMemo(() => {
+    if (!jobFilters.status) return jobs as BulkJob[]
+    return (jobs as BulkJob[]).filter(j => j.status === jobFilters.status)
+  }, [jobs, jobFilters.status])
+  const filteredRenderQueue = useMemo(() => {
+    if (!renderFilters.status) return renderQueue as ZoneRenderJob[]
+    return (renderQueue as ZoneRenderJob[]).filter(j => j.status === renderFilters.status)
+  }, [renderQueue, renderFilters.status])
+  const renderActive = (renderQueue as ZoneRenderJob[]).filter(j => j.status === 'pending' || j.status === 'processing')
+
+  const jobStatusBtnLabel = jobFilters.status || t('jobs_allStatuses')
+  const renderStatusBtnLabel = renderFilters.status || t('jobs_allStatuses')
 
   // ── Handlers ─────────────────────────────────────────────────
 
@@ -454,14 +487,8 @@ export default function JobsPage() {
 
   return (
     <div>
-      <div style={styles.header}>
-        <h2 style={styles.h2}>{t('jobs_title')}</h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem' }}>
-          {activeJobs.length > 0 && (
-            <span style={styles.activeBadge}>{activeJobs.length} active</span>
-          )}
-          <button onClick={() => setShowWizard(true)} style={styles.btnPrimary}>{t('bulk_newJob')}</button>
-        </div>
+      <div style={s.pageBar}>
+        <h2 style={s.pageTitle}>{t('jobs_title')}</h2>
       </div>
 
       {/* ── Wizard ── */}
@@ -689,121 +716,220 @@ export default function JobsPage() {
       )}
 
       {/* ── Jobs table ── */}
-      {isLoading ? (
-        <p style={styles.muted}>{t('loading')}</p>
-      ) : (jobs as BulkJob[]).length === 0 ? (
-        <p style={styles.muted}>{t('jobs_noJobs')}</p>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>{t('jobs_id')}</th>
-              <th style={styles.th}>{t('jobs_operation')}</th>
-              <th style={styles.th}>{t('jobs_status')}</th>
-              <th style={styles.th}>{t('jobs_domains')}</th>
-              <th style={styles.th}>{t('jobs_progress')}</th>
-              <th style={styles.th}>{t('jobs_created')}</th>
-              <th style={styles.th}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {(jobs as BulkJob[]).map(job => (
+      <div style={s.panel}>
+        <FilterBar>
+          <span style={styles.countPill}>
+            {jobFiltersActive
+              ? t('jobs_filteredCount', filteredJobs.length, (jobs as BulkJob[]).length)
+              : `${(jobs as BulkJob[]).length} ${t('jobs_count')}`}
+          </span>
+          {activeJobs.length > 0 && (
+            <span style={styles.activeBadge}>{activeJobs.length} {t('jobs_active')}</span>
+          )}
+        </FilterBar>
+
+        <FilterBar>
+          <Dropdown
+            label={
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: jobFilters.status ? '#111827' : '#9ca3af' }}>
+                {jobStatusBtnLabel}
+              </span>
+            }
+            active={!!jobFilters.status}
+            onClear={() => setJobFilter('status', '')}
+            width={160}
+          >
+            {close => (
               <>
-                <tr key={job.id} style={styles.tr}>
-                  <td style={styles.tdMono}>{job.id}</td>
-                  <td style={styles.td}><code style={styles.code}>{job.operation}</code></td>
-                  <td style={styles.td}><StatusBadge status={job.status} /></td>
-                  <td style={styles.td}>{job.affected_domains ?? '—'}</td>
-                  <td style={styles.td}>
-                    {job.affected_domains ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-                        <div style={styles.progressTrack}>
-                          <div
-                            style={{
-                              ...styles.progressBar,
-                              width: `${Math.round(((job.processed_domains ?? 0) / job.affected_domains) * 100)}%`,
-                              background: job.status === 'failed' ? '#dc2626' : '#2563eb',
-                            }}
-                          />
-                        </div>
-                        <span style={{ fontSize: '.8125rem', color: '#6b7280', whiteSpace: 'nowrap' }}>
-                          {job.processed_domains ?? 0} / {job.affected_domains}
-                        </span>
-                      </div>
-                    ) : '—'}
-                  </td>
-                  <td style={styles.tdMono}>{new Date(job.created_at).toLocaleString()}</td>
-                  <td style={{ ...styles.td, textAlign: 'right' }}>
-                    <button
-                      onClick={() => setExpanded(expanded === job.id ? null : job.id)}
-                      style={styles.detailBtn}
-                    >
-                      {expanded === job.id ? t('jobs_hide') : t('jobs_detail')}
-                    </button>
-                  </td>
+                <DropdownItem onSelect={() => { setJobFilter('status', ''); close() }}>
+                  <span style={{ color: '#6b7280' }}>{t('jobs_allStatuses')}</span>
+                </DropdownItem>
+                {JOB_STATUS_OPTIONS.map(opt => (
+                  <DropdownItem key={opt} onSelect={() => { setJobFilter('status', opt); close() }}>
+                    {opt}
+                  </DropdownItem>
+                ))}
+              </>
+            )}
+          </Dropdown>
+
+          <FilterPersistControls
+            persist={jobsPersist}
+            setPersist={setJobsPersist}
+            onClear={clearJobFilters}
+            hasActive={jobFiltersActive}
+            style={{ marginLeft: 'auto' }}
+          />
+
+          <button onClick={() => setShowWizard(true)} style={s.actionBtn}>{t('bulk_newJob')}</button>
+        </FilterBar>
+
+        <div style={s.tableWrap}>
+          {isLoading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>{t('loading')}</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={s.th}>{t('jobs_id')}</th>
+                  <th style={s.th}>{t('jobs_operation')}</th>
+                  <th style={s.th}>{t('jobs_status')}</th>
+                  <th style={s.th}>{t('jobs_domains')}</th>
+                  <th style={s.th}>{t('jobs_progress')}</th>
+                  <th style={s.th}>{t('jobs_created')}</th>
+                  <th style={s.th}></th>
                 </tr>
-                {expanded === job.id && (
-                  <tr key={`${job.id}-detail`}>
-                    <td colSpan={7} style={{ padding: 0, borderBottom: '1px solid #e5e7eb' }}>
-                      <JobDetail job={job} />
+              </thead>
+              <tbody>
+                {filteredJobs.map(job => (
+                  <React.Fragment key={job.id}>
+                    <tr>
+                      <td style={styles.tdMono}>{job.id}</td>
+                      <td style={s.td}><code style={styles.code}>{job.operation}</code></td>
+                      <td style={s.td}><StatusBadge status={job.status} /></td>
+                      <td style={s.td}>{job.affected_domains ?? '—'}</td>
+                      <td style={s.td}>
+                        {job.affected_domains ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                            <div style={styles.progressTrack}>
+                              <div
+                                style={{
+                                  ...styles.progressBar,
+                                  width: `${Math.round(((job.processed_domains ?? 0) / job.affected_domains) * 100)}%`,
+                                  background: job.status === 'failed' ? '#dc2626' : '#2563eb',
+                                }}
+                              />
+                            </div>
+                            <span style={{ fontSize: '.8125rem', color: '#6b7280', whiteSpace: 'nowrap' }}>
+                              {job.processed_domains ?? 0} / {job.affected_domains}
+                            </span>
+                          </div>
+                        ) : '—'}
+                      </td>
+                      <td style={styles.tdMono}>{new Date(job.created_at).toLocaleString()}</td>
+                      <td style={{ ...s.td, textAlign: 'right' }}>
+                        <button
+                          onClick={() => setExpanded(expanded === job.id ? null : job.id)}
+                          style={styles.detailBtn}
+                        >
+                          {expanded === job.id ? t('jobs_hide') : t('jobs_detail')}
+                        </button>
+                      </td>
+                    </tr>
+                    {expanded === job.id && (
+                      <tr>
+                        <td colSpan={7} style={{ padding: 0, borderBottom: '1px solid #e5e7eb' }}>
+                          <JobDetail job={job} />
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))}
+                {filteredJobs.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ ...s.td, textAlign: 'center', color: '#9ca3af' }}>
+                      {t('jobs_noJobs')}
                     </td>
                   </tr>
                 )}
-              </>
-            ))}
-          </tbody>
-        </table>
+              </tbody>
+            </table>
+          )}
         </div>
-      )}
+      </div>
 
       {/* ── Zone Render Queue ── */}
       {isStaff && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginTop: '2rem', marginBottom: '1rem' }}>
-            <h3 style={{ margin: 0, fontSize: '.9375rem', fontWeight: 700, color: '#1e293b' }}>{t('jobs_renderQueue')}</h3>
-            {renderQueue.filter(j => j.status === 'pending' || j.status === 'processing').length > 0 && (
-              <span style={styles.activeBadge}>
-                {renderQueue.filter(j => j.status === 'pending' || j.status === 'processing').length} active
-              </span>
-            )}
+          <div style={{ ...s.pageBar, marginTop: '1.5rem' }}>
+            <h3 style={s.pageTitle}>{t('jobs_renderQueue')}</h3>
           </div>
-          {renderQueue.length === 0 ? (
-            <p style={styles.muted}>{t('jobs_renderQueueEmpty')}</p>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>{t('jobs_id')}</th>
-                  <th style={styles.th}>{t('domain')}</th>
-                  <th style={styles.th}>{t('tenant')}</th>
-                  <th style={styles.th}>{t('jobs_status')}</th>
-                  <th style={styles.th}>{t('priority')}</th>
-                  <th style={styles.th}>{t('jobs_retries')}</th>
-                  <th style={styles.th}>{t('jobs_updated')}</th>
-                  <th style={styles.th}>{t('jobs_error')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(renderQueue as ZoneRenderJob[]).map(job => (
-                  <tr key={job.id} style={styles.tr}>
-                    <td style={styles.tdMono}>{job.id}</td>
-                    <td style={styles.tdMono}>{job.domain_name}</td>
-                    <td style={styles.td}>{job.tenant_name}</td>
-                    <td style={styles.td}><StatusBadge status={job.status} /></td>
-                    <td style={styles.td}>{job.priority}</td>
-                    <td style={styles.td}>{job.retries}/{job.max_retries}</td>
-                    <td style={styles.tdMono}>{new Date(job.updated_at).toLocaleString()}</td>
-                    <td style={{ ...styles.td, color: '#b91c1c', fontSize: '.8125rem', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {job.error ?? ''}
-                    </td>
+          <div style={s.panel}>
+            <FilterBar>
+              <span style={styles.countPill}>
+                {renderFiltersActive
+                  ? t('jobs_filteredCount', filteredRenderQueue.length, (renderQueue as ZoneRenderJob[]).length)
+                  : `${(renderQueue as ZoneRenderJob[]).length} ${t('jobs_count')}`}
+              </span>
+              {renderActive.length > 0 && (
+                <span style={styles.activeBadge}>{renderActive.length} {t('jobs_active')}</span>
+              )}
+            </FilterBar>
+
+            <FilterBar>
+              <Dropdown
+                label={
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: renderFilters.status ? '#111827' : '#9ca3af' }}>
+                    {renderStatusBtnLabel}
+                  </span>
+                }
+                active={!!renderFilters.status}
+                onClear={() => setRenderFilter('status', '')}
+                width={160}
+              >
+                {close => (
+                  <>
+                    <DropdownItem onSelect={() => { setRenderFilter('status', ''); close() }}>
+                      <span style={{ color: '#6b7280' }}>{t('jobs_allStatuses')}</span>
+                    </DropdownItem>
+                    {RENDER_STATUS_OPTIONS.map(opt => (
+                      <DropdownItem key={opt} onSelect={() => { setRenderFilter('status', opt); close() }}>
+                        {opt}
+                      </DropdownItem>
+                    ))}
+                  </>
+                )}
+              </Dropdown>
+
+              <FilterPersistControls
+                persist={renderPersist}
+                setPersist={setRenderPersist}
+                onClear={clearRenderFilters}
+                hasActive={renderFiltersActive}
+                style={{ marginLeft: 'auto' }}
+              />
+            </FilterBar>
+
+            <div style={s.tableWrap}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={s.th}>{t('jobs_id')}</th>
+                    <th style={s.th}>{t('domain')}</th>
+                    <th style={s.th}>{t('tenant')}</th>
+                    <th style={s.th}>{t('jobs_status')}</th>
+                    <th style={s.th}>{t('priority')}</th>
+                    <th style={s.th}>{t('jobs_retries')}</th>
+                    <th style={s.th}>{t('jobs_updated')}</th>
+                    <th style={s.th}>{t('jobs_error')}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredRenderQueue.map(job => (
+                    <tr key={job.id}>
+                      <td style={styles.tdMono}>{job.id}</td>
+                      <td style={styles.tdMono}>{job.domain_name}</td>
+                      <td style={s.td}>{job.tenant_name}</td>
+                      <td style={s.td}><StatusBadge status={job.status} /></td>
+                      <td style={s.td}>{job.priority}</td>
+                      <td style={s.td}>{job.retries}/{job.max_retries}</td>
+                      <td style={styles.tdMono}>{new Date(job.updated_at).toLocaleString()}</td>
+                      <td style={{ ...s.td, color: '#b91c1c', fontSize: '.8125rem', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {job.error ?? ''}
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredRenderQueue.length === 0 && (
+                    <tr>
+                      <td colSpan={8} style={{ ...s.td, textAlign: 'center', color: '#9ca3af' }}>
+                        {t('jobs_renderQueueEmpty')}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
+          </div>
         </>
       )}
     </div>
@@ -811,8 +937,7 @@ export default function JobsPage() {
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  header:       { display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1rem', flexWrap: 'wrap' },
-  h2:           { margin: 0, fontSize: '.9375rem', fontWeight: 700, color: '#1e293b' },
+  countPill:    { display: 'inline-flex', alignItems: 'center', fontSize: '.8125rem', color: '#475569', background: '#e2e8f0', borderRadius: 4, padding: '1px 8px' },
   activeBadge:  { background: '#ede9fe', color: '#6d28d9', padding: '1px 7px', borderRadius: 4, fontSize: '.75rem', fontWeight: 600 },
   muted:        { color: '#94a3b8', margin: 0 },
   wizardCard:   { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '1.25rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: 760 },

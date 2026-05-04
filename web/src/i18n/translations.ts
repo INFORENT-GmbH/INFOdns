@@ -272,6 +272,10 @@ export const translations = {
     nav_jobs:              'Jobs',
     jobs_title:            'Jobs',
     jobs_noJobs:           'No jobs yet',
+    jobs_allStatuses:      'All statuses',
+    jobs_count:            'jobs',
+    jobs_filteredCount:    (shown: number, total: number) => `${shown} of ${total}`,
+    jobs_active:           'active',
     jobs_id:               'ID',
     jobs_operation:        'Operation',
     jobs_status:           'Status',
@@ -314,6 +318,9 @@ export const translations = {
     tenants_contactSection: 'Contact',
     tenants_addressSection: 'Address',
     tenants_billingSection: 'Billing',
+    tenants_searchPlaceholder: 'Search name, company, email…',
+    tenants_filteredCount:    (shown: number, total: number) => `${shown} of ${total}`,
+    tenants_none:             'No tenants yet',
 
     // Users
     users_title:       'Users',
@@ -377,6 +384,11 @@ export const translations = {
     users_deletedAt:        'Deleted',
     users_noDeletedUsers:   'No deleted users',
     users_deletedBanner:    'Viewing deleted users. Edits and password resets are disabled until restored.',
+    users_searchPlaceholder: 'Search email or name…',
+    users_allRoles:         'All roles',
+    users_active:           'Active',
+    users_deleted:          'Deleted',
+    users_filteredCount:    (shown: number, total: number) => `${shown} of ${total}`,
 
     // Impersonation
     impersonation_active: 'You are impersonating another user.',
@@ -500,6 +512,8 @@ export const translations = {
     tickets_allAssignees:     'All assignees',
     tickets_unassigned:       'Unassigned',
     tickets_noTickets:        'No tickets found',
+    tickets_filteredCount:    (shown: number, total: number) => `${shown} of ${total}`,
+    tickets_count:            'tickets',
     tickets_requester:        'Requester',
     tickets_assignedTo:       'Assigned to',
     tickets_updated:          'Updated',
@@ -824,6 +838,10 @@ export const translations = {
     nav_jobs:              'Aufgaben',
     jobs_title:            'Aufgaben',
     jobs_noJobs:           'Noch keine Aufgaben',
+    jobs_allStatuses:      'Alle Status',
+    jobs_count:            'Aufgaben',
+    jobs_filteredCount:    (shown: number, total: number) => `${shown} von ${total}`,
+    jobs_active:           'aktiv',
     jobs_id:               'ID',
     jobs_operation:        'Vorgang',
     jobs_status:           'Status',
@@ -866,6 +884,9 @@ export const translations = {
     tenants_contactSection: 'Kontakt',
     tenants_addressSection: 'Adresse',
     tenants_billingSection: 'Abrechnung',
+    tenants_searchPlaceholder: 'Name, Firma, E-Mail suchen…',
+    tenants_filteredCount:    (shown: number, total: number) => `${shown} von ${total}`,
+    tenants_none:             'Keine Mandanten vorhanden',
 
     // Users
     users_title:       'Benutzer',
@@ -929,6 +950,11 @@ export const translations = {
     users_deletedAt:        'Gelöscht',
     users_noDeletedUsers:   'Keine gelöschten Benutzer',
     users_deletedBanner:    'Ansicht gelöschter Benutzer. Bearbeiten und Passwort-Reset sind erst nach Wiederherstellung möglich.',
+    users_searchPlaceholder: 'E-Mail oder Name suchen…',
+    users_allRoles:         'Alle Rollen',
+    users_active:           'Aktiv',
+    users_deleted:          'Gelöscht',
+    users_filteredCount:    (shown: number, total: number) => `${shown} von ${total}`,
 
     // Impersonation
     impersonation_active: 'Sie agieren als ein anderer Benutzer.',
@@ -1052,6 +1078,8 @@ export const translations = {
     tickets_allAssignees:     'Alle Zuständigen',
     tickets_unassigned:       'Nicht zugewiesen',
     tickets_noTickets:        'Keine Tickets gefunden',
+    tickets_filteredCount:    (shown: number, total: number) => `${shown} von ${total}`,
+    tickets_count:            'Tickets',
     tickets_requester:        'Anfragender',
     tickets_assignedTo:       'Zuständig',
     tickets_updated:          'Aktualisiert',

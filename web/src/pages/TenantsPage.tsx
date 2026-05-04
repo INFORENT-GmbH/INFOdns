@@ -1,12 +1,17 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenants, createTenant, updateTenant, deleteTenant, type Tenant } from '../api/client'
+import SearchInput from '../components/SearchInput'
+import FilterBar from '../components/FilterBar'
+import FilterPersistControls from '../components/FilterPersistControls'
 import { useI18n } from '../i18n/I18nContext'
+import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import { formatApiError } from '../lib/formError'
+import * as s from '../styles/shell'
 
 const INLINE_STYLES = `
   .tenant-row { transition: background 0.08s; cursor: pointer; }
-  .tenant-row:hover { background: #e8f0fe !important; }
+  .tenant-row:hover td { background: #f1f5f9; }
   .tenant-input:focus { border-color: #2563eb !important; outline: none; box-shadow: 0 0 0 2px #bfdbfe; }
 `
 
@@ -16,9 +21,17 @@ const emptyForm = {
   phone: '', fax: '', email: '', vat_id: '', notes: '',
 }
 
+const TENANT_FILTER_DEFAULTS = { search: '' }
+
 export default function TenantsPage() {
   const { t } = useI18n()
   const qc = useQueryClient()
+
+  const {
+    filters, setFilter, persist, setPersist, clear: clearFilters, hasActive,
+  } = usePersistedFilters('tenants', TENANT_FILTER_DEFAULTS)
+  const { search } = filters
+
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState<Tenant | null>(null)
   const [form, setForm] = useState(emptyForm)
@@ -29,6 +42,16 @@ export default function TenantsPage() {
     queryKey: ['tenants'],
     queryFn: () => getTenants().then(r => r.data),
   })
+
+  const filteredTenants = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return tenants
+    return tenants.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      (c.company_name ?? '').toLowerCase().includes(q) ||
+      (c.email ?? '').toLowerCase().includes(q)
+    )
+  }, [tenants, search])
 
   function set(field: keyof typeof emptyForm) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -91,157 +114,184 @@ export default function TenantsPage() {
     <div>
       <style>{INLINE_STYLES}</style>
 
-      <div style={styles.header}>
-        <h2 style={styles.h2}>{t('tenants_title')}</h2>
-        <button onClick={openCreate} style={styles.btnPrimary}>{t('tenants_add')}</button>
+      <div style={s.pageBar}>
+        <h2 style={s.pageTitle}>{t('tenants_title')}</h2>
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} style={styles.formCard}>
-          <div style={styles.formHeader}>
-            <h4 style={styles.formTitle}>{editTarget ? t('tenants_editTitle') : t('tenants_newTitle')}</h4>
+        <form onSubmit={handleSubmit} style={localStyles.formCard}>
+          <div style={localStyles.formHeader}>
+            <h4 style={localStyles.formTitle}>{editTarget ? t('tenants_editTitle') : t('tenants_newTitle')}</h4>
           </div>
-          {error && <div style={styles.error}>{error}</div>}
+          {error && <div style={localStyles.error}>{error}</div>}
 
-          <div style={styles.formBody}>
+          <div style={localStyles.formBody}>
             {/* General */}
-            <div style={styles.grid}>
-              <label style={styles.label}>
+            <div style={localStyles.grid}>
+              <label style={localStyles.label}>
                 {t('name')}
-                <input className="tenant-input" value={form.name} onChange={set('name')} required style={styles.input} />
+                <input className="tenant-input" value={form.name} onChange={set('name')} required style={localStyles.input} />
               </label>
-              <label style={styles.label}>
+              <label style={localStyles.label}>
                 {t('tenants_companyName')}
-                <input className="tenant-input" value={form.company_name} onChange={set('company_name')} style={styles.input} />
+                <input className="tenant-input" value={form.company_name} onChange={set('company_name')} style={localStyles.input} />
               </label>
             </div>
 
             {/* Contact */}
-            <div style={styles.sectionDivider}>
-              <span style={styles.sectionLabel}>{t('tenants_contactSection')}</span>
+            <div style={localStyles.sectionDivider}>
+              <span style={localStyles.sectionLabel}>{t('tenants_contactSection')}</span>
             </div>
-            <div style={styles.grid}>
-              <label style={styles.label}>
+            <div style={localStyles.grid}>
+              <label style={localStyles.label}>
                 {t('tenants_firstName')}
-                <input className="tenant-input" value={form.first_name} onChange={set('first_name')} style={styles.input} />
+                <input className="tenant-input" value={form.first_name} onChange={set('first_name')} style={localStyles.input} />
               </label>
-              <label style={styles.label}>
+              <label style={localStyles.label}>
                 {t('tenants_lastName')}
-                <input className="tenant-input" value={form.last_name} onChange={set('last_name')} style={styles.input} />
+                <input className="tenant-input" value={form.last_name} onChange={set('last_name')} style={localStyles.input} />
               </label>
-              <label style={styles.label}>
+              <label style={localStyles.label}>
                 {t('tenants_email')}
-                <input className="tenant-input" type="email" value={form.email} onChange={set('email')} style={styles.input} />
+                <input className="tenant-input" type="email" value={form.email} onChange={set('email')} style={localStyles.input} />
               </label>
-              <label style={styles.label}>
+              <label style={localStyles.label}>
                 {t('tenants_phone')}
-                <input className="tenant-input" value={form.phone} onChange={set('phone')} style={styles.input} />
+                <input className="tenant-input" value={form.phone} onChange={set('phone')} style={localStyles.input} />
               </label>
-              <label style={styles.label}>
+              <label style={localStyles.label}>
                 {t('tenants_fax')}
-                <input className="tenant-input" value={form.fax} onChange={set('fax')} style={styles.input} />
+                <input className="tenant-input" value={form.fax} onChange={set('fax')} style={localStyles.input} />
               </label>
             </div>
 
             {/* Address */}
-            <div style={styles.sectionDivider}>
-              <span style={styles.sectionLabel}>{t('tenants_addressSection')}</span>
+            <div style={localStyles.sectionDivider}>
+              <span style={localStyles.sectionLabel}>{t('tenants_addressSection')}</span>
             </div>
-            <div style={styles.grid}>
-              <label style={{ ...styles.label, gridColumn: '1 / -1' }}>
+            <div style={localStyles.grid}>
+              <label style={{ ...localStyles.label, gridColumn: '1 / -1' }}>
                 {t('tenants_street')}
-                <input className="tenant-input" value={form.street} onChange={set('street')} style={styles.input} />
+                <input className="tenant-input" value={form.street} onChange={set('street')} style={localStyles.input} />
               </label>
-              <label style={styles.label}>
+              <label style={localStyles.label}>
                 {t('tenants_zip')}
-                <input className="tenant-input" value={form.zip} onChange={set('zip')} style={styles.input} />
+                <input className="tenant-input" value={form.zip} onChange={set('zip')} style={localStyles.input} />
               </label>
-              <label style={styles.label}>
+              <label style={localStyles.label}>
                 {t('tenants_city')}
-                <input className="tenant-input" value={form.city} onChange={set('city')} style={styles.input} />
+                <input className="tenant-input" value={form.city} onChange={set('city')} style={localStyles.input} />
               </label>
-              <label style={styles.label}>
+              <label style={localStyles.label}>
                 {t('tenants_country')}
-                <input className="tenant-input" value={form.country} onChange={set('country')} maxLength={2} style={styles.input} placeholder="DE" />
+                <input className="tenant-input" value={form.country} onChange={set('country')} maxLength={2} style={localStyles.input} placeholder="DE" />
               </label>
             </div>
 
             {/* Billing */}
-            <div style={styles.sectionDivider}>
-              <span style={styles.sectionLabel}>{t('tenants_billingSection')}</span>
+            <div style={localStyles.sectionDivider}>
+              <span style={localStyles.sectionLabel}>{t('tenants_billingSection')}</span>
             </div>
-            <label style={styles.label}>
+            <label style={localStyles.label}>
               {t('tenants_vatId')}
-              <input className="tenant-input" value={form.vat_id} onChange={set('vat_id')} style={styles.input} />
+              <input className="tenant-input" value={form.vat_id} onChange={set('vat_id')} style={localStyles.input} />
             </label>
 
             {/* Notes */}
-            <div style={styles.sectionDivider}>
-              <span style={styles.sectionLabel}>{t('tenants_notes')}</span>
+            <div style={localStyles.sectionDivider}>
+              <span style={localStyles.sectionLabel}>{t('tenants_notes')}</span>
             </div>
-            <textarea className="tenant-input" value={form.notes} onChange={set('notes')} rows={3} style={{ ...styles.input, resize: 'vertical' }} />
+            <textarea className="tenant-input" value={form.notes} onChange={set('notes')} rows={3} style={{ ...localStyles.input, resize: 'vertical' }} />
           </div>
 
-          <div style={styles.formFooter}>
-            <button type="button" onClick={() => setShowForm(false)} style={styles.btnSecondary}>{t('cancel')}</button>
-            <button type="submit" disabled={saving} style={styles.btnPrimary}>{saving ? t('saving') : t('save')}</button>
+          <div style={localStyles.formFooter}>
+            <button type="button" onClick={() => setShowForm(false)} style={s.secondaryBtn}>{t('cancel')}</button>
+            <button type="submit" disabled={saving} style={s.actionBtn}>{saving ? t('saving') : t('save')}</button>
           </div>
         </form>
       )}
 
-      {isLoading ? <p style={{ padding: '.75rem', color: '#64748b', fontSize: '.8125rem' }}>{t('loading')}</p> : (
-        <div style={styles.card}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>{t('name')}</th>
-                <th style={styles.th}>{t('tenants_companyName')}</th>
-                <th style={styles.th}>{t('tenants_email')}</th>
-                <th style={styles.th}>{t('tenants_phone')}</th>
-                <th style={styles.th}>{t('active')}</th>
-                <th style={styles.th}>{t('created')}</th>
-                <th style={{ ...styles.th, width: 1 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {tenants.map((c: Tenant) => (
-                <tr key={c.id} className="tenant-row" onClick={() => openEdit(c)}>
-                  <td style={styles.td}>
-                    <span style={{ fontWeight: 600, color: '#1e293b' }}>{c.name}</span>
-                  </td>
-                  <td style={styles.tdMuted}>{c.company_name ?? ''}</td>
-                  <td style={styles.tdMuted}>{c.email ?? ''}</td>
-                  <td style={styles.tdMuted}>{c.phone ?? ''}</td>
-                  <td style={styles.td}>
-                    {c.is_active
-                      ? <span style={styles.badgeActive}>Active</span>
-                      : <span style={styles.badgeInactive}>Inactive</span>}
-                  </td>
-                  <td style={styles.tdMuted}>{new Date(c.created_at).toLocaleDateString()}</td>
-                  <td style={{ ...styles.td, whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
-                    <button onClick={() => openEdit(c)} style={styles.btnEdit}>{t('edit')}</button>
-                    <button onClick={() => handleDelete(c)} style={styles.btnDanger}>{t('delete')}</button>
-                  </td>
+      <div style={s.panel}>
+        {/* Stats / count bar */}
+        <FilterBar>
+          <span style={localStyles.countPill}>
+            {hasActive
+              ? t('tenants_filteredCount', filteredTenants.length, tenants.length)
+              : `${tenants.length} ${t('tenants_title').toLowerCase()}`}
+          </span>
+        </FilterBar>
+
+        {/* Filter bar */}
+        <FilterBar>
+          <SearchInput
+            value={search}
+            onChange={v => setFilter('search', v)}
+            placeholder={t('tenants_searchPlaceholder')}
+            width={280}
+          />
+
+          <FilterPersistControls
+            persist={persist}
+            setPersist={setPersist}
+            onClear={clearFilters}
+            hasActive={hasActive}
+            style={{ marginLeft: 'auto' }}
+          />
+
+          <button onClick={openCreate} style={s.actionBtn}>{t('tenants_add')}</button>
+        </FilterBar>
+
+        {/* Table */}
+        <div style={s.tableWrap}>
+          {isLoading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>{t('loading')}</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={s.th}>{t('name')}</th>
+                  <th style={s.th}>{t('tenants_companyName')}</th>
+                  <th style={s.th}>{t('tenants_email')}</th>
+                  <th style={s.th}>{t('tenants_phone')}</th>
+                  <th style={s.th}>{t('active')}</th>
+                  <th style={s.th}>{t('created')}</th>
+                  <th style={{ ...s.th, width: 1 }}></th>
                 </tr>
-              ))}
-              {tenants.length === 0 && (
-                <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '.8125rem' }}>No tenants yet</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredTenants.map((c: Tenant) => (
+                  <tr key={c.id} className="tenant-row" onClick={() => openEdit(c)}>
+                    <td style={s.td}>
+                      <span style={{ fontWeight: 600, color: '#1e293b' }}>{c.name}</span>
+                    </td>
+                    <td style={{ ...s.td, color: '#64748b' }}>{c.company_name ?? ''}</td>
+                    <td style={{ ...s.td, color: '#64748b' }}>{c.email ?? ''}</td>
+                    <td style={{ ...s.td, color: '#64748b' }}>{c.phone ?? ''}</td>
+                    <td style={s.td}>
+                      {c.is_active
+                        ? <span style={localStyles.badgeActive}>Active</span>
+                        : <span style={localStyles.badgeInactive}>Inactive</span>}
+                    </td>
+                    <td style={{ ...s.td, color: '#64748b' }}>{new Date(c.created_at).toLocaleDateString()}</td>
+                    <td style={{ ...s.td, whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+                      <button onClick={() => openEdit(c)} style={localStyles.btnEdit}>{t('edit')}</button>
+                      <button onClick={() => handleDelete(c)} style={localStyles.btnDanger}>{t('delete')}</button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredTenants.length === 0 && (
+                  <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '.8125rem' }}>{t('tenants_none')}</td></tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.75rem', flexWrap: 'wrap', gap: '.5rem' },
-  h2: { margin: 0, fontSize: '.9375rem', fontWeight: 700, color: '#1e293b' },
-
-  // Card wrapper for table
-  card: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' },
-
+const localStyles: Record<string, React.CSSProperties> = {
   // Form
   formCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, marginBottom: '1rem', overflow: 'hidden' },
   formHeader: { padding: '.625rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
@@ -250,7 +300,6 @@ const styles: Record<string, React.CSSProperties> = {
   formFooter: { display: 'flex', gap: '.5rem', justifyContent: 'flex-end', padding: '.625rem .75rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0' },
   error: { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 4, fontSize: '.8125rem', margin: '.75rem .75rem 0' },
 
-  // Section dividers
   sectionDivider: { borderBottom: '1px solid #f1f5f9', paddingBottom: 2, marginTop: '.25rem' },
   sectionLabel: { fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.04em' },
 
@@ -258,19 +307,11 @@ const styles: Record<string, React.CSSProperties> = {
   label: { display: 'flex', flexDirection: 'column', gap: '.25rem', fontSize: '.8125rem', fontWeight: 500, color: '#374151' },
   input: { padding: '.375rem .625rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8125rem', color: '#1e293b' },
 
-  // Table
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { textAlign: 'left', padding: '.5rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', whiteSpace: 'nowrap', letterSpacing: '.04em' },
-  td: { padding: '.5rem .75rem', fontSize: '.8125rem', color: '#1e293b', borderBottom: '1px solid #f1f5f9' },
-  tdMuted: { padding: '.5rem .75rem', fontSize: '.8125rem', color: '#64748b', borderBottom: '1px solid #f1f5f9' },
+  countPill: { display: 'inline-flex', alignItems: 'center', fontSize: '.8125rem', color: '#475569', background: '#e2e8f0', borderRadius: 4, padding: '1px 8px' },
 
-  // Badges
   badgeActive: { display: 'inline-block', background: '#dcfce7', color: '#15803d', padding: '1px 8px', borderRadius: 10, fontSize: '.75rem', fontWeight: 600 },
   badgeInactive: { display: 'inline-block', background: '#f1f5f9', color: '#64748b', padding: '1px 8px', borderRadius: 10, fontSize: '.75rem', fontWeight: 600 },
 
-  // Buttons
-  btnPrimary: { padding: '.3125rem .75rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' },
-  btnSecondary: { padding: '.3125rem .75rem', background: '#fff', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.8125rem', cursor: 'pointer', color: '#374151' },
-  btnEdit: { background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '.8125rem', padding: '2px 6px', fontWeight: 500 },
+  btnEdit:   { background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '.8125rem', padding: '2px 6px', fontWeight: 500 },
   btnDanger: { background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontSize: '.8125rem', padding: '2px 6px', fontWeight: 500 },
 }
