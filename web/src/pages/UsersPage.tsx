@@ -6,6 +6,8 @@ import Dropdown, { DropdownItem, DropdownEmpty } from '../components/Dropdown'
 import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
+import ListPage from '../components/ListPage'
+import ListTable from '../components/ListTable'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
 import { usePersistedFilters } from '../hooks/usePersistedFilters'
@@ -274,12 +276,8 @@ export default function UsersPage() {
   const filtersActive = !!(search || role || tenantFilter.length > 0)
 
   return (
-    <div>
+    <ListPage>
       <style>{INLINE_STYLES}</style>
-
-      <div style={s.pageBar}>
-        <h2 style={s.pageTitle}>{t('users_title')}</h2>
-      </div>
 
       {showDeleted && (
         <div style={localStyles.infoBanner}>{t('users_deletedBanner')}</div>
@@ -374,7 +372,6 @@ export default function UsersPage() {
         </div>
       )}
 
-      <div style={s.panel}>
         {/* Stats / count bar */}
         <FilterBar>
           <span style={localStyles.countPill}>
@@ -512,7 +509,7 @@ export default function UsersPage() {
         </FilterBar>
 
         {/* Table */}
-        <div style={s.tableWrap}>
+        <ListTable>
           {isLoading ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>{t('loading')}</div>
           ) : (
@@ -681,22 +678,21 @@ export default function UsersPage() {
               </tbody>
             </table>
           )}
-        </div>
-      </div>
-    </div>
+        </ListTable>
+    </ListPage>
   )
 }
 
 const localStyles: Record<string, React.CSSProperties> = {
   // Form (preserved from prior look — only list/filter pieces moved to shared)
-  formCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, marginBottom: '1rem', overflow: 'hidden' },
+  formCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, margin: '.75rem .75rem 0', flexShrink: 0, maxHeight: '70vh', overflowY: 'auto' },
   formHeader: { padding: '.625rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
   formTitle: { margin: 0, fontSize: '.875rem', fontWeight: 600, color: '#1e293b' },
   formBody: { padding: '.75rem', display: 'flex', flexDirection: 'column', gap: '.75rem' },
   formFooter: { display: 'flex', gap: '.5rem', justifyContent: 'flex-end', padding: '.625rem .75rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0' },
   error: { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 4, fontSize: '.8125rem', margin: '.75rem .75rem 0' },
-  successBanner: { background: '#dcfce7', color: '#15803d', padding: '.5rem .75rem', borderRadius: 6, fontSize: '.8125rem', marginBottom: '.75rem', border: '1px solid #bbf7d0' },
-  infoBanner: { background: '#fef3c7', color: '#92400e', padding: '.5rem .75rem', borderRadius: 6, fontSize: '.8125rem', marginBottom: '.75rem', border: '1px solid #fde68a' },
+  successBanner: { background: '#dcfce7', color: '#15803d', padding: '.5rem .75rem', fontSize: '.8125rem', borderBottom: '1px solid #bbf7d0', flexShrink: 0 },
+  infoBanner:    { background: '#fef3c7', color: '#92400e', padding: '.5rem .75rem', fontSize: '.8125rem', borderBottom: '1px solid #fde68a', flexShrink: 0 },
 
   sectionDivider: { borderBottom: '1px solid #f1f5f9', paddingBottom: 2, marginTop: '.25rem' },
   sectionLabel: { fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.04em' },

@@ -7,6 +7,8 @@ import Dropdown, { DropdownItem } from '../components/Dropdown'
 import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
+import ListPage from '../components/ListPage'
+import ListTable from '../components/ListTable'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
 import { usePersistedFilters } from '../hooks/usePersistedFilters'
@@ -155,11 +157,7 @@ export default function TicketsPage() {
     : t('tickets_allTenants')
 
   return (
-    <div>
-      <div style={s.pageBar}>
-        <h2 style={s.pageTitle}>{t('tickets_title')}</h2>
-      </div>
-
+    <ListPage>
       {showCreate && (
         <form onSubmit={handleCreate} style={localStyles.createForm}>
           <input
@@ -209,7 +207,6 @@ export default function TicketsPage() {
         </form>
       )}
 
-      <div style={s.panel}>
         {/* Stats / count bar */}
         <FilterBar>
           <span style={localStyles.countPill}>
@@ -361,7 +358,7 @@ export default function TicketsPage() {
         </FilterBar>
 
         {/* Table */}
-        <div style={s.tableWrap}>
+        <ListTable>
           {isLoading ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>{t('loading')}</div>
           ) : (
@@ -407,7 +404,7 @@ export default function TicketsPage() {
               </tbody>
             </table>
           )}
-        </div>
+        </ListTable>
 
         {totalPages > 1 && (
           <div style={localStyles.pagination}>
@@ -416,13 +413,12 @@ export default function TicketsPage() {
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={localStyles.pageBtn}>→</button>
           </div>
         )}
-      </div>
-    </div>
+    </ListPage>
   )
 }
 
 const localStyles: Record<string, React.CSSProperties> = {
-  createForm:   { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '1rem', marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '.5rem' },
+  createForm:   { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '1rem', margin: '.75rem .75rem 0', display: 'flex', flexDirection: 'column', gap: '.5rem', flexShrink: 0, maxHeight: '70vh', overflowY: 'auto' },
   input:        { padding: '.375rem .75rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.875rem', width: '100%', boxSizing: 'border-box' },
   selectInForm: { padding: '.3rem .6rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8125rem', background: '#fff' },
   fileLabel:    { padding: '.25rem .6rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8rem', cursor: 'pointer', color: '#374151' },
@@ -431,7 +427,7 @@ const localStyles: Record<string, React.CSSProperties> = {
   errorText:    { color: '#b91c1c', fontSize: '.875rem', margin: 0 },
   countPill:    { display: 'inline-flex', alignItems: 'center', fontSize: '.8125rem', color: '#475569', background: '#e2e8f0', borderRadius: 4, padding: '1px 8px' },
   link:         { color: '#2563eb', textDecoration: 'none', fontWeight: 500 },
-  pagination:   { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.75rem', padding: '.75rem 0', borderTop: '1px solid #e2e8f0' },
+  pagination:   { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.75rem', padding: '.75rem 0', borderTop: '1px solid #e2e8f0', flexShrink: 0 },
   pageBtn:      { padding: '.25rem .5rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, cursor: 'pointer', fontSize: '.8125rem', color: '#374151' },
   pageInfo:     { fontSize: '.8125rem', color: '#64748b' },
 }

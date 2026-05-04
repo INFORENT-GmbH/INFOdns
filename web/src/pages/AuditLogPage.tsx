@@ -6,6 +6,8 @@ import Dropdown, { DropdownItem } from '../components/Dropdown'
 import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
+import ListPage from '../components/ListPage'
+import ListTable from '../components/ListTable'
 import { useI18n } from '../i18n/I18nContext'
 import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import * as s from '../styles/shell'
@@ -67,12 +69,7 @@ export default function AuditLogPage() {
     : t('audit_allTenants')
 
   return (
-    <div>
-      <div style={s.pageBar}>
-        <h2 style={s.pageTitle}>{t('audit_title')}</h2>
-      </div>
-
-      <div style={s.panel}>
+    <ListPage>
         {/* Stats / count bar */}
         <FilterBar>
           <span style={localStyles.countPill}>
@@ -198,7 +195,7 @@ export default function AuditLogPage() {
         </FilterBar>
 
         {/* Table */}
-        <div style={s.tableWrap}>
+        <ListTable>
           {isLoading ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>{t('loading')}</div>
           ) : (
@@ -271,7 +268,7 @@ export default function AuditLogPage() {
               </tbody>
             </table>
           )}
-        </div>
+        </ListTable>
 
         {/* Pagination */}
         {totalPages > 1 && (
@@ -285,8 +282,7 @@ export default function AuditLogPage() {
             <button style={localStyles.pageBtn} disabled={page >= totalPages} onClick={() => setPage(totalPages)}>»</button>
           </div>
         )}
-      </div>
-    </div>
+    </ListPage>
   )
 }
 
@@ -315,7 +311,7 @@ const localStyles: Record<string, React.CSSProperties> = {
   diffGrid:   { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' },
   diffLabel:  { fontSize: '.75rem', fontWeight: 600, marginBottom: '.25rem', color: '#64748b' },
   diffPre:    { fontSize: '.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 4, padding: '.5rem', overflow: 'auto', maxHeight: 200, margin: 0 },
-  pagination: { display: 'flex', alignItems: 'center', gap: '.5rem', justifyContent: 'center', padding: '.75rem 0', borderTop: '1px solid #e2e8f0' },
+  pagination: { display: 'flex', alignItems: 'center', gap: '.5rem', justifyContent: 'center', padding: '.75rem 0', borderTop: '1px solid #e2e8f0', flexShrink: 0 },
   pageBtn:    { padding: '.25rem .6rem', border: '1px solid #e2e8f0', borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: '.8125rem', color: '#374151' },
   pageInfo:   { fontSize: '.8125rem', color: '#64748b', padding: '0 .5rem' },
 }

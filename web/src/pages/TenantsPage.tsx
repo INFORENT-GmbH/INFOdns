@@ -5,6 +5,8 @@ import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
 import Dropdown, { DropdownItem } from '../components/Dropdown'
+import ListPage from '../components/ListPage'
+import ListTable from '../components/ListTable'
 import { useI18n } from '../i18n/I18nContext'
 import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import { formatApiError } from '../lib/formError'
@@ -126,12 +128,8 @@ export default function TenantsPage() {
   }
 
   return (
-    <div>
+    <ListPage>
       <style>{INLINE_STYLES}</style>
-
-      <div style={s.pageBar}>
-        <h2 style={s.pageTitle}>{t('tenants_title')}</h2>
-      </div>
 
       {showForm && (
         <form onSubmit={handleSubmit} style={localStyles.formCard}>
@@ -226,7 +224,6 @@ export default function TenantsPage() {
         </form>
       )}
 
-      <div style={s.panel}>
         {/* Stats / count bar */}
         <FilterBar>
           <span style={localStyles.countPill}>
@@ -308,7 +305,7 @@ export default function TenantsPage() {
         </FilterBar>
 
         {/* Table */}
-        <div style={s.tableWrap}>
+        <ListTable>
           {isLoading ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>{t('loading')}</div>
           ) : (
@@ -351,15 +348,14 @@ export default function TenantsPage() {
               </tbody>
             </table>
           )}
-        </div>
-      </div>
-    </div>
+        </ListTable>
+    </ListPage>
   )
 }
 
 const localStyles: Record<string, React.CSSProperties> = {
   // Form
-  formCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, marginBottom: '1rem', overflow: 'hidden' },
+  formCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, margin: '.75rem .75rem 0', flexShrink: 0, maxHeight: '70vh', overflowY: 'auto' },
   formHeader: { padding: '.625rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
   formTitle: { margin: 0, fontSize: '.875rem', fontWeight: 600, color: '#1e293b' },
   formBody: { padding: '.75rem', display: 'flex', flexDirection: 'column', gap: '.75rem' },

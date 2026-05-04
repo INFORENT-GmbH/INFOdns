@@ -17,9 +17,9 @@ services:
       - public
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 5s
+      interval: 500ms
       timeout: 5s
-      retries: 10
+      retries: 100
       start_period: 30s
     ports:
       - "3306:3306"
