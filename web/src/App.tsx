@@ -76,8 +76,9 @@ export default function App() {
               <Route path="users" element={<UsersPage />} />
               <Route path="audit-logs" element={<AuditLogPage />} />
               <Route path="mail-queue" element={<MailQueuePage />} />
-              <Route path="tickets" element={<TicketsPage />} />
-              <Route path="tickets/:id" element={<TicketDetailPage />} />
+              <Route path="tickets" element={<TicketsPage />}>
+                <Route path=":id" element={<TicketDetailPage />} />
+              </Route>
               <Route path="import" element={<ImportPage />} />
               <Route path="tld-pricing" element={<TldPricingPage />} />
               <Route path="registrars" element={<RegistrarsPage />} />

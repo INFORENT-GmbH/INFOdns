@@ -12,8 +12,8 @@ import { useAuth } from '../context/AuthContext'
 import Select from '../components/Select'
 import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
-import ListPage from '../components/ListPage'
 import ListTable from '../components/ListTable'
+import MasterDetailLayout from '../components/MasterDetailLayout'
 import * as sh from '../styles/shell'
 import { formatApiError } from '../lib/formError'
 
@@ -235,107 +235,180 @@ export default function TemplatesPage() {
     }
   }
 
-  return (
-    <ListPage style={{ flexDirection: 'row' }}>
+  function selectTemplate(id: number) {
+    setSelectedId(id)
+    setEditName(null); setEditDesc(null)
+    setEdits({}); setPendingDeletes(new Set()); setNewRows([])
+    setFocusedValue(null); setApplyError(null)
+  }
+
+  // Reusable bits ──────────────────────────────────────────────────
+  const newFormUI = showNewForm && (
+    <form onSubmit={handleCreate} style={styles.formCard}>
+      {createError && <div style={styles.error}>{createError}</div>}
+      <input
+        placeholder={t('templates_namePh')}
+        value={newName}
+        onChange={e => setNewName(e.target.value)}
+        required
+        style={styles.formInput}
+      />
+      <input
+        placeholder={t('templates_descPh')}
+        value={newDesc}
+        onChange={e => setNewDesc(e.target.value)}
+        style={styles.formInput}
+      />
+      {isAdmin && (
+        <Select
+          value={newTenantId === '' ? '__global__' : String(newTenantId)}
+          onChange={v => setNewTenantId(v === '__global__' ? '' : Number(v))}
+          options={[
+            { value: '__global__', label: t('templates_global') },
+            ...tenants.map(ten => ({ value: String(ten.id), label: ten.name })),
+          ]}
+          style={{ width: '100%' }}
+        />
+      )}
+      <div style={styles.actions}>
+        <button type="button" onClick={() => setShowNewForm(false)} style={styles.btnSecondary}>{t('cancel')}</button>
+        <button type="submit" disabled={creating} style={styles.btnPrimary}>{creating ? t('creating') : t('create')}</button>
+      </div>
+    </form>
+  )
+
+  // ── Sidebar: compact list (300px wide when detail is open) ──────
+  const sidebar = (
+    <>
       <style>{INLINE_STYLES}</style>
-
-      {/* ── Sidebar: template list ── */}
-      <aside style={styles.sidebar}>
+      <FilterBar>
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder={t('templates_searchPlaceholder') || 'Search templates…'}
+          width="100%"
+        />
+      </FilterBar>
+      {canWrite && (
         <FilterBar>
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            placeholder={t('templates_searchPlaceholder') || 'Search templates…'}
-            width="100%"
-          />
+          <button
+            onClick={() => { setShowNewForm(true); setCreateError(null); setNewName(''); setNewDesc(''); setNewTenantId('') }}
+            style={{ ...sh.actionBtn, width: '100%' }}
+          >
+            {t('templates_newTemplate')}
+          </button>
         </FilterBar>
-        {canWrite && (
-          <FilterBar>
-            <button
-              onClick={() => { setShowNewForm(true); setCreateError(null); setNewName(''); setNewDesc(''); setNewTenantId('') }}
-              style={{ ...sh.actionBtn, width: '100%' }}
-            >
-              {t('templates_newTemplate')}
-            </button>
-          </FilterBar>
-        )}
-
-          {showNewForm && (
-            <form onSubmit={handleCreate} style={styles.formCard}>
-              {createError && <div style={styles.error}>{createError}</div>}
-              <input
-                placeholder={t('templates_namePh')}
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-                required
-                style={styles.formInput}
-              />
-              <input
-                placeholder={t('templates_descPh')}
-                value={newDesc}
-                onChange={e => setNewDesc(e.target.value)}
-                style={styles.formInput}
-              />
-              {isAdmin && (
-                <Select
-                  value={newTenantId === '' ? '__global__' : String(newTenantId)}
-                  onChange={v => setNewTenantId(v === '__global__' ? '' : Number(v))}
-                  options={[
-                    { value: '__global__', label: t('templates_global') },
-                    ...tenants.map(ten => ({ value: String(ten.id), label: ten.name })),
-                  ]}
-                  style={{ width: '100%' }}
-                />
-              )}
-              <div style={styles.actions}>
-                <button type="button" onClick={() => setShowNewForm(false)} style={styles.btnSecondary}>{t('cancel')}</button>
-                <button type="submit" disabled={creating} style={styles.btnPrimary}>{creating ? t('creating') : t('create')}</button>
-              </div>
-            </form>
-          )}
-
-          {isLoading ? <p style={{ padding: '.5rem', fontSize: '.8125rem' }}>{t('loading')}</p> : (
-            <ListTable>
-              <table style={styles.table}>
-                <tbody>
-                  {filteredTemplates.map((tmpl: DnsTemplate) => (
-                    <tr
-                      key={tmpl.id}
-                      style={{ ...styles.tr, background: selectedId === tmpl.id ? '#eff6ff' : undefined, cursor: 'pointer' }}
-                      onClick={() => {
-                        setSelectedId(tmpl.id)
-                        setEditName(null); setEditDesc(null)
-                        setEdits({}); setPendingDeletes(new Set()); setNewRows([])
-                        setFocusedValue(null); setApplyError(null)
-                      }}
-                    >
-                      <td style={styles.td}>
-                        <div style={{ fontWeight: selectedId === tmpl.id ? 600 : 400 }}>{tmpl.name}</div>
-                        <div style={{ fontSize: '.75rem', color: '#64748b', marginTop: 2 }}>
-                          <span style={styles.badge}>{tenantName(tmpl.tenant_id)}</span>
-                          <span style={{ marginLeft: 6 }}>{tmpl.record_count} records</span>
-                        </div>
-                      </td>
-                      {canEditTemplate(tmpl) && (
-                        <td style={{ ...styles.td, textAlign: 'right', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
-                          <button onClick={() => handleDeleteTemplate(tmpl)} style={{ ...styles.btnIcon, color: '#b91c1c' }}>{t('delete')}</button>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                  {filteredTemplates.length === 0 && (
-                    <tr><td style={{ ...styles.td, color: '#94a3b8', textAlign: 'center', padding: '1rem' }}>{search ? t('templates_noneFound') || 'No templates match' : ''}</td></tr>
+      )}
+      {newFormUI}
+      {isLoading ? (
+        <p style={{ padding: '.5rem', fontSize: '.8125rem' }}>{t('loading')}</p>
+      ) : (
+        <ListTable>
+          <table style={styles.table}>
+            <tbody>
+              {filteredTemplates.map((tmpl: DnsTemplate) => (
+                <tr
+                  key={tmpl.id}
+                  style={{ ...styles.tr, background: selectedId === tmpl.id ? '#eff6ff' : undefined, cursor: 'pointer' }}
+                  onClick={() => selectTemplate(tmpl.id)}
+                >
+                  <td style={styles.td}>
+                    <div style={{ fontWeight: selectedId === tmpl.id ? 600 : 400 }}>{tmpl.name}</div>
+                    <div style={{ fontSize: '.75rem', color: '#64748b', marginTop: 2 }}>
+                      <span style={styles.badge}>{tenantName(tmpl.tenant_id)}</span>
+                      <span style={{ marginLeft: 6 }}>{tmpl.record_count} records</span>
+                    </div>
+                  </td>
+                  {canEditTemplate(tmpl) && (
+                    <td style={{ ...styles.td, textAlign: 'right', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+                      <button onClick={() => handleDeleteTemplate(tmpl)} style={{ ...styles.btnIcon, color: '#b91c1c' }}>{t('delete')}</button>
+                    </td>
                   )}
-                </tbody>
-              </table>
-            </ListTable>
-          )}
-      </aside>
+                </tr>
+              ))}
+              {filteredTemplates.length === 0 && (
+                <tr><td style={{ ...styles.td, color: '#94a3b8', textAlign: 'center', padding: '1rem' }}>{search ? t('templates_noneFound') || 'No templates match' : ''}</td></tr>
+              )}
+            </tbody>
+          </table>
+        </ListTable>
+      )}
+    </>
+  )
 
-      {/* ── Main: template detail ── */}
-      <main style={styles.main}>
-          {!selectedId || !detail ? (
-            <p style={{ color: '#9ca3af', fontSize: '.875rem', padding: '.5rem' }}>{t('templates_selectToView')}</p>
+  // ── Dashboard: full-width table when no detail is selected ──────
+  const dashboard = (
+    <>
+      <style>{INLINE_STYLES}</style>
+      <FilterBar>
+        <span style={styles.countPill}>{filteredTemplates.length} {filteredTemplates.length === 1 ? 'template' : 'templates'}</span>
+      </FilterBar>
+      <FilterBar>
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder={t('templates_searchPlaceholder') || 'Search templates…'}
+          width={280}
+        />
+        {canWrite && (
+          <button
+            onClick={() => { setShowNewForm(true); setCreateError(null); setNewName(''); setNewDesc(''); setNewTenantId('') }}
+            style={{ ...sh.actionBtn, marginLeft: 'auto' }}
+          >
+            {t('templates_newTemplate')}
+          </button>
+        )}
+      </FilterBar>
+      {newFormUI}
+      <ListTable>
+        {isLoading ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>{t('loading')}</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={sh.th}>{t('name')}</th>
+                <th style={sh.th}>Description</th>
+                <th style={sh.th}>{t('tenant')}</th>
+                <th style={sh.th}>Records</th>
+                <th style={{ ...sh.th, width: 1 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTemplates.map((tmpl: DnsTemplate) => (
+                <tr
+                  key={tmpl.id}
+                  style={{ ...styles.tr, cursor: 'pointer' }}
+                  onClick={() => selectTemplate(tmpl.id)}
+                  onMouseOver={e => (e.currentTarget.style.background = '#f1f5f9')}
+                  onMouseOut={e => (e.currentTarget.style.background = '')}
+                >
+                  <td style={{ ...sh.td, fontWeight: 500 }}>{tmpl.name}</td>
+                  <td style={{ ...sh.td, color: '#64748b' }}>{tmpl.description ?? <span style={{ color: '#cbd5e1' }}>—</span>}</td>
+                  <td style={sh.td}><span style={styles.badge}>{tenantName(tmpl.tenant_id)}</span></td>
+                  <td style={sh.td}>{tmpl.record_count}</td>
+                  <td style={{ ...sh.td, textAlign: 'right', whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
+                    {canEditTemplate(tmpl) && (
+                      <button onClick={() => handleDeleteTemplate(tmpl)} style={{ ...styles.btnIcon, color: '#b91c1c' }}>{t('delete')}</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {filteredTemplates.length === 0 && (
+                <tr><td colSpan={5} style={{ ...sh.td, color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>{search ? t('templates_noneFound') || 'No templates match' : t('templates_selectToView')}</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </ListTable>
+    </>
+  )
+
+  // ── Detail pane (shown when selectedId is set) ──────────────────
+  const detailPane = (
+    <div style={styles.main}>
+          {!detail ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#9ca3af', fontSize: '.875rem' }}>{t('loading')}</div>
           ) : (
             <>
               {/* Header: name + description */}
@@ -590,15 +663,22 @@ export default function TemplatesPage() {
               )}
             </>
           )}
-        </div>
-      </div>
-    </>
+    </div>
+  )
+
+  return (
+    <MasterDetailLayout
+      dashboard={dashboard}
+      sidebar={sidebar}
+      detail={detailPane}
+      isOpen={selectedId !== null}
+    />
   )
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  leftPanel: { width: 280, minWidth: 200, flexShrink: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, overflow: 'hidden' },
-  rightPanel: { flex: 1, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '1rem', minWidth: 0, overflow: 'hidden' },
+  countPill:  { display: 'inline-flex', alignItems: 'center', fontSize: '.8125rem', color: '#475569', background: '#e2e8f0', borderRadius: 4, padding: '1px 8px' },
+  main:       { padding: '1rem' },
   panelHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.625rem .75rem', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', gap: '.5rem' },
   detailHeader: { display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.25rem', flexWrap: 'wrap' },
   tableHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '.5rem .75rem', borderBottom: '1px solid #e2e8f0', marginTop: '.5rem' },

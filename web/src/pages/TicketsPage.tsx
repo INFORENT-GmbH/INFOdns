@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Outlet, useMatch, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTickets, getUsers, createTicket, uploadAttachments, getTenants, type Ticket } from '../api/client'
 import Select from '../components/Select'
@@ -7,8 +7,8 @@ import Dropdown, { DropdownItem } from '../components/Dropdown'
 import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
-import ListPage from '../components/ListPage'
 import ListTable from '../components/ListTable'
+import MasterDetailLayout from '../components/MasterDetailLayout'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
 import { usePersistedFilters } from '../hooks/usePersistedFilters'
@@ -47,6 +47,9 @@ export default function TicketsPage() {
   const { t } = useI18n()
   const { user } = useAuth()
   const qc = useQueryClient()
+  const navigate = useNavigate()
+  const detailMatch = useMatch('/tickets/:id')
+  const selectedTicketId = detailMatch?.params.id ? Number(detailMatch.params.id) : null
   const isStaff = user?.role === 'admin' || user?.role === 'operator'
 
   const {
@@ -156,9 +159,11 @@ export default function TicketsPage() {
     ? (tenantsList.find(c => String(c.id) === tenantFilter)?.name ?? `#${tenantFilter}`)
     : t('tickets_allTenants')
 
-  return (
-    <ListPage>
-      {showCreate && (
+  // Click handler — navigate to detail
+  const openTicket = (id: number) => navigate(`/tickets/${id}`)
+
+  // Compose dashboard (full-width table when no detail open) and sidebar (compact list when open)
+  const createForm = showCreate && (
         <form onSubmit={handleCreate} style={localStyles.createForm}>
           <input
             style={localStyles.input}
@@ -205,8 +210,11 @@ export default function TicketsPage() {
           </div>
           {createError && <p style={localStyles.errorText}>{createError}</p>}
         </form>
-      )}
+  )
 
+  const dashboard = (
+    <>
+      {createForm}
         {/* Stats / count bar */}
         <FilterBar>
           <span style={localStyles.countPill}>
@@ -377,11 +385,15 @@ export default function TicketsPage() {
               </thead>
               <tbody>
                 {tickets.map((tk) => (
-                  <tr key={tk.id}>
+                  <tr
+                    key={tk.id}
+                    onClick={() => openTicket(tk.id)}
+                    style={{ cursor: 'pointer' }}
+                    onMouseOver={e => (e.currentTarget.style.background = '#f1f5f9')}
+                    onMouseOut={e => (e.currentTarget.style.background = '')}
+                  >
                     <td style={s.td}>{tk.id}</td>
-                    <td style={s.td}>
-                      <Link to={`/tickets/${tk.id}`} style={localStyles.link}>{tk.subject}</Link>
-                    </td>
+                    <td style={{ ...s.td, fontWeight: 500, color: '#2563eb' }}>{tk.subject}</td>
                     <td style={s.td}><StatusBadge status={tk.status} label={statusLabel(tk.status)} /></td>
                     <td style={s.td}><PriorityBadge priority={tk.priority} label={priorityLabel(tk.priority)} /></td>
                     <td style={{ ...s.td, color: '#64748b' }}>{tk.requester_name || tk.requester_email}</td>
@@ -413,7 +425,76 @@ export default function TicketsPage() {
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={localStyles.pageBtn}>→</button>
           </div>
         )}
-    </ListPage>
+    </>
+  )
+
+  // Compact sidebar view — shown when a ticket is selected
+  const sidebar = (
+    <>
+      <FilterBar>
+        <SearchInput
+          value={searchFilter}
+          onChange={setSearchFilter}
+          placeholder={t('tickets_searchPlaceholder')}
+          width="100%"
+        />
+      </FilterBar>
+      <FilterBar>
+        <button onClick={() => setShowCreate(s => !s)} style={{ ...s.actionBtn, width: '100%' }}>{t('tickets_newTicket')}</button>
+      </FilterBar>
+      <ListTable>
+        {isLoading ? (
+          <div style={{ padding: '1rem', color: '#9ca3af', fontSize: '.8125rem' }}>{t('loading')}</div>
+        ) : tickets.length === 0 ? (
+          <div style={{ padding: '1rem', color: '#9ca3af', fontSize: '.8125rem' }}>{t('tickets_noTickets')}</div>
+        ) : (
+          <div>
+            {tickets.map(tk => {
+              const isSel = selectedTicketId === tk.id
+              return (
+                <div
+                  key={tk.id}
+                  onClick={() => openTicket(tk.id)}
+                  style={{
+                    padding: '.5rem .75rem',
+                    cursor: 'pointer',
+                    borderBottom: '1px solid #f1f5f9',
+                    background: isSel ? '#eff6ff' : 'transparent',
+                  }}
+                >
+                  <div style={{ fontSize: '.8125rem', fontWeight: isSel ? 600 : 500, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    #{tk.id} {tk.subject}
+                  </div>
+                  <div style={{ display: 'flex', gap: '.35rem', alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
+                    <StatusBadge status={tk.status} label={statusLabel(tk.status)} />
+                    <PriorityBadge priority={tk.priority} label={priorityLabel(tk.priority)} />
+                  </div>
+                  <div style={{ fontSize: '.7rem', color: '#94a3b8', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {tk.requester_name || tk.requester_email}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </ListTable>
+      {totalPages > 1 && (
+        <div style={localStyles.pagination}>
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={localStyles.pageBtn}>←</button>
+          <span style={localStyles.pageInfo}>{page} / {totalPages}</span>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={localStyles.pageBtn}>→</button>
+        </div>
+      )}
+    </>
+  )
+
+  return (
+    <MasterDetailLayout
+      dashboard={dashboard}
+      sidebar={sidebar}
+      detail={<Outlet />}
+      isOpen={selectedTicketId !== null}
+    />
   )
 }
 

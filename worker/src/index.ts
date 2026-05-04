@@ -1,4 +1,4 @@
-import { query, queryOne, execute, transaction, pool } from './db.js'
+import { query, queryOne, execute, transaction, pool, waitForDb } from './db.js'
 import { claimSerial } from './serialNumber.js'
 import { renderZone } from './renderZone.js'
 import { validateZone } from './validateZone.js'
@@ -643,6 +643,9 @@ async function retryDnssecExtraction(): Promise<void> {
 // ── Entry point ───────────────────────────────────────────────
 
 console.log('[worker] Starting INFORENT Prisma Worker')
+
+// Wait for DB so worker can boot in parallel with mariadb (depends_on is service_started, not service_healthy).
+await waitForDb()
 
 // Recover from unclean shutdown: reset stuck 'processing' rows and queue any
 // dirty domains that lost their queue row.
