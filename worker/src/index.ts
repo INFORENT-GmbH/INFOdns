@@ -698,9 +698,9 @@ const loopFinished = (async function loop() {
   while (running) {
     let didWork = false
     try {
-      didWork = await poll()
+      if (await poll()) didWork = true
       if (!running) break
-      await pollBulkJobs()
+      if (await pollBulkJobs()) didWork = true
       if (!running) break
       await pollMailQueue()
       if (!running) break
@@ -709,9 +709,9 @@ const loopFinished = (async function loop() {
       console.error('[worker] Poll error:', err.message)
     }
     if (!running) break
-    // When poll() drained zone-render jobs, immediately re-poll to keep up with
-    // a backlog instead of waiting POLL_INTERVAL_MS between batches. Sleep only
-    // when the queue was empty. Always wake on shutdown so we don't add latency.
+    // When poll() or pollBulkJobs() did work, immediately re-poll to keep up
+    // with the backlog instead of waiting POLL_INTERVAL_MS. Sleep only when
+    // every queue is empty. Always wake on shutdown so we don't add latency.
     if (didWork) continue
     await new Promise<void>(resolve => {
       const t = setTimeout(resolve, POLL_INTERVAL_MS)

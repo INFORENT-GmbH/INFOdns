@@ -248,6 +248,28 @@ export async function bulkRoutes(app: FastifyInstance) {
       return reply.status(409).send({ code: 'INVALID_STATE', message: 'Job must be in approved state' })
     }
     await execute("UPDATE bulk_jobs SET status = 'running' WHERE id = ?", [job.id])
+
+    // Mark all targeted domains dirty immediately so the UI reflects the
+    // pending change without waiting for the worker to process them one by one.
+    // The worker's enqueueRender re-asserts dirty + queues the render.
+    const targeted = await query<{ id: number; fqdn: string; tenant_id: number }>(
+      `SELECT d.id, d.fqdn, d.tenant_id
+       FROM domains d
+       JOIN bulk_job_domains bjd ON bjd.domain_id = d.id
+       WHERE bjd.bulk_job_id = ?`,
+      [job.id]
+    )
+    if (targeted.length > 0) {
+      await execute(
+        `UPDATE domains SET zone_status = 'dirty'
+         WHERE id IN (${targeted.map(() => '?').join(',')})`,
+        targeted.map(d => d.id)
+      )
+      for (const d of targeted) {
+        broadcast({ type: 'domain_status', domainId: d.id, fqdn: d.fqdn, zone_status: 'dirty', tenantId: d.tenant_id, zone_error: null })
+      }
+    }
+
     await writeAuditLog({ req, entityType: 'bulk_job', entityId: job.id, action: 'bulk_apply' })
     broadcast({ type: 'bulk_job_progress', jobId: job.id, status: 'running', processed_domains: 0, affected_domains: job.affected_domains })
     return { ok: true, id: job.id }
