@@ -223,7 +223,9 @@ async function processJob(job: QueueRow): Promise<void> {
       "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' AND publish = 1 ORDER BY fqdn"
     )
     await ensureNamedConf(allDomains.map(r => ({ fqdn: r.fqdn, dnssec_enabled: !!r.dnssec_enabled })))
+    await execute("UPDATE domains SET zone_status = 'clean' WHERE id = ?", [domainId])
     await execute("UPDATE zone_render_queue SET status = 'done', updated_at = NOW() WHERE id = ?", [job.id])
+    broadcastEvent({ type: 'domain_status', domainId, fqdn: domain.fqdn, zone_status: 'clean', tenantId: domain.tenant_id, zone_error: null })
     console.log(`[worker] Job ${job.id} — ${domain.fqdn} is ${domain.status}, synced named.conf, skipped render`)
     return
   }
@@ -234,7 +236,9 @@ async function processJob(job: QueueRow): Promise<void> {
       "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' AND publish = 1 ORDER BY fqdn"
     )
     await ensureNamedConf(allDomains.map(r => ({ fqdn: r.fqdn, dnssec_enabled: !!r.dnssec_enabled })))
+    await execute("UPDATE domains SET zone_status = 'clean' WHERE id = ?", [domainId])
     await execute("UPDATE zone_render_queue SET status = 'done', updated_at = NOW() WHERE id = ?", [job.id])
+    broadcastEvent({ type: 'domain_status', domainId, fqdn: domain.fqdn, zone_status: 'clean', tenantId: domain.tenant_id, zone_error: null })
     console.log(`[worker] Job ${job.id} — ${domain.fqdn} has publish=0, synced named.conf, skipped render`)
     return
   }
@@ -514,13 +518,15 @@ async function recoverStuckJobs(): Promise<void> {
     console.log(`[worker] Recovered ${reset.affectedRows} stuck 'processing' jobs`)
   }
 
+  // Catch every dirty domain regardless of publish/status — processJob has
+  // branches for non-active and publish=0 domains and will mark them clean
+  // after a named.conf sync.
   const dirty = await query<{ id: number; fqdn: string }>(
     `SELECT d.id, d.fqdn
      FROM domains d
      LEFT JOIN zone_render_queue q
        ON q.domain_id = d.id AND q.status IN ('pending', 'processing')
-     WHERE d.status = 'active' AND d.publish = 1
-       AND d.zone_status = 'dirty' AND q.id IS NULL`
+     WHERE d.zone_status = 'dirty' AND q.id IS NULL`
   )
   for (const d of dirty) {
     await execute(
