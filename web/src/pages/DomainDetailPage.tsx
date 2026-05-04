@@ -97,7 +97,7 @@ function BulkEditButton({ rec }: { rec: DnsRecord }) {
 type IssueSeverity = 'error' | 'warning' | 'info'
 
 const ISSUE_TONE: Record<IssueSeverity, { border: string; bg: string; iconBg: string; fg: string; icon: string }> = {
-  error:   { border: '#fca5a5', bg: '#fef2f2', iconBg: '#fee2e2', fg: '#991b1b', icon: '⊗' },
+  error:   { border: '#dc2626', bg: '#fee2e2', iconBg: '#fecaca', fg: '#7f1d1d', icon: '⊗' },
   warning: { border: '#fde68a', bg: '#fffbeb', iconBg: '#fef3c7', fg: '#92400e', icon: '⚠' },
   info:    { border: '#bfdbfe', bg: '#eff6ff', iconBg: '#dbeafe', fg: '#1e40af', icon: 'ⓘ' },
 }
@@ -1035,7 +1035,7 @@ export default function DomainDetailPage() {
             )}
             {hasNsMismatch && (
               <IssueRow
-                severity="warning"
+                severity="error"
                 title={<><strong>{t('domainDetail_nsMismatch')}</strong> — {t('domainDetail_nsMismatchDesc')}</>}
               >
                 {domain.ns_observed !== null && domain.ns_observed !== undefined && (
