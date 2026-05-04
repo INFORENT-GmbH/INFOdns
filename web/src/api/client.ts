@@ -422,6 +422,7 @@ export interface AuditLogPage {
   page: number
   limit: number
   pages: number
+  entityTypes: string[]
 }
 
 export const getAuditLogs = (params?: Record<string, string>) =>
@@ -446,6 +447,7 @@ export interface MailQueuePage {
   page: number
   limit: number
   pages: number
+  templates: string[]
 }
 
 export interface MailQueueDetail extends MailQueueItem {

@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getMailQueue, getMailQueueItem, retryMail, type MailQueueItem } from '../api/client'
 import Dropdown, { DropdownItem } from '../components/Dropdown'
+import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
 import { useI18n } from '../i18n/I18nContext'
@@ -11,7 +12,7 @@ import * as s from '../styles/shell'
 const STATUSES = ['pending', 'processing', 'done', 'failed']
 const LIMIT = 50
 
-const MAIL_FILTER_DEFAULTS = { status: '' }
+const MAIL_FILTER_DEFAULTS = { search: '', status: '', template: '' }
 
 export default function MailQueuePage() {
   const { t } = useI18n()
@@ -21,8 +22,12 @@ export default function MailQueuePage() {
     persist: filtersPersist, setPersist: setFiltersPersist,
     clear: clearFiltersInternal, hasActive: filtersHasActive,
   } = usePersistedFilters('mailQueue', MAIL_FILTER_DEFAULTS)
-  const statusFilter = mailFilters.status
-  const setStatusFilter = (v: string) => { setMailFilter('status', v); setPage(1) }
+  const searchFilter   = mailFilters.search
+  const statusFilter   = mailFilters.status
+  const templateFilter = mailFilters.template
+  const setSearchFilter   = (v: string) => { setMailFilter('search', v); setPage(1) }
+  const setStatusFilter   = (v: string) => { setMailFilter('status', v); setPage(1) }
+  const setTemplateFilter = (v: string) => { setMailFilter('template', v); setPage(1) }
   const clearFilters = () => { clearFiltersInternal(); setPage(1) }
   const [page, setPage] = useState(1)
   const [acting, setActing] = useState<number | null>(null)
@@ -31,7 +36,9 @@ export default function MailQueuePage() {
   const params: Record<string, string> = {
     page: String(page),
     limit: String(LIMIT),
-    ...(statusFilter ? { status: statusFilter } : {}),
+    ...(searchFilter   ? { search: searchFilter }     : {}),
+    ...(statusFilter   ? { status: statusFilter }     : {}),
+    ...(templateFilter ? { template: templateFilter } : {}),
   }
 
   const { data, isLoading, isFetching } = useQuery({
@@ -44,6 +51,7 @@ export default function MailQueuePage() {
   const items: MailQueueItem[] = data?.data ?? []
   const totalPages = data?.pages ?? 1
   const total = data?.total ?? 0
+  const templates = data?.templates ?? []
 
   async function handleRetry(id: number) {
     setActing(id)
@@ -71,6 +79,7 @@ export default function MailQueuePage() {
   }
 
   const statusBtnLabel = statusFilter || t('mailQueue_allStatuses')
+  const templateBtnLabel = templateFilter || t('mailQueue_allTemplates')
 
   return (
     <div>
@@ -90,6 +99,13 @@ export default function MailQueuePage() {
 
         {/* Filter bar */}
         <FilterBar>
+          <SearchInput
+            value={searchFilter}
+            onChange={setSearchFilter}
+            placeholder={t('mailQueue_searchPlaceholder')}
+            width={240}
+          />
+
           <Dropdown
             label={
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: statusFilter ? '#111827' : '#9ca3af' }}>
@@ -113,6 +129,32 @@ export default function MailQueuePage() {
               </>
             )}
           </Dropdown>
+
+          {templates.length > 0 && (
+            <Dropdown
+              label={
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: templateFilter ? '#111827' : '#9ca3af' }}>
+                  {templateBtnLabel}
+                </span>
+              }
+              active={!!templateFilter}
+              onClear={() => setTemplateFilter('')}
+              width={200}
+            >
+              {close => (
+                <>
+                  <DropdownItem onSelect={() => { setTemplateFilter(''); close() }}>
+                    <span style={{ color: '#6b7280' }}>{t('mailQueue_allTemplates')}</span>
+                  </DropdownItem>
+                  {templates.map(tpl => (
+                    <DropdownItem key={tpl} onSelect={() => { setTemplateFilter(tpl); close() }}>
+                      {tpl}
+                    </DropdownItem>
+                  ))}
+                </>
+              )}
+            </Dropdown>
+          )}
 
           <FilterPersistControls
             persist={filtersPersist}

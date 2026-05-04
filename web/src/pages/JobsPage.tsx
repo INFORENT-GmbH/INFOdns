@@ -9,6 +9,7 @@ import {
 import { useI18n } from '../i18n/I18nContext'
 import Select from '../components/Select'
 import Dropdown, { DropdownItem } from '../components/Dropdown'
+import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
 import { useAuth } from '../context/AuthContext'
@@ -18,8 +19,9 @@ import * as s from '../styles/shell'
 
 const JOB_STATUS_OPTIONS = ['draft', 'previewing', 'approved', 'running', 'done', 'failed']
 const RENDER_STATUS_OPTIONS = ['pending', 'processing', 'done', 'failed']
-const JOB_FILTER_DEFAULTS = { status: '' }
-const RENDER_FILTER_DEFAULTS = { status: '' }
+const JOB_OPERATION_OPTIONS = ['add', 'replace', 'delete', 'change_ttl', 'upsert']
+const JOB_FILTER_DEFAULTS = { status: '', operation: '' }
+const RENDER_FILTER_DEFAULTS = { status: '', search: '' }
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -404,16 +406,24 @@ export default function JobsPage() {
 
   const activeJobs = (jobs as BulkJob[]).filter(j => j.status === 'running' || j.status === 'previewing')
   const filteredJobs = useMemo(() => {
-    if (!jobFilters.status) return jobs as BulkJob[]
-    return (jobs as BulkJob[]).filter(j => j.status === jobFilters.status)
-  }, [jobs, jobFilters.status])
+    return (jobs as BulkJob[]).filter(j => {
+      if (jobFilters.status && j.status !== jobFilters.status) return false
+      if (jobFilters.operation && j.operation !== jobFilters.operation) return false
+      return true
+    })
+  }, [jobs, jobFilters.status, jobFilters.operation])
   const filteredRenderQueue = useMemo(() => {
-    if (!renderFilters.status) return renderQueue as ZoneRenderJob[]
-    return (renderQueue as ZoneRenderJob[]).filter(j => j.status === renderFilters.status)
-  }, [renderQueue, renderFilters.status])
+    const q = renderFilters.search.trim().toLowerCase()
+    return (renderQueue as ZoneRenderJob[]).filter(j => {
+      if (renderFilters.status && j.status !== renderFilters.status) return false
+      if (q && !j.domain_name.toLowerCase().includes(q) && !(j.tenant_name ?? '').toLowerCase().includes(q)) return false
+      return true
+    })
+  }, [renderQueue, renderFilters.status, renderFilters.search])
   const renderActive = (renderQueue as ZoneRenderJob[]).filter(j => j.status === 'pending' || j.status === 'processing')
 
-  const jobStatusBtnLabel = jobFilters.status || t('jobs_allStatuses')
+  const jobStatusBtnLabel    = jobFilters.status || t('jobs_allStatuses')
+  const jobOperationBtnLabel = jobFilters.operation || t('jobs_allOperations')
   const renderStatusBtnLabel = renderFilters.status || t('jobs_allStatuses')
 
   // ── Handlers ─────────────────────────────────────────────────
@@ -753,6 +763,30 @@ export default function JobsPage() {
             )}
           </Dropdown>
 
+          <Dropdown
+            label={
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: jobFilters.operation ? '#111827' : '#9ca3af' }}>
+                {jobOperationBtnLabel}
+              </span>
+            }
+            active={!!jobFilters.operation}
+            onClear={() => setJobFilter('operation', '')}
+            width={160}
+          >
+            {close => (
+              <>
+                <DropdownItem onSelect={() => { setJobFilter('operation', ''); close() }}>
+                  <span style={{ color: '#6b7280' }}>{t('jobs_allOperations')}</span>
+                </DropdownItem>
+                {JOB_OPERATION_OPTIONS.map(opt => (
+                  <DropdownItem key={opt} onSelect={() => { setJobFilter('operation', opt); close() }}>
+                    {opt}
+                  </DropdownItem>
+                ))}
+              </>
+            )}
+          </Dropdown>
+
           <FilterPersistControls
             persist={jobsPersist}
             setPersist={setJobsPersist}
@@ -857,6 +891,13 @@ export default function JobsPage() {
             </FilterBar>
 
             <FilterBar>
+              <SearchInput
+                value={renderFilters.search}
+                onChange={v => setRenderFilter('search', v)}
+                placeholder={t('jobs_renderSearchPlaceholder')}
+                width={260}
+              />
+
               <Dropdown
                 label={
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: renderFilters.status ? '#111827' : '#9ca3af' }}>

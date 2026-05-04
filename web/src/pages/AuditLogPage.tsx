@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getAuditLogs, type AuditLog } from '../api/client'
+import { getAuditLogs, getTenants, type AuditLog } from '../api/client'
+import { useAuth } from '../context/AuthContext'
 import Dropdown, { DropdownItem } from '../components/Dropdown'
 import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
@@ -12,10 +13,12 @@ import * as s from '../styles/shell'
 const ACTIONS = ['create', 'update', 'delete', 'bulk_apply']
 const LIMIT = 50
 
-const AUDIT_FILTER_DEFAULTS = { domain_id: '', user_id: '', action: '', from: '', to: '' }
+const AUDIT_FILTER_DEFAULTS = { domain_id: '', user_id: '', tenant_id: '', entity_type: '', action: '', from: '', to: '' }
 
 export default function AuditLogPage() {
   const { t } = useI18n()
+  const { user } = useAuth()
+  const isStaff = user?.role === 'admin' || user?.role === 'operator'
   const {
     filters, setFilter: setFilterInternal,
     persist: filtersPersist, setPersist: setFiltersPersist,
@@ -46,11 +49,22 @@ export default function AuditLogPage() {
     placeholderData: (prev) => prev,
   })
 
+  const { data: tenantsList = [] } = useQuery({
+    queryKey: ['tenants'],
+    queryFn: () => getTenants().then(r => r.data),
+    enabled: isStaff,
+  })
+
   const logs: AuditLog[] = data?.data ?? []
   const totalPages = data?.pages ?? 1
   const total = data?.total ?? 0
+  const entityTypes = data?.entityTypes ?? []
 
   const actionLabel = filters.action || t('audit_allActions')
+  const entityLabel = filters.entity_type || t('audit_allEntities')
+  const tenantLabel = filters.tenant_id
+    ? (tenantsList.find(c => String(c.id) === filters.tenant_id)?.name ?? `#${filters.tenant_id}`)
+    : t('audit_allTenants')
 
   return (
     <div>
@@ -106,6 +120,58 @@ export default function AuditLogPage() {
               </>
             )}
           </Dropdown>
+
+          {entityTypes.length > 0 && (
+            <Dropdown
+              label={
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filters.entity_type ? '#111827' : '#9ca3af' }}>
+                  {entityLabel}
+                </span>
+              }
+              active={!!filters.entity_type}
+              onClear={() => setFilter('entity_type', '')}
+              width={160}
+            >
+              {close => (
+                <>
+                  <DropdownItem onSelect={() => { setFilter('entity_type', ''); close() }}>
+                    <span style={{ color: '#6b7280' }}>{t('audit_allEntities')}</span>
+                  </DropdownItem>
+                  {entityTypes.map(et => (
+                    <DropdownItem key={et} onSelect={() => { setFilter('entity_type', et); close() }}>
+                      {et}
+                    </DropdownItem>
+                  ))}
+                </>
+              )}
+            </Dropdown>
+          )}
+
+          {isStaff && tenantsList.length > 1 && (
+            <Dropdown
+              label={
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: filters.tenant_id ? '#111827' : '#9ca3af' }}>
+                  {tenantLabel}
+                </span>
+              }
+              active={!!filters.tenant_id}
+              onClear={() => setFilter('tenant_id', '')}
+              width={180}
+            >
+              {close => (
+                <>
+                  <DropdownItem onSelect={() => { setFilter('tenant_id', ''); close() }}>
+                    <span style={{ color: '#6b7280' }}>{t('audit_allTenants')}</span>
+                  </DropdownItem>
+                  {tenantsList.map(c => (
+                    <DropdownItem key={c.id} onSelect={() => { setFilter('tenant_id', String(c.id)); close() }}>
+                      {c.name}
+                    </DropdownItem>
+                  ))}
+                </>
+              )}
+            </Dropdown>
+          )}
 
           <input
             type="date"

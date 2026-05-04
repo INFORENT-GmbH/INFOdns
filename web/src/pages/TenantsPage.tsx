@@ -4,6 +4,7 @@ import { getTenants, createTenant, updateTenant, deleteTenant, type Tenant } fro
 import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
+import Dropdown, { DropdownItem } from '../components/Dropdown'
 import { useI18n } from '../i18n/I18nContext'
 import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import { formatApiError } from '../lib/formError'
@@ -21,7 +22,8 @@ const emptyForm = {
   phone: '', fax: '', email: '', vat_id: '', notes: '',
 }
 
-const TENANT_FILTER_DEFAULTS = { search: '' }
+type StatusFilter = '' | 'active' | 'inactive'
+const TENANT_FILTER_DEFAULTS = { search: '', status: '' as StatusFilter, country: '' }
 
 export default function TenantsPage() {
   const { t } = useI18n()
@@ -30,7 +32,7 @@ export default function TenantsPage() {
   const {
     filters, setFilter, persist, setPersist, clear: clearFilters, hasActive,
   } = usePersistedFilters('tenants', TENANT_FILTER_DEFAULTS)
-  const { search } = filters
+  const { search, status, country } = filters
 
   const [showForm, setShowForm] = useState(false)
   const [editTarget, setEditTarget] = useState<Tenant | null>(null)
@@ -45,13 +47,26 @@ export default function TenantsPage() {
 
   const filteredTenants = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return tenants
-    return tenants.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      (c.company_name ?? '').toLowerCase().includes(q) ||
-      (c.email ?? '').toLowerCase().includes(q)
-    )
-  }, [tenants, search])
+    return tenants.filter(c => {
+      if (q && !(
+        c.name.toLowerCase().includes(q) ||
+        (c.company_name ?? '').toLowerCase().includes(q) ||
+        (c.email ?? '').toLowerCase().includes(q)
+      )) return false
+      if (status === 'active' && !c.is_active) return false
+      if (status === 'inactive' && c.is_active) return false
+      if (country && (c.country ?? '').toUpperCase() !== country.toUpperCase()) return false
+      return true
+    })
+  }, [tenants, search, status, country])
+
+  const countryOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const c of tenants) {
+      if (c.country) set.add(c.country.toUpperCase())
+    }
+    return Array.from(set).sort()
+  }, [tenants])
 
   function set(field: keyof typeof emptyForm) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -229,6 +244,57 @@ export default function TenantsPage() {
             placeholder={t('tenants_searchPlaceholder')}
             width={280}
           />
+
+          <Dropdown
+            label={
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: status ? '#111827' : '#9ca3af' }}>
+                {status === 'active' ? t('users_active') : status === 'inactive' ? 'Inactive' : t('domains_allStatuses')}
+              </span>
+            }
+            active={!!status}
+            onClear={() => setFilter('status', '' as StatusFilter)}
+            width={140}
+          >
+            {close => (
+              <>
+                <DropdownItem onSelect={() => { setFilter('status', '' as StatusFilter); close() }}>
+                  <span style={{ color: '#6b7280' }}>{t('domains_allStatuses')}</span>
+                </DropdownItem>
+                <DropdownItem onSelect={() => { setFilter('status', 'active' as StatusFilter); close() }}>
+                  {t('users_active')}
+                </DropdownItem>
+                <DropdownItem onSelect={() => { setFilter('status', 'inactive' as StatusFilter); close() }}>
+                  Inactive
+                </DropdownItem>
+              </>
+            )}
+          </Dropdown>
+
+          {countryOptions.length > 0 && (
+            <Dropdown
+              label={
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: country ? '#111827' : '#9ca3af' }}>
+                  {country || t('tenants_country')}
+                </span>
+              }
+              active={!!country}
+              onClear={() => setFilter('country', '')}
+              width={120}
+            >
+              {close => (
+                <>
+                  <DropdownItem onSelect={() => { setFilter('country', ''); close() }}>
+                    <span style={{ color: '#6b7280' }}>{t('tenants_country')}</span>
+                  </DropdownItem>
+                  {countryOptions.map(c => (
+                    <DropdownItem key={c} onSelect={() => { setFilter('country', c); close() }}>
+                      {c}
+                    </DropdownItem>
+                  ))}
+                </>
+              )}
+            </Dropdown>
+          )}
 
           <FilterPersistControls
             persist={persist}

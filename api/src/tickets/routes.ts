@@ -39,7 +39,7 @@ export async function ticketRoutes(app: FastifyInstance) {
 
   // GET /tickets
   app.get('/tickets', { preHandler: requireAuth }, async (req: any) => {
-    const { status, priority, assigned_to, tenant_id, page = '1', limit = '50' } = req.query as Record<string, string>
+    const { status, priority, assigned_to, tenant_id, source, search, page = '1', limit = '50' } = req.query as Record<string, string>
     const pageNum  = Math.max(1, Number(page))
     const limitNum = Math.min(200, Math.max(1, Number(limit)))
     const offset   = (pageNum - 1) * limitNum
@@ -58,6 +58,13 @@ export async function ticketRoutes(app: FastifyInstance) {
     if (priority)    { clauses.push('t.priority = ?');    params.push(priority) }
     if (assigned_to) { clauses.push('t.assigned_to = ?'); params.push(Number(assigned_to)) }
     if (tenant_id) { clauses.push('t.tenant_id = ?'); params.push(Number(tenant_id)) }
+    if (source)    { clauses.push('t.source = ?'); params.push(source) }
+    if (search) {
+      const escaped = search.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&')
+      const pattern = `%${escaped}%`
+      clauses.push('(t.subject LIKE ? OR t.requester_email LIKE ? OR t.requester_name LIKE ?)')
+      params.push(pattern, pattern, pattern)
+    }
 
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
 

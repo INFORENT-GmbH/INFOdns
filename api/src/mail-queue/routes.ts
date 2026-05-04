@@ -6,18 +6,25 @@ import { renderTemplate, type Locale } from '../lib/mailTemplates.js'
 export async function mailQueueRoutes(app: FastifyInstance) {
   // GET /mail-queue  (admin only)
   app.get('/mail-queue', { preHandler: requireAdmin }, async (req: any) => {
-    const { status, page = '1', limit = '50' } = req.query as Record<string, string>
+    const { status, template, search, page = '1', limit = '50' } = req.query as Record<string, string>
     const pageNum  = Math.max(1, Number(page))
     const limitNum = Math.min(200, Math.max(1, Number(limit)))
     const offset   = (pageNum - 1) * limitNum
     const params: unknown[] = []
     const clauses: string[] = []
 
-    if (status) { clauses.push('status = ?'); params.push(status) }
+    if (status)   { clauses.push('status = ?');   params.push(status) }
+    if (template) { clauses.push('template = ?'); params.push(template) }
+    if (search) {
+      const escaped = search.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&')
+      const pattern = `%${escaped}%`
+      clauses.push('to_email LIKE ?')
+      params.push(pattern)
+    }
 
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
 
-    const [rows, countRow] = await Promise.all([
+    const [rows, countRow, templateRows] = await Promise.all([
       query(
         `SELECT id, to_email, template, status, retries, max_retries, error, created_at, updated_at
          FROM mail_queue ${where}
@@ -29,6 +36,9 @@ export async function mailQueueRoutes(app: FastifyInstance) {
         `SELECT COUNT(*) AS total FROM mail_queue ${where}`,
         params
       ),
+      query<{ template: string | null }>(
+        `SELECT DISTINCT template FROM mail_queue WHERE template IS NOT NULL ORDER BY template`
+      ),
     ])
 
     return {
@@ -37,6 +47,7 @@ export async function mailQueueRoutes(app: FastifyInstance) {
       page: pageNum,
       limit: limitNum,
       pages: Math.ceil((countRow?.total ?? 0) / limitNum),
+      templates: (templateRows as any[]).map(r => r.template).filter((t): t is string => !!t),
     }
   })
 

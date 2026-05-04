@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getTickets, getUsers, createTicket, uploadAttachments, type Ticket } from '../api/client'
+import { getTickets, getUsers, createTicket, uploadAttachments, getTenants, type Ticket } from '../api/client'
 import Select from '../components/Select'
 import Dropdown, { DropdownItem } from '../components/Dropdown'
+import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
 import { useI18n } from '../i18n/I18nContext'
@@ -14,7 +15,7 @@ import * as s from '../styles/shell'
 
 const LIMIT = 50
 
-const TICKET_FILTER_DEFAULTS = { status: '', priority: '', assignee: '' }
+const TICKET_FILTER_DEFAULTS = { search: '', status: '', priority: '', assignee: '', source: '', tenant: '' }
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
   open:        { bg: '#fef3c7', fg: '#92400e' },
@@ -51,12 +52,18 @@ export default function TicketsPage() {
     persist: filtersPersist, setPersist: setFiltersPersist,
     clear: clearFiltersInternal, hasActive: filtersHasActive,
   } = usePersistedFilters('tickets', TICKET_FILTER_DEFAULTS)
+  const searchFilter   = ticketFilters.search
   const statusFilter   = ticketFilters.status
   const priorityFilter = ticketFilters.priority
   const assigneeFilter = ticketFilters.assignee
+  const sourceFilter   = ticketFilters.source
+  const tenantFilter   = ticketFilters.tenant
+  const setSearchFilter   = (v: string) => { setTicketFilter('search', v); setPage(1) }
   const setStatusFilter   = (v: string) => { setTicketFilter('status', v); setPage(1) }
   const setPriorityFilter = (v: string) => { setTicketFilter('priority', v); setPage(1) }
   const setAssigneeFilter = (v: string) => { setTicketFilter('assignee', v); setPage(1) }
+  const setSourceFilter   = (v: string) => { setTicketFilter('source', v); setPage(1) }
+  const setTenantFilter   = (v: string) => { setTicketFilter('tenant', v); setPage(1) }
   const clearFilters = () => { clearFiltersInternal(); setPage(1) }
   const [page, setPage]                     = useState(1)
   const [showCreate, setShowCreate]         = useState(false)
@@ -68,9 +75,12 @@ export default function TicketsPage() {
   const params: Record<string, string> = {
     page: String(page),
     limit: String(LIMIT),
+    ...(searchFilter   ? { search: searchFilter }         : {}),
     ...(statusFilter   ? { status: statusFilter }         : {}),
     ...(priorityFilter ? { priority: priorityFilter }     : {}),
     ...(assigneeFilter ? { assigned_to: assigneeFilter }  : {}),
+    ...(sourceFilter   ? { source: sourceFilter }         : {}),
+    ...(tenantFilter   ? { tenant_id: tenantFilter }      : {}),
   }
 
   const { data, isLoading, isFetching } = useQuery({
@@ -83,6 +93,12 @@ export default function TicketsPage() {
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: () => getUsers().then(r => r.data),
+    enabled: isStaff,
+  })
+
+  const { data: tenantsList = [] } = useQuery({
+    queryKey: ['tenants'],
+    queryFn: () => getTenants().then(r => r.data),
     enabled: isStaff,
   })
 
@@ -133,6 +149,10 @@ export default function TicketsPage() {
        ?? staffUsers.find(u => String(u.id) === assigneeFilter)?.email
        ?? `#${assigneeFilter}`)
     : t('tickets_allAssignees')
+  const sourceBtnLabel = sourceFilter || t('tickets_allSources')
+  const tenantBtnLabel = tenantFilter
+    ? (tenantsList.find(c => String(c.id) === tenantFilter)?.name ?? `#${tenantFilter}`)
+    : t('tickets_allTenants')
 
   return (
     <div>
@@ -201,6 +221,13 @@ export default function TicketsPage() {
 
         {/* Filter bar */}
         <FilterBar>
+          <SearchInput
+            value={searchFilter}
+            onChange={setSearchFilter}
+            placeholder={t('tickets_searchPlaceholder')}
+            width={240}
+          />
+
           <Dropdown
             label={
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: statusFilter ? '#111827' : '#9ca3af' }}>
@@ -274,6 +301,53 @@ export default function TicketsPage() {
               )}
             </Dropdown>
           )}
+
+          {isStaff && tenantsList.length > 1 && (
+            <Dropdown
+              label={
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: tenantFilter ? '#111827' : '#9ca3af' }}>
+                  {tenantBtnLabel}
+                </span>
+              }
+              active={!!tenantFilter}
+              onClear={() => setTenantFilter('')}
+              width={180}
+            >
+              {close => (
+                <>
+                  <DropdownItem onSelect={() => { setTenantFilter(''); close() }}>
+                    <span style={{ color: '#6b7280' }}>{t('tickets_allTenants')}</span>
+                  </DropdownItem>
+                  {tenantsList.map(c => (
+                    <DropdownItem key={c.id} onSelect={() => { setTenantFilter(String(c.id)); close() }}>
+                      {c.name}
+                    </DropdownItem>
+                  ))}
+                </>
+              )}
+            </Dropdown>
+          )}
+
+          <Dropdown
+            label={
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: sourceFilter ? '#111827' : '#9ca3af' }}>
+                {sourceBtnLabel}
+              </span>
+            }
+            active={!!sourceFilter}
+            onClear={() => setSourceFilter('')}
+            width={130}
+          >
+            {close => (
+              <>
+                <DropdownItem onSelect={() => { setSourceFilter(''); close() }}>
+                  <span style={{ color: '#6b7280' }}>{t('tickets_allSources')}</span>
+                </DropdownItem>
+                <DropdownItem onSelect={() => { setSourceFilter('web'); close() }}>web</DropdownItem>
+                <DropdownItem onSelect={() => { setSourceFilter('email'); close() }}>email</DropdownItem>
+              </>
+            )}
+          </Dropdown>
 
           <FilterPersistControls
             persist={filtersPersist}
