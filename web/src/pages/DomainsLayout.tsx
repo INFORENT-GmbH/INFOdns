@@ -7,18 +7,30 @@ import DomainsPage from './DomainsPage'
 import DomainsTableView from './DomainsDashboard'
 import { getDirtyDomainFqdns } from '../hooks/domainEditCache'
 import { useIsMobile } from '../hooks/useIsMobile'
+import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import BulkEditDrawer from '../components/bulk/BulkEditDrawer'
 import BulkSelectionBar from '../components/bulk/BulkSelectionBar'
 import RecordSearchModal from '../components/bulk/RecordSearchModal'
 import type { BulkPayloadSeed, BulkOperation } from '../components/bulk/BulkPayloadForm'
 
+const DOMAIN_FILTER_DEFAULTS = { search: '', labelFilter: '', tenantFilter: [] as number[] }
+
 export default function DomainsLayout() {
   const { user } = useAuth()
   const isMobile = useIsMobile()
 
-  const [search, setSearch] = useState('')
-  const [labelFilter, setLabelFilter] = useState('')
-  const [tenantFilter, setTenantFilter] = useState<number[]>([])
+  const {
+    filters: domainFilters,
+    setFilter: setDomainFilter,
+    persist: filtersPersist,
+    setPersist: setFiltersPersist,
+    clear: clearFilters,
+    hasActive: filtersHasActive,
+  } = usePersistedFilters('domains', DOMAIN_FILTER_DEFAULTS)
+  const { search, labelFilter, tenantFilter } = domainFilters
+  const setSearch = (v: string) => setDomainFilter('search', v)
+  const setLabelFilter = (v: string) => setDomainFilter('labelFilter', v)
+  const setTenantFilter = (v: number[]) => setDomainFilter('tenantFilter', v)
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [bulkOpen, setBulkOpen]       = useState(false)
@@ -126,6 +138,10 @@ export default function DomainsLayout() {
       tenants={tenants}
       totalCount={totalCount}
       selectedCount={selectedIds.size}
+      filtersPersist={filtersPersist}
+      setFiltersPersist={setFiltersPersist}
+      clearFilters={clearFilters}
+      filtersHasActive={filtersHasActive}
     />
   )
 
@@ -145,6 +161,10 @@ export default function DomainsLayout() {
       onToggleSelected={toggleSelected}
       onSelectAll={() => setSelectionFromIds(domains.map(d => d.id))}
       onClearSelection={clearSelection}
+      filtersPersist={filtersPersist}
+      setFiltersPersist={setFiltersPersist}
+      clearFilters={clearFilters}
+      filtersHasActive={filtersHasActive}
     />
   )
 

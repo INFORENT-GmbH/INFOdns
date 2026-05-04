@@ -4,6 +4,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { type Domain, type LabelSuggestion, type Tenant } from '../api/client'
 import LabelChip from '../components/LabelChip'
 import Tooltip from '../components/Tooltip'
+import FilterPersistControls from '../components/FilterPersistControls'
 import { useI18n } from '../i18n/I18nContext'
 import { getDirtyDomainFqdns, subscribe } from '../hooks/domainEditCache'
 
@@ -20,6 +21,10 @@ interface Props {
   tenants: Tenant[]
   totalCount?: number
   selectedCount: number
+  filtersPersist: boolean
+  setFiltersPersist: (v: boolean) => void
+  clearFilters: () => void
+  filtersHasActive: boolean
 }
 
 const zoneStatusDotColors: Record<string, string> = {
@@ -62,6 +67,7 @@ export default function DomainsPage({
   labelFilter, setLabelFilter, labelSuggestions,
   tenantFilter, setTenantFilter, tenants,
   totalCount, selectedCount,
+  filtersPersist, setFiltersPersist, clearFilters, filtersHasActive,
 }: Props) {
   const { t } = useI18n()
   const navigate = useNavigate()
@@ -303,6 +309,15 @@ export default function DomainsPage({
             )}
           </div>
         )}
+
+        <FilterPersistControls
+          persist={filtersPersist}
+          setPersist={setFiltersPersist}
+          onClear={clearFilters}
+          hasActive={filtersHasActive}
+          compact
+          style={{ marginTop: '.375rem', justifyContent: 'space-between', display: 'flex' }}
+        />
 
       </div>
 

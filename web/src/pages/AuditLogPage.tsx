@@ -2,19 +2,32 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getAuditLogs, type AuditLog } from '../api/client'
 import Select from '../components/Select'
+import FilterPersistControls from '../components/FilterPersistControls'
 import { useI18n } from '../i18n/I18nContext'
+import { usePersistedFilters } from '../hooks/usePersistedFilters'
 
 const ACTIONS = ['', 'create', 'update', 'delete', 'bulk_apply']
 const LIMIT = 50
 
+const AUDIT_FILTER_DEFAULTS = { domain_id: '', user_id: '', action: '', from: '', to: '' }
+
 export default function AuditLogPage() {
   const { t } = useI18n()
-  const [filters, setFilters] = useState({ domain_id: '', user_id: '', action: '', from: '', to: '' })
+  const {
+    filters, setFilter: setFilterInternal,
+    persist: filtersPersist, setPersist: setFiltersPersist,
+    clear: clearFiltersInternal, hasActive: filtersHasActive,
+  } = usePersistedFilters('audit', AUDIT_FILTER_DEFAULTS)
   const [page, setPage] = useState(1)
   const [expanded, setExpanded] = useState<number | null>(null)
 
-  function setFilter(key: string, value: string) {
-    setFilters(f => ({ ...f, [key]: value }))
+  function setFilter(key: keyof typeof AUDIT_FILTER_DEFAULTS, value: string) {
+    setFilterInternal(key, value)
+    setPage(1)
+  }
+
+  function clearFilters() {
+    clearFiltersInternal()
     setPage(1)
   }
 
@@ -77,12 +90,13 @@ export default function AuditLogPage() {
           style={styles.filterInput}
           title={t('audit_toDate')}
         />
-        <button
-          onClick={() => { setFilters({ domain_id: '', user_id: '', action: '', from: '', to: '' }); setPage(1) }}
-          style={styles.btnSecondary}
-        >
-          {t('audit_clear')}
-        </button>
+        <FilterPersistControls
+          persist={filtersPersist}
+          setPersist={setFiltersPersist}
+          onClear={clearFilters}
+          hasActive={filtersHasActive}
+          style={{ marginLeft: 'auto' }}
+        />
       </div>
 
       {isLoading ? (

@@ -2,15 +2,26 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getMailQueue, getMailQueueItem, retryMail, type MailQueueItem } from '../api/client'
 import Select from '../components/Select'
+import FilterPersistControls from '../components/FilterPersistControls'
 import { useI18n } from '../i18n/I18nContext'
+import { usePersistedFilters } from '../hooks/usePersistedFilters'
 
 const STATUSES = ['', 'pending', 'processing', 'done', 'failed']
 const LIMIT = 50
 
+const MAIL_FILTER_DEFAULTS = { status: '' }
+
 export default function MailQueuePage() {
   const { t } = useI18n()
   const qc = useQueryClient()
-  const [statusFilter, setStatusFilter] = useState('')
+  const {
+    filters: mailFilters, setFilter: setMailFilter,
+    persist: filtersPersist, setPersist: setFiltersPersist,
+    clear: clearFiltersInternal, hasActive: filtersHasActive,
+  } = usePersistedFilters('mailQueue', MAIL_FILTER_DEFAULTS)
+  const statusFilter = mailFilters.status
+  const setStatusFilter = (v: string) => { setMailFilter('status', v); setPage(1) }
+  const clearFilters = () => { clearFiltersInternal(); setPage(1) }
   const [page, setPage] = useState(1)
   const [acting, setActing] = useState<number | null>(null)
   const [expanded, setExpanded] = useState<number | null>(null)
@@ -69,12 +80,19 @@ export default function MailQueuePage() {
       <div style={styles.filters}>
         <Select
           value={statusFilter}
-          onChange={v => { setStatusFilter(v); setPage(1) }}
+          onChange={setStatusFilter}
           style={styles.select}
           options={[
             { value: '', label: t('mailQueue_allStatuses') },
             ...STATUSES.filter(Boolean).map(s => ({ value: s, label: s })),
           ]}
+        />
+        <FilterPersistControls
+          persist={filtersPersist}
+          setPersist={setFiltersPersist}
+          onClear={clearFilters}
+          hasActive={filtersHasActive}
+          style={{ marginLeft: 'auto' }}
         />
       </div>
 

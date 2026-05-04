@@ -3,11 +3,15 @@ import { Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTickets, getUsers, createTicket, uploadAttachments, type Ticket } from '../api/client'
 import Select from '../components/Select'
+import FilterPersistControls from '../components/FilterPersistControls'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
+import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import { formatApiError } from '../lib/formError'
 
 const LIMIT = 50
+
+const TICKET_FILTER_DEFAULTS = { status: '', priority: '', assignee: '' }
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
   open:        { bg: '#fef3c7', fg: '#92400e' },
@@ -39,9 +43,18 @@ export default function TicketsPage() {
   const qc = useQueryClient()
   const isStaff = user?.role === 'admin' || user?.role === 'operator'
 
-  const [statusFilter, setStatusFilter]     = useState('')
-  const [priorityFilter, setPriorityFilter] = useState('')
-  const [assigneeFilter, setAssigneeFilter] = useState('')
+  const {
+    filters: ticketFilters, setFilter: setTicketFilter,
+    persist: filtersPersist, setPersist: setFiltersPersist,
+    clear: clearFiltersInternal, hasActive: filtersHasActive,
+  } = usePersistedFilters('tickets', TICKET_FILTER_DEFAULTS)
+  const statusFilter   = ticketFilters.status
+  const priorityFilter = ticketFilters.priority
+  const assigneeFilter = ticketFilters.assignee
+  const setStatusFilter   = (v: string) => { setTicketFilter('status', v); setPage(1) }
+  const setPriorityFilter = (v: string) => { setTicketFilter('priority', v); setPage(1) }
+  const setAssigneeFilter = (v: string) => { setTicketFilter('assignee', v); setPage(1) }
+  const clearFilters = () => { clearFiltersInternal(); setPage(1) }
   const [page, setPage]                     = useState(1)
   const [showCreate, setShowCreate]         = useState(false)
   const [creating, setCreating]             = useState(false)
@@ -169,7 +182,7 @@ export default function TicketsPage() {
       <div style={styles.filters}>
         <Select
           value={statusFilter}
-          onChange={v => { setStatusFilter(v); setPage(1) }}
+          onChange={setStatusFilter}
           style={styles.select}
           options={[
             { value: '', label: t('tickets_allStatuses') },
@@ -178,7 +191,7 @@ export default function TicketsPage() {
         />
         <Select
           value={priorityFilter}
-          onChange={v => { setPriorityFilter(v); setPage(1) }}
+          onChange={setPriorityFilter}
           style={styles.select}
           options={[
             { value: '', label: t('tickets_allPriorities') },
@@ -188,7 +201,7 @@ export default function TicketsPage() {
         {isStaff && (
           <Select
             value={assigneeFilter}
-            onChange={v => { setAssigneeFilter(v); setPage(1) }}
+            onChange={setAssigneeFilter}
             style={styles.select}
             options={[
               { value: '', label: t('tickets_allAssignees') },
@@ -196,6 +209,13 @@ export default function TicketsPage() {
             ]}
           />
         )}
+        <FilterPersistControls
+          persist={filtersPersist}
+          setPersist={setFiltersPersist}
+          onClear={clearFilters}
+          hasActive={filtersHasActive}
+          style={{ marginLeft: 'auto' }}
+        />
       </div>
 
       {isLoading ? <p>{t('loading')}</p> : tickets.length === 0 ? (

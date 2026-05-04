@@ -2,6 +2,11 @@ export type Locale = 'en' | 'de'
 
 export const translations = {
   en: {
+    // Filter controls (shared)
+    filters_persist:    'Keep filters',
+    filters_persistTip: 'Remember filter values across reloads',
+    filters_clear:      'Clear filters',
+
     // Nav
     nav_domains:   'Domains',
     nav_bulkJobs:  'Bulk Jobs',
@@ -545,6 +550,11 @@ export const translations = {
   },
 
   de: {
+    // Filter controls (shared)
+    filters_persist:    'Filter merken',
+    filters_persistTip: 'Filterwerte über Neuladen hinweg speichern',
+    filters_clear:      'Filter zurücksetzen',
+
     // Nav
     nav_domains:   'Domains',
     nav_bulkJobs:  'Massenaufgaben',

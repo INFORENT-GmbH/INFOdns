@@ -5,6 +5,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { getDomainStats, type Domain, type LabelSuggestion, type Tenant } from '../api/client'
 import LabelChip from '../components/LabelChip'
 import Tooltip from '../components/Tooltip'
+import FilterPersistControls from '../components/FilterPersistControls'
 import { useI18n } from '../i18n/I18nContext'
 import * as s from '../styles/shell'
 
@@ -23,6 +24,10 @@ interface Props {
   onToggleSelected: (id: number) => void
   onSelectAll: () => void
   onClearSelection: () => void
+  filtersPersist: boolean
+  setFiltersPersist: (v: boolean) => void
+  clearFilters: () => void
+  filtersHasActive: boolean
 }
 
 type SortKey = 'fqdn' | 'zone_status' | 'ns_ok' | 'dnssec_enabled' | 'status' | 'tenant_name'
@@ -130,6 +135,7 @@ export default function DomainsTableView({
   labelFilter, setLabelFilter, labelSuggestions,
   tenantFilter, setTenantFilter, tenants,
   selectedIds, onToggleSelected, onSelectAll, onClearSelection,
+  filtersPersist, setFiltersPersist, clearFilters, filtersHasActive,
 }: Props) {
   const { t } = useI18n()
   const navigate = useNavigate()
@@ -408,7 +414,15 @@ export default function DomainsTableView({
           </div>
         )}
 
-        <div ref={columnsRef} style={{ position: 'relative', marginLeft: 'auto' }}>
+        <FilterPersistControls
+          persist={filtersPersist}
+          setPersist={setFiltersPersist}
+          onClear={clearFilters}
+          hasActive={filtersHasActive}
+          style={{ marginLeft: 'auto' }}
+        />
+
+        <div ref={columnsRef} style={{ position: 'relative' }}>
           <button
             type="button"
             onClick={() => setColumnsOpen(v => !v)}
