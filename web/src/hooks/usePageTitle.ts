@@ -1,14 +1,12 @@
 import { useEffect } from 'react'
 
-const SUFFIX = 'INFORENT GmbH'
-
 /**
- * Sets document.title to "<title> — INFORENT GmbH".
- * Pass no argument (or undefined) to get just "Manager — INFORENT GmbH".
+ * Sets document.title to "INFORENT - <title>".
+ * Pass no argument (or undefined) to get just "INFORENT - Manager".
  */
 export function usePageTitle(title?: string) {
   useEffect(() => {
-    document.title = title ? `${title} — ${SUFFIX}` : `Manager — ${SUFFIX}`
-    return () => { document.title = `Manager — ${SUFFIX}` }
+    document.title = `INFORENT - ${title ?? 'Manager'}`
+    return () => { document.title = 'INFORENT - Manager' }
   }, [title])
 }
