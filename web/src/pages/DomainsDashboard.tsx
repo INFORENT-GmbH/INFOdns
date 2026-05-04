@@ -28,6 +28,8 @@ interface Props {
   setStatus: (v: string) => void
   zoneStatus: string
   setZoneStatus: (v: string) => void
+  nsIssues: boolean
+  setNsIssues: (v: boolean) => void
   sort: [string, 'asc' | 'desc']
   setSort: (v: [string, 'asc' | 'desc']) => void
   selectedIds: Set<number>
@@ -85,10 +87,21 @@ function StatPill({ label, value, warn }: { label: string; value: number | undef
   )
 }
 
-function WarnPill({ label, value, color = '#dc2626' }: { label: string; value: number | undefined; color?: string }) {
+function WarnPill({ label, value, color = '#dc2626', onClick, active }: { label: string; value: number | undefined; color?: string; onClick?: () => void; active?: boolean }) {
   if (!value) return null
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '.8125rem', color: '#fff', background: color, borderRadius: 4, padding: '1px 8px', fontWeight: 600 }}>
+    <span
+      onClick={onClick}
+      title={onClick ? (active ? 'Click to clear filter' : 'Click to filter') : undefined}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '.8125rem',
+        color: '#fff', background: color, borderRadius: 4, padding: '1px 8px', fontWeight: 600,
+        cursor: onClick ? 'pointer' : 'default',
+        outline: active ? '2px solid #1e3a8a' : undefined,
+        outlineOffset: active ? 1 : 0,
+        userSelect: 'none',
+      }}
+    >
       {value} {label}
     </span>
   )
@@ -143,6 +156,7 @@ export default function DomainsTableView({
   tenantFilter, setTenantFilter, tenants,
   status, setStatus,
   zoneStatus, setZoneStatus,
+  nsIssues, setNsIssues,
   sort: sortProp, setSort: setSortProp,
   selectedIds, onToggleSelected, onSelectAll, onClearSelection,
   filtersPersist, setFiltersPersist, clearFilters, filtersHasActive,
@@ -282,11 +296,7 @@ export default function DomainsTableView({
   })
 
   const sorted = useMemo(() => {
-    const arr = domains.filter(d => {
-      if (status && d.status !== status) return false
-      if (zoneStatus && d.zone_status !== zoneStatus) return false
-      return true
-    })
+    const arr = [...domains]
     arr.sort((a, b) => {
       const [col, dir] = sort
       let cmp = 0
@@ -303,7 +313,7 @@ export default function DomainsTableView({
       return dir === 'asc' ? cmp : -cmp
     })
     return arr
-  }, [domains, sort, status, zoneStatus])
+  }, [domains, sort])
 
   const tableScrollRef = useRef<HTMLDivElement>(null)
   const virtualizer = useVirtualizer({
@@ -348,9 +358,25 @@ export default function DomainsTableView({
         {stats && stats.suspended > 0 && (
           <WarnPill label={t('dashboard_suspended').toLowerCase()} value={stats.suspended} color="#d97706" />
         )}
-        <WarnPill label={t('dashboard_zoneErrors').toLowerCase()} value={stats?.zone_error} />
-        <WarnPill label={t('dashboard_dirtyZones').toLowerCase()} value={stats?.zone_dirty} color="#d97706" />
-        <WarnPill label={t('dashboard_nsIssues').toLowerCase()} value={stats?.ns_not_ok} />
+        <WarnPill
+          label={t('dashboard_zoneErrors').toLowerCase()}
+          value={stats?.zone_error}
+          active={zoneStatus === 'error'}
+          onClick={() => setZoneStatus(zoneStatus === 'error' ? '' : 'error')}
+        />
+        <WarnPill
+          label={t('dashboard_dirtyZones').toLowerCase()}
+          value={stats?.zone_dirty}
+          color="#d97706"
+          active={zoneStatus === 'dirty'}
+          onClick={() => setZoneStatus(zoneStatus === 'dirty' ? '' : 'dirty')}
+        />
+        <WarnPill
+          label={t('dashboard_nsIssues').toLowerCase()}
+          value={stats?.ns_not_ok}
+          active={nsIssues}
+          onClick={() => setNsIssues(!nsIssues)}
+        />
         {stats && stats.dnssec_enabled > 0 && (
           <span style={{ fontSize: '.8125rem', color: '#64748b' }}>{stats.dnssec_enabled} {t('dashboard_dnssec')}</span>
         )}

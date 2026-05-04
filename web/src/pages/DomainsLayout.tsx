@@ -20,6 +20,7 @@ const DOMAIN_FILTER_DEFAULTS = {
   tenantFilter: [] as number[],
   status:       '',
   zoneStatus:   '',
+  nsIssues:     false,
   sort:         ['fqdn', 'asc'] as DomainSort,
 }
 
@@ -35,12 +36,13 @@ export default function DomainsLayout() {
     clear: clearFilters,
     hasActive: filtersHasActive,
   } = usePersistedFilters('domains', DOMAIN_FILTER_DEFAULTS)
-  const { search, labelFilter, tenantFilter, status, zoneStatus, sort } = domainFilters
+  const { search, labelFilter, tenantFilter, status, zoneStatus, nsIssues, sort } = domainFilters
   const setSearch = (v: string) => setDomainFilter('search', v)
   const setLabelFilter = (v: string) => setDomainFilter('labelFilter', v)
   const setTenantFilter = (v: number[]) => setDomainFilter('tenantFilter', v)
   const setStatus = (v: string) => setDomainFilter('status', v)
   const setZoneStatus = (v: string) => setDomainFilter('zoneStatus', v)
+  const setNsIssues = (v: boolean) => setDomainFilter('nsIssues', v)
   const setSort = (v: DomainSort) => setDomainFilter('sort', v)
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
@@ -119,46 +121,37 @@ export default function DomainsLayout() {
     },
   })
 
-  const filtersActive = !!(search || labelFilter || tenantFilter.length > 0)
+  // Client-side filters (server already applied search/label/tenant).
+  // Both the sidebar and the dashboard render this filtered list, so the
+  // counts and selection match across views.
+  const filteredDomains = useMemo(() => {
+    return domains.filter(d => {
+      if (status && d.status !== status) return false
+      if (zoneStatus && d.zone_status !== zoneStatus) return false
+      if (nsIssues && d.ns_ok !== 0) return false
+      return true
+    })
+  }, [domains, status, zoneStatus, nsIssues])
+
+  const filtersActive = !!(search || labelFilter || tenantFilter.length > 0 || status || zoneStatus || nsIssues)
   const { data: totalDomains } = useQuery<Domain[]>({
     queryKey: ['domains', 'total'],
     queryFn: () => getDomains({ limit: '9999' }).then(r => r.data),
     enabled: filtersActive,
   })
-  const totalCount = filtersActive ? totalDomains?.length : domains.length
+  const totalCount = filtersActive ? totalDomains?.length : filteredDomains.length
 
   const match = useMatch('/domains/:name')
   const detailOpen = !!match
 
   const selectedDomains = useMemo(
-    () => domains.filter(d => selectedIds.has(d.id)),
-    [domains, selectedIds],
+    () => filteredDomains.filter(d => selectedIds.has(d.id)),
+    [filteredDomains, selectedIds],
   )
 
   const sidebar = (
     <DomainsPage
-      domains={domains}
-      isLoading={isLoading}
-      search={search}
-      setSearch={setSearch}
-      labelFilter={labelFilter}
-      setLabelFilter={setLabelFilter}
-      labelSuggestions={labelSuggestions}
-      tenantFilter={tenantFilter}
-      setTenantFilter={setTenantFilter}
-      tenants={tenants}
-      totalCount={totalCount}
-      selectedCount={selectedIds.size}
-      filtersPersist={filtersPersist}
-      setFiltersPersist={setFiltersPersist}
-      clearFilters={clearFilters}
-      filtersHasActive={filtersHasActive}
-    />
-  )
-
-  const dashboard = (
-    <DomainsTableView
-      domains={domains}
+      domains={filteredDomains}
       isLoading={isLoading}
       search={search}
       setSearch={setSearch}
@@ -172,6 +165,35 @@ export default function DomainsLayout() {
       setStatus={setStatus}
       zoneStatus={zoneStatus}
       setZoneStatus={setZoneStatus}
+      nsIssues={nsIssues}
+      setNsIssues={setNsIssues}
+      totalCount={totalCount}
+      selectedCount={selectedIds.size}
+      filtersPersist={filtersPersist}
+      setFiltersPersist={setFiltersPersist}
+      clearFilters={clearFilters}
+      filtersHasActive={filtersHasActive}
+    />
+  )
+
+  const dashboard = (
+    <DomainsTableView
+      domains={filteredDomains}
+      isLoading={isLoading}
+      search={search}
+      setSearch={setSearch}
+      labelFilter={labelFilter}
+      setLabelFilter={setLabelFilter}
+      labelSuggestions={labelSuggestions}
+      tenantFilter={tenantFilter}
+      setTenantFilter={setTenantFilter}
+      tenants={tenants}
+      status={status}
+      setStatus={setStatus}
+      zoneStatus={zoneStatus}
+      setZoneStatus={setZoneStatus}
+      nsIssues={nsIssues}
+      setNsIssues={setNsIssues}
       sort={sort}
       setSort={setSort}
       selectedIds={selectedIds}

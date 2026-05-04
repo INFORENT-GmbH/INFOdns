@@ -19,6 +19,12 @@ interface Props {
   tenantFilter: number[]
   setTenantFilter: (v: number[]) => void
   tenants: Tenant[]
+  status: string
+  setStatus: (v: string) => void
+  zoneStatus: string
+  setZoneStatus: (v: string) => void
+  nsIssues: boolean
+  setNsIssues: (v: boolean) => void
   totalCount?: number
   selectedCount: number
   filtersPersist: boolean
@@ -66,6 +72,9 @@ export default function DomainsPage({
   search, setSearch,
   labelFilter, setLabelFilter, labelSuggestions,
   tenantFilter, setTenantFilter, tenants,
+  status, setStatus,
+  zoneStatus, setZoneStatus,
+  nsIssues, setNsIssues,
   totalCount, selectedCount,
   filtersPersist, setFiltersPersist, clearFilters, filtersHasActive,
 }: Props) {
@@ -79,8 +88,44 @@ export default function DomainsPage({
   const [tenantDropdownOpen, setTenantDropdownOpen] = useState(false)
   const [tenantSearch, setTenantSearch] = useState('')
   const tenantDropdownRef = useRef<HTMLDivElement>(null)
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
+  const statusDropdownRef = useRef<HTMLDivElement>(null)
+  const [zoneStatusDropdownOpen, setZoneStatusDropdownOpen] = useState(false)
+  const zoneStatusDropdownRef = useRef<HTMLDivElement>(null)
   const [displayOptionsOpen, setDisplayOptionsOpen] = useState(false)
   const displayOptionsRef = useRef<HTMLDivElement>(null)
+
+  const STATUS_OPTIONS: { value: string; label: string }[] = [
+    { value: 'active',    label: t('dashboard_active') },
+    { value: 'pending',   label: t('dashboard_pending') },
+    { value: 'suspended', label: t('dashboard_suspended') },
+    { value: 'deleted',   label: t('domains_deleted') },
+  ]
+  const ZONE_STATUS_OPTIONS: { value: string; label: string }[] = [
+    { value: 'clean', label: t('zone_clean') },
+    { value: 'dirty', label: t('zone_dirty') },
+    { value: 'error', label: t('zone_error') },
+  ]
+  const statusButtonLabel = STATUS_OPTIONS.find(o => o.value === status)?.label ?? t('domains_allStatuses')
+  const zoneStatusButtonLabel = ZONE_STATUS_OPTIONS.find(o => o.value === zoneStatus)?.label ?? t('domains_allZoneStatuses')
+
+  useEffect(() => {
+    if (!statusDropdownOpen) return
+    const onDoc = (e: MouseEvent) => {
+      if (!statusDropdownRef.current?.contains(e.target as Node)) setStatusDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [statusDropdownOpen])
+
+  useEffect(() => {
+    if (!zoneStatusDropdownOpen) return
+    const onDoc = (e: MouseEvent) => {
+      if (!zoneStatusDropdownRef.current?.contains(e.target as Node)) setZoneStatusDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [zoneStatusDropdownOpen])
 
   function toggleTenant(id: number) {
     setTenantFilter(tenantFilter.includes(id) ? tenantFilter.filter(x => x !== id) : [...tenantFilter, id])
@@ -183,7 +228,7 @@ export default function DomainsPage({
               </span>
             )}
             {!isLoading && (() => {
-              const filtersActive = !!(search || labelFilter || tenantFilter.length > 0)
+              const filtersActive = !!(search || labelFilter || tenantFilter.length > 0 || status || zoneStatus || nsIssues)
               const showFiltered = filtersActive && totalCount !== undefined && totalCount !== domains.length
               return (
                 <span
@@ -309,6 +354,103 @@ export default function DomainsPage({
             )}
           </div>
         )}
+
+        {/* Status filter */}
+        <div ref={statusDropdownRef} style={{ position: 'relative', marginBottom: '.375rem' }}>
+          <button
+            type="button"
+            onClick={() => setStatusDropdownOpen(v => !v)}
+            style={{
+              ...styles.searchInput, width: '100%', boxSizing: 'border-box' as const,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              cursor: 'pointer', background: '#fff', textAlign: 'left' as const,
+              outline: status ? '2px solid #2563eb' : undefined,
+            }}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, color: status ? '#111827' : '#9ca3af' }}>
+              {statusButtonLabel}
+            </span>
+            <span style={{ fontSize: '.65rem', color: '#9ca3af', marginLeft: 4, flexShrink: 0 }}>{status ? '' : '▼'}</span>
+          </button>
+          {status && (
+            <button
+              onClick={() => { setStatus(''); setStatusDropdownOpen(false) }}
+              style={{ ...styles.btnClear, position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)' }}
+              title="Clear"
+            >✕</button>
+          )}
+          {statusDropdownOpen && (
+            <div style={styles.labelDropdown}>
+              {STATUS_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onMouseDown={e => { e.preventDefault(); setStatus(opt.value); setStatusDropdownOpen(false) }}
+                  style={styles.labelDropdownItem}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Zone status filter */}
+        <div ref={zoneStatusDropdownRef} style={{ position: 'relative', marginBottom: '.375rem' }}>
+          <button
+            type="button"
+            onClick={() => setZoneStatusDropdownOpen(v => !v)}
+            style={{
+              ...styles.searchInput, width: '100%', boxSizing: 'border-box' as const,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              cursor: 'pointer', background: '#fff', textAlign: 'left' as const,
+              outline: zoneStatus ? '2px solid #2563eb' : undefined,
+            }}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, color: zoneStatus ? '#111827' : '#9ca3af' }}>
+              {zoneStatusButtonLabel}
+            </span>
+            <span style={{ fontSize: '.65rem', color: '#9ca3af', marginLeft: 4, flexShrink: 0 }}>{zoneStatus ? '' : '▼'}</span>
+          </button>
+          {zoneStatus && (
+            <button
+              onClick={() => { setZoneStatus(''); setZoneStatusDropdownOpen(false) }}
+              style={{ ...styles.btnClear, position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)' }}
+              title="Clear"
+            >✕</button>
+          )}
+          {zoneStatusDropdownOpen && (
+            <div style={styles.labelDropdown}>
+              {ZONE_STATUS_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onMouseDown={e => { e.preventDefault(); setZoneStatus(opt.value); setZoneStatusDropdownOpen(false) }}
+                  style={styles.labelDropdownItem}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* NS issues toggle */}
+        <label
+          style={{
+            display: 'flex', alignItems: 'center', gap: '.375rem',
+            fontSize: '.75rem', color: '#475569', cursor: 'pointer', userSelect: 'none',
+            padding: '.125rem 0', marginBottom: '.25rem',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={nsIssues}
+            onChange={e => setNsIssues(e.target.checked)}
+            style={{ cursor: 'pointer' }}
+          />
+          {t('dashboard_nsIssues')}
+        </label>
 
         <FilterPersistControls
           persist={filtersPersist}
