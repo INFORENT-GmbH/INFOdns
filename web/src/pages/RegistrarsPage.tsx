@@ -7,6 +7,8 @@ import {
 import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
+import ListPage from '../components/ListPage'
+import ListTable from '../components/ListTable'
 import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import { formatApiError } from '../lib/formError'
 import * as s from '../styles/shell'
@@ -112,14 +114,8 @@ export default function RegistrarsPage() {
   }
 
   return (
-    <div>
-      <div style={s.pageBar}>
-        <h2 style={s.pageTitle}>Registrars</h2>
-      </div>
-
-      {error && <p style={localStyles.errorText}>{error}</p>}
-
-      <div style={s.panel}>
+    <ListPage>
+      {error && <div style={localStyles.errorText}>{error}</div>}
         {/* Stats / count bar */}
         <FilterBar>
           <span style={localStyles.countPill}>
@@ -152,7 +148,7 @@ export default function RegistrarsPage() {
         </FilterBar>
 
         {/* Table */}
-        <div style={s.tableWrap}>
+        <ListTable>
           {isLoading ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>Loading…</div>
           ) : (
@@ -198,15 +194,14 @@ export default function RegistrarsPage() {
               </tbody>
             </table>
           )}
-        </div>
-      </div>
-    </div>
+        </ListTable>
+    </ListPage>
   )
 }
 
 const localStyles: Record<string, React.CSSProperties> = {
   countPill: { display: 'inline-flex', alignItems: 'center', fontSize: '.8125rem', color: '#475569', background: '#e2e8f0', borderRadius: 4, padding: '1px 8px' },
-  errorText: { color: '#b91c1c', fontSize: '.875rem', marginBottom: '.5rem' },
+  errorText: { color: '#b91c1c', fontSize: '.875rem', padding: '.5rem .75rem', background: '#fee2e2', borderBottom: '1px solid #fecaca', flexShrink: 0 },
   muted:     { color: '#94a3b8', fontSize: '.8rem' },
   editRow:   { borderBottom: '1px solid #e2e8f0', background: '#fffbeb' },
   tdActions: { padding: '.4375rem .75rem', verticalAlign: 'middle', whiteSpace: 'nowrap' as const },

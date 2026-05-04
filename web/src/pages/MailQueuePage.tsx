@@ -5,6 +5,8 @@ import Dropdown, { DropdownItem } from '../components/Dropdown'
 import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
+import ListPage from '../components/ListPage'
+import ListTable from '../components/ListTable'
 import { useI18n } from '../i18n/I18nContext'
 import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import * as s from '../styles/shell'
@@ -82,12 +84,7 @@ export default function MailQueuePage() {
   const templateBtnLabel = templateFilter || t('mailQueue_allTemplates')
 
   return (
-    <div>
-      <div style={s.pageBar}>
-        <h2 style={s.pageTitle}>{t('mailQueue_title')}</h2>
-      </div>
-
-      <div style={s.panel}>
+    <ListPage>
         {/* Stats / count bar */}
         <FilterBar>
           <span style={localStyles.countPill}>
@@ -166,7 +163,7 @@ export default function MailQueuePage() {
         </FilterBar>
 
         {/* Table */}
-        <div style={s.tableWrap}>
+        <ListTable>
           {isLoading ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>{t('loading')}</div>
           ) : (
@@ -205,7 +202,7 @@ export default function MailQueuePage() {
               </tbody>
             </table>
           )}
-        </div>
+        </ListTable>
 
         {totalPages > 1 && (
           <div style={localStyles.pagination}>
@@ -214,8 +211,7 @@ export default function MailQueuePage() {
             <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={localStyles.pageBtn}>→</button>
           </div>
         )}
-      </div>
-    </div>
+    </ListPage>
   )
 }
 
@@ -334,7 +330,7 @@ const localStyles: Record<string, React.CSSProperties> = {
   actions:     { display: 'flex', gap: '.35rem' },
   btnRetry:    { padding: '.25rem .5rem', background: '#fbbf24', color: '#78350f', border: 'none', borderRadius: 4, fontSize: '.75rem', fontWeight: 600, cursor: 'pointer' },
   btnView:     { padding: '.25rem .5rem', background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.75rem', fontWeight: 500, cursor: 'pointer' },
-  pagination:  { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.75rem', padding: '.75rem 0', borderTop: '1px solid #e2e8f0' },
+  pagination:  { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.75rem', padding: '.75rem 0', borderTop: '1px solid #e2e8f0', flexShrink: 0 },
   pageBtn:     { padding: '.25rem .5rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, cursor: 'pointer', fontSize: '.8125rem', color: '#374151' },
   pageInfo:    { fontSize: '.8125rem', color: '#64748b' },
   detailCell:  { padding: '.75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' },

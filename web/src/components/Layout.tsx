@@ -20,7 +20,7 @@ export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const isMobile = useIsMobile()
-  const FULL_BLEED_PREFIXES = ['/domains', '/users', '/tenants', '/audit-logs', '/mail-queue', '/jobs', '/registrars']
+  const FULL_BLEED_PREFIXES = ['/domains', '/users', '/tenants', '/audit-logs', '/mail-queue', '/jobs', '/registrars', '/tld-pricing', '/templates']
   const fullBleed = FULL_BLEED_PREFIXES.some(p => location.pathname === p || location.pathname.startsWith(`${p}/`))
     || location.pathname === '/tickets'  // /tickets/:id keeps padding (it's a detail page)
   const [sidebarOpen, setSidebarOpen] = useState(false)

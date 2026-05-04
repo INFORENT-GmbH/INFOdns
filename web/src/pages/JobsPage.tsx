@@ -12,6 +12,7 @@ import Dropdown, { DropdownItem } from '../components/Dropdown'
 import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
+import ListPage from '../components/ListPage'
 import { useAuth } from '../context/AuthContext'
 import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import { formatApiError } from '../lib/formError'
@@ -496,11 +497,7 @@ export default function JobsPage() {
     : null
 
   return (
-    <div>
-      <div style={s.pageBar}>
-        <h2 style={s.pageTitle}>{t('jobs_title')}</h2>
-      </div>
-
+    <ListPage style={{ overflowY: 'auto' }}>
       {/* ── Wizard ── */}
       {showWizard && (
         <div style={styles.wizardCard}>
@@ -726,7 +723,7 @@ export default function JobsPage() {
       )}
 
       {/* ── Jobs table ── */}
-      <div style={s.panel}>
+      <div>
         <FilterBar>
           <span style={styles.countPill}>
             {jobFiltersActive
@@ -798,7 +795,7 @@ export default function JobsPage() {
           <button onClick={() => setShowWizard(true)} style={s.actionBtn}>{t('bulk_newJob')}</button>
         </FilterBar>
 
-        <div style={s.tableWrap}>
+        <div style={{ overflowX: 'auto' }}>
           {isLoading ? (
             <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>{t('loading')}</div>
           ) : (
@@ -875,10 +872,10 @@ export default function JobsPage() {
       {/* ── Zone Render Queue ── */}
       {isStaff && (
         <>
-          <div style={{ ...s.pageBar, marginTop: '1.5rem' }}>
-            <h3 style={s.pageTitle}>{t('jobs_renderQueue')}</h3>
+          <div style={styles.sectionHeader}>
+            <h3 style={styles.sectionTitle}>{t('jobs_renderQueue')}</h3>
           </div>
-          <div style={s.panel}>
+          <div>
             <FilterBar>
               <span style={styles.countPill}>
                 {renderFiltersActive
@@ -931,7 +928,7 @@ export default function JobsPage() {
               />
             </FilterBar>
 
-            <div style={s.tableWrap}>
+            <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
@@ -973,12 +970,14 @@ export default function JobsPage() {
           </div>
         </>
       )}
-    </div>
+    </ListPage>
   )
 }
 
 const styles: Record<string, React.CSSProperties> = {
   countPill:    { display: 'inline-flex', alignItems: 'center', fontSize: '.8125rem', color: '#475569', background: '#e2e8f0', borderRadius: 4, padding: '1px 8px' },
+  sectionHeader:{ padding: '.625rem .75rem', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center' },
+  sectionTitle: { margin: 0, fontSize: '.8125rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '.04em' },
   activeBadge:  { background: '#ede9fe', color: '#6d28d9', padding: '1px 7px', borderRadius: 4, fontSize: '.75rem', fontWeight: 600 },
   muted:        { color: '#94a3b8', margin: 0 },
   wizardCard:   { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '1.25rem', marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: 760 },

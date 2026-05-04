@@ -6,9 +6,15 @@ import {
   getTenants,
   type DnsTemplate, type DnsTemplateRecord,
 } from '../api/client'
+import { useMemo } from 'react'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
 import Select from '../components/Select'
+import SearchInput from '../components/SearchInput'
+import FilterBar from '../components/FilterBar'
+import ListPage from '../components/ListPage'
+import ListTable from '../components/ListTable'
+import * as sh from '../styles/shell'
 import { formatApiError } from '../lib/formError'
 
 const RECORD_TYPES = ['A','AAAA','CNAME','MX','NS','TXT','SRV','CAA','PTR','NAPTR','TLSA','SSHFP','DS','ALIAS']
@@ -45,6 +51,7 @@ export default function TemplatesPage() {
   const canWrite = isAdmin || isOperator
 
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [search, setSearch] = useState('')
   const [showNewForm, setShowNewForm] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
@@ -69,6 +76,15 @@ export default function TemplatesPage() {
     queryKey: ['templates'],
     queryFn: () => getTemplates().then(r => r.data),
   })
+
+  const filteredTemplates = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return templates
+    return templates.filter((tmpl: DnsTemplate) =>
+      tmpl.name.toLowerCase().includes(q) ||
+      (tmpl.description ?? '').toLowerCase().includes(q)
+    )
+  }, [templates, search])
 
   const { data: detail } = useQuery({
     queryKey: ['template', selectedId],
@@ -220,20 +236,29 @@ export default function TemplatesPage() {
   }
 
   return (
-    <>
+    <ListPage style={{ flexDirection: 'row' }}>
       <style>{INLINE_STYLES}</style>
-      <div style={{ display: 'flex', gap: '1rem', height: '100%', alignItems: 'flex-start' }}>
 
-        {/* ── Left panel: template list ── */}
-        <div style={styles.leftPanel}>
-          <div style={styles.panelHeader}>
-            <h2 style={styles.h2}>{t('templates_title')}</h2>
-            {canWrite && (
-              <button onClick={() => { setShowNewForm(true); setCreateError(null); setNewName(''); setNewDesc(''); setNewTenantId('') }} style={styles.btnPrimary}>
-                {t('templates_newTemplate')}
-              </button>
-            )}
-          </div>
+      {/* ── Sidebar: template list ── */}
+      <aside style={styles.sidebar}>
+        <FilterBar>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder={t('templates_searchPlaceholder') || 'Search templates…'}
+            width="100%"
+          />
+        </FilterBar>
+        {canWrite && (
+          <FilterBar>
+            <button
+              onClick={() => { setShowNewForm(true); setCreateError(null); setNewName(''); setNewDesc(''); setNewTenantId('') }}
+              style={{ ...sh.actionBtn, width: '100%' }}
+            >
+              {t('templates_newTemplate')}
+            </button>
+          </FilterBar>
+        )}
 
           {showNewForm && (
             <form onSubmit={handleCreate} style={styles.formCard}>
@@ -270,10 +295,10 @@ export default function TemplatesPage() {
           )}
 
           {isLoading ? <p style={{ padding: '.5rem', fontSize: '.8125rem' }}>{t('loading')}</p> : (
-            <div style={{ overflowX: 'auto' }}>
+            <ListTable>
               <table style={styles.table}>
                 <tbody>
-                  {templates.map((tmpl: DnsTemplate) => (
+                  {filteredTemplates.map((tmpl: DnsTemplate) => (
                     <tr
                       key={tmpl.id}
                       style={{ ...styles.tr, background: selectedId === tmpl.id ? '#eff6ff' : undefined, cursor: 'pointer' }}
@@ -298,14 +323,17 @@ export default function TemplatesPage() {
                       )}
                     </tr>
                   ))}
+                  {filteredTemplates.length === 0 && (
+                    <tr><td style={{ ...styles.td, color: '#94a3b8', textAlign: 'center', padding: '1rem' }}>{search ? t('templates_noneFound') || 'No templates match' : ''}</td></tr>
+                  )}
                 </tbody>
               </table>
-            </div>
+            </ListTable>
           )}
-        </div>
+      </aside>
 
-        {/* ── Right panel: template detail ── */}
-        <div style={styles.rightPanel}>
+      {/* ── Main: template detail ── */}
+      <main style={styles.main}>
           {!selectedId || !detail ? (
             <p style={{ color: '#9ca3af', fontSize: '.875rem', padding: '.5rem' }}>{t('templates_selectToView')}</p>
           ) : (
