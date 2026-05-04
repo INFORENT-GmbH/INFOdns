@@ -13,7 +13,15 @@ import BulkSelectionBar from '../components/bulk/BulkSelectionBar'
 import RecordSearchModal from '../components/bulk/RecordSearchModal'
 import type { BulkPayloadSeed, BulkOperation } from '../components/bulk/BulkPayloadForm'
 
-const DOMAIN_FILTER_DEFAULTS = { search: '', labelFilter: '', tenantFilter: [] as number[] }
+type DomainSort = [string, 'asc' | 'desc']
+const DOMAIN_FILTER_DEFAULTS = {
+  search:       '',
+  labelFilter:  '',
+  tenantFilter: [] as number[],
+  status:       '',
+  zoneStatus:   '',
+  sort:         ['fqdn', 'asc'] as DomainSort,
+}
 
 export default function DomainsLayout() {
   const { user } = useAuth()
@@ -27,10 +35,13 @@ export default function DomainsLayout() {
     clear: clearFilters,
     hasActive: filtersHasActive,
   } = usePersistedFilters('domains', DOMAIN_FILTER_DEFAULTS)
-  const { search, labelFilter, tenantFilter } = domainFilters
+  const { search, labelFilter, tenantFilter, status, zoneStatus, sort } = domainFilters
   const setSearch = (v: string) => setDomainFilter('search', v)
   const setLabelFilter = (v: string) => setDomainFilter('labelFilter', v)
   const setTenantFilter = (v: number[]) => setDomainFilter('tenantFilter', v)
+  const setStatus = (v: string) => setDomainFilter('status', v)
+  const setZoneStatus = (v: string) => setDomainFilter('zoneStatus', v)
+  const setSort = (v: DomainSort) => setDomainFilter('sort', v)
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
   const [bulkOpen, setBulkOpen]       = useState(false)
@@ -157,6 +168,12 @@ export default function DomainsLayout() {
       tenantFilter={tenantFilter}
       setTenantFilter={setTenantFilter}
       tenants={tenants}
+      status={status}
+      setStatus={setStatus}
+      zoneStatus={zoneStatus}
+      setZoneStatus={setZoneStatus}
+      sort={sort}
+      setSort={setSort}
       selectedIds={selectedIds}
       onToggleSelected={toggleSelected}
       onSelectAll={() => setSelectionFromIds(domains.map(d => d.id))}

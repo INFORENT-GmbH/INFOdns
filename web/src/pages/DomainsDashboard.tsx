@@ -9,6 +9,10 @@ import FilterPersistControls from '../components/FilterPersistControls'
 import { useI18n } from '../i18n/I18nContext'
 import * as s from '../styles/shell'
 
+type SortKey = 'fqdn' | 'zone_status' | 'ns_ok' | 'dnssec_enabled' | 'status' | 'tenant_name'
+type SortDir = 'asc' | 'desc'
+type SortTuple = [SortKey, SortDir]
+
 interface Props {
   domains: Domain[]
   isLoading: boolean
@@ -20,6 +24,12 @@ interface Props {
   tenantFilter: number[]
   setTenantFilter: (v: number[]) => void
   tenants: Tenant[]
+  status: string
+  setStatus: (v: string) => void
+  zoneStatus: string
+  setZoneStatus: (v: string) => void
+  sort: [string, 'asc' | 'desc']
+  setSort: (v: [string, 'asc' | 'desc']) => void
   selectedIds: Set<number>
   onToggleSelected: (id: number) => void
   onSelectAll: () => void
@@ -29,9 +39,6 @@ interface Props {
   clearFilters: () => void
   filtersHasActive: boolean
 }
-
-type SortKey = 'fqdn' | 'zone_status' | 'ns_ok' | 'dnssec_enabled' | 'status' | 'tenant_name'
-type SortDir = 'asc' | 'desc'
 
 type ColumnKey = 'zone' | 'ns' | 'dnssec' | 'status' | 'tenant' | 'lastRendered' | 'nsChecked' | 'created' | 'labels'
 
@@ -134,12 +141,17 @@ export default function DomainsTableView({
   search, setSearch,
   labelFilter, setLabelFilter, labelSuggestions,
   tenantFilter, setTenantFilter, tenants,
+  status, setStatus,
+  zoneStatus, setZoneStatus,
+  sort: sortProp, setSort: setSortProp,
   selectedIds, onToggleSelected, onSelectAll, onClearSelection,
   filtersPersist, setFiltersPersist, clearFilters, filtersHasActive,
 }: Props) {
   const { t } = useI18n()
   const navigate = useNavigate()
-  const [sort, setSort] = useState<[SortKey, SortDir]>(['fqdn', 'asc'])
+  // Persisted sort comes through as a wider tuple type; narrow it for internal use.
+  const sort = sortProp as SortTuple
+  const setSort = setSortProp as (v: SortTuple) => void
 
   // Tick once a minute so "X time ago" cells stay accurate without a refetch.
   // Frequent NS-check broadcasts patch the underlying timestamps via setQueriesData.
@@ -154,6 +166,10 @@ export default function DomainsTableView({
   const [tenantDropdownOpen, setTenantDropdownOpen] = useState(false)
   const [tenantSearch, setTenantSearch] = useState('')
   const tenantDropdownRef = useRef<HTMLDivElement>(null)
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
+  const statusDropdownRef = useRef<HTMLDivElement>(null)
+  const [zoneStatusDropdownOpen, setZoneStatusDropdownOpen] = useState(false)
+  const zoneStatusDropdownRef = useRef<HTMLDivElement>(null)
   const [columnsOpen, setColumnsOpen] = useState(false)
   const columnsRef = useRef<HTMLDivElement>(null)
 
@@ -220,6 +236,24 @@ export default function DomainsTableView({
   }, [tenantDropdownOpen])
 
   useEffect(() => {
+    if (!statusDropdownOpen) return
+    const onDoc = (e: MouseEvent) => {
+      if (!statusDropdownRef.current?.contains(e.target as Node)) setStatusDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [statusDropdownOpen])
+
+  useEffect(() => {
+    if (!zoneStatusDropdownOpen) return
+    const onDoc = (e: MouseEvent) => {
+      if (!zoneStatusDropdownRef.current?.contains(e.target as Node)) setZoneStatusDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [zoneStatusDropdownOpen])
+
+  useEffect(() => {
     if (!columnsOpen) return
     const onDoc = (e: MouseEvent) => {
       if (!columnsRef.current?.contains(e.target as Node)) setColumnsOpen(false)
@@ -228,13 +262,31 @@ export default function DomainsTableView({
     return () => document.removeEventListener('mousedown', onDoc)
   }, [columnsOpen])
 
+  const STATUS_OPTIONS: { value: string; label: string }[] = [
+    { value: 'active',    label: t('dashboard_active') },
+    { value: 'pending',   label: t('dashboard_pending') },
+    { value: 'suspended', label: t('dashboard_suspended') },
+    { value: 'deleted',   label: t('domains_deleted') },
+  ]
+  const ZONE_STATUS_OPTIONS: { value: string; label: string }[] = [
+    { value: 'clean', label: t('zone_clean') },
+    { value: 'dirty', label: t('zone_dirty') },
+    { value: 'error', label: t('zone_error') },
+  ]
+  const statusButtonLabel = STATUS_OPTIONS.find(o => o.value === status)?.label ?? t('domains_allStatuses')
+  const zoneStatusButtonLabel = ZONE_STATUS_OPTIONS.find(o => o.value === zoneStatus)?.label ?? t('domains_allZoneStatuses')
+
   const { data: stats } = useQuery({
     queryKey: ['domain-stats'],
     queryFn: () => getDomainStats().then(r => r.data),
   })
 
   const sorted = useMemo(() => {
-    const arr = [...domains]
+    const arr = domains.filter(d => {
+      if (status && d.status !== status) return false
+      if (zoneStatus && d.zone_status !== zoneStatus) return false
+      return true
+    })
     arr.sort((a, b) => {
       const [col, dir] = sort
       let cmp = 0
@@ -251,7 +303,7 @@ export default function DomainsTableView({
       return dir === 'asc' ? cmp : -cmp
     })
     return arr
-  }, [domains, sort])
+  }, [domains, sort, status, zoneStatus])
 
   const tableScrollRef = useRef<HTMLDivElement>(null)
   const virtualizer = useVirtualizer({
@@ -413,6 +465,84 @@ export default function DomainsTableView({
             )}
           </div>
         )}
+
+        <div ref={statusDropdownRef} style={{ position: 'relative', minWidth: 160 }}>
+          <button
+            type="button"
+            onClick={() => setStatusDropdownOpen(v => !v)}
+            style={{
+              ...filterStyles.searchInput, width: '100%', boxSizing: 'border-box' as const,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              cursor: 'pointer', textAlign: 'left' as const,
+              outline: status ? '2px solid #2563eb' : undefined,
+            }}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, color: status ? '#111827' : '#9ca3af' }}>
+              {statusButtonLabel}
+            </span>
+            <span style={{ fontSize: '.65rem', color: '#9ca3af', marginLeft: 4, flexShrink: 0 }}>{status ? '' : '▼'}</span>
+          </button>
+          {status && (
+            <button
+              onClick={() => { setStatus(''); setStatusDropdownOpen(false) }}
+              style={{ ...filterStyles.btnClear, position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)' }}
+              title="Clear"
+            >✕</button>
+          )}
+          {statusDropdownOpen && (
+            <div style={filterStyles.labelDropdown}>
+              {STATUS_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onMouseDown={e => { e.preventDefault(); setStatus(opt.value); setStatusDropdownOpen(false) }}
+                  style={filterStyles.labelDropdownItem}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div ref={zoneStatusDropdownRef} style={{ position: 'relative', minWidth: 160 }}>
+          <button
+            type="button"
+            onClick={() => setZoneStatusDropdownOpen(v => !v)}
+            style={{
+              ...filterStyles.searchInput, width: '100%', boxSizing: 'border-box' as const,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              cursor: 'pointer', textAlign: 'left' as const,
+              outline: zoneStatus ? '2px solid #2563eb' : undefined,
+            }}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, color: zoneStatus ? '#111827' : '#9ca3af' }}>
+              {zoneStatusButtonLabel}
+            </span>
+            <span style={{ fontSize: '.65rem', color: '#9ca3af', marginLeft: 4, flexShrink: 0 }}>{zoneStatus ? '' : '▼'}</span>
+          </button>
+          {zoneStatus && (
+            <button
+              onClick={() => { setZoneStatus(''); setZoneStatusDropdownOpen(false) }}
+              style={{ ...filterStyles.btnClear, position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)' }}
+              title="Clear"
+            >✕</button>
+          )}
+          {zoneStatusDropdownOpen && (
+            <div style={filterStyles.labelDropdown}>
+              {ZONE_STATUS_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onMouseDown={e => { e.preventDefault(); setZoneStatus(opt.value); setZoneStatusDropdownOpen(false) }}
+                  style={filterStyles.labelDropdownItem}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <FilterPersistControls
           persist={filtersPersist}

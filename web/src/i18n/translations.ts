@@ -103,6 +103,8 @@ export const translations = {
     domains_nsWarning:           'NS records don\'t point to our nameservers',
     domains_purging:             'Purging…',
     domains_suspended:           'suspended',
+    domains_allStatuses:         'All statuses',
+    domains_allZoneStatuses:     'All zone statuses',
 
     // Domain detail
     domainDetail_backLink:         '← Domains',
@@ -651,6 +653,8 @@ export const translations = {
     domains_nsWarning:           'NS-Einträge zeigen nicht auf unsere Nameserver',
     domains_purging:             'Wird gelöscht…',
     domains_suspended:           'gesperrt',
+    domains_allStatuses:         'Alle Status',
+    domains_allZoneStatuses:     'Alle Zonen-Status',
 
     // Domain detail
     domainDetail_backLink:         '← Domains',
