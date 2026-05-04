@@ -36,8 +36,10 @@ export async function writeAtomic(destPath: string, content: string): Promise<vo
 
 /**
  * Atomically writes a zone file and reloads BIND.
- * Always does reconfig before reload so newly added zones are registered.
- * Retries reload if BIND hasn't finished processing reconfig yet.
+ * Reconfig is NOT done here on the happy path — the caller (worker) runs
+ * regenerateNamedConf() before deployZone whenever the active zone set
+ * changes, which already issues rndc reconfig. The retry-on-not-found path
+ * still triggers a defensive reconfig in case BIND's view diverged.
  */
 export async function deployZone(fqdn: string, content: string): Promise<void> {
   assertFqdn(fqdn)
@@ -53,7 +55,6 @@ export async function deployZone(fqdn: string, content: string): Promise<void> {
   await unlink(`${zonePath}.jbk`).catch(() => {})
 
   await writeAtomic(zonePath, content)
-  await rndcReconfig(RNDC_HOST, RNDC_PORT)
 
   // BIND may need a moment after reconfig to register a new zone.
   // Retry reload up to 5 times with 1s between attempts.
@@ -66,7 +67,7 @@ export async function deployZone(fqdn: string, content: string): Promise<void> {
       if (notFound && attempt < 5) {
         console.log(`[deploy] rndc reload ${fqdn} not found (attempt ${attempt}/5), retrying after ${attempt}s...`)
         await new Promise(r => setTimeout(r, 1000 * attempt))
-        // Re-issue reconfig in case BIND dropped it
+        // BIND lost track of the zone — force a reconfig to re-register it
         await rndcReconfig(RNDC_HOST, RNDC_PORT).catch(() => {})
         continue
       }

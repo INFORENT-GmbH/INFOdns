@@ -18,7 +18,8 @@ import { join } from 'path'
 const BIND_KEYS_DIR = process.env.BIND_KEYS_DIR ?? '/bind/primary/keys'
 
 const POLL_INTERVAL_MS         = Number(process.env.POLL_INTERVAL_MS ?? 2000)
-const BATCH_SIZE               = Number(process.env.BATCH_SIZE ?? 10)
+const BATCH_SIZE               = Number(process.env.BATCH_SIZE ?? 100)
+const WORKER_CONCURRENCY       = Number(process.env.WORKER_CONCURRENCY ?? 10)
 const MAIL_ADMIN_TO            = process.env.MAIL_ADMIN_TO ?? ''
 const ALIAS_REFRESH_INTERVAL_MS = Number(process.env.ALIAS_REFRESH_INTERVAL_MS ?? 10_000)
 
@@ -177,6 +178,35 @@ function extractAndStoreDsAsync(domainId: number, fqdn: string, tenantId: number
   }).catch(err => console.warn(`[worker] DS extraction for ${fqdn} failed: ${err.message}`))
 }
 
+// ── named.conf cache ─────────────────────────────────────────
+// regenerateNamedConf() is expensive (write file + rndc reconfig + rndc reload
+// of catalog zone). For most renders — record edits on existing zones — the
+// active zone set hasn't changed, so the conf doesn't need rewriting. We
+// fingerprint the zone set and skip the rewrite when it matches the last
+// successfully-applied state. The 60s syncNamedConf tick still force-rewrites
+// to catch out-of-band drift.
+
+let lastConfFingerprint: string | null = null
+// Serialize ensureNamedConf so parallel jobs in the same batch don't all
+// race to rewrite named.conf.local. The chain catches errors per-call so a
+// single failure doesn't poison subsequent calls.
+let confChain: Promise<unknown> = Promise.resolve()
+
+function fingerprintZones(zones: { fqdn: string; dnssec_enabled: boolean }[]): string {
+  return zones.map(z => `${z.fqdn}|${z.dnssec_enabled ? 1 : 0}`).sort().join(';')
+}
+
+async function ensureNamedConf(zones: { fqdn: string; dnssec_enabled: boolean }[]): Promise<void> {
+  const next = confChain.catch(() => {}).then(async () => {
+    const fp = fingerprintZones(zones)
+    if (fp === lastConfFingerprint) return
+    await regenerateNamedConf(zones)
+    lastConfFingerprint = fp
+  })
+  confChain = next
+  return next
+}
+
 // ── Core render pipeline ─────────────────────────────────────
 
 async function processJob(job: QueueRow): Promise<void> {
@@ -192,7 +222,7 @@ async function processJob(job: QueueRow): Promise<void> {
     const allDomains = await query<{ fqdn: string; dnssec_enabled: number }>(
       "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' AND publish = 1 ORDER BY fqdn"
     )
-    await regenerateNamedConf(allDomains.map(r => ({ fqdn: r.fqdn, dnssec_enabled: !!r.dnssec_enabled })))
+    await ensureNamedConf(allDomains.map(r => ({ fqdn: r.fqdn, dnssec_enabled: !!r.dnssec_enabled })))
     await execute("UPDATE zone_render_queue SET status = 'done', updated_at = NOW() WHERE id = ?", [job.id])
     console.log(`[worker] Job ${job.id} — ${domain.fqdn} is ${domain.status}, synced named.conf, skipped render`)
     return
@@ -203,7 +233,7 @@ async function processJob(job: QueueRow): Promise<void> {
     const allDomains = await query<{ fqdn: string; dnssec_enabled: number }>(
       "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' AND publish = 1 ORDER BY fqdn"
     )
-    await regenerateNamedConf(allDomains.map(r => ({ fqdn: r.fqdn, dnssec_enabled: !!r.dnssec_enabled })))
+    await ensureNamedConf(allDomains.map(r => ({ fqdn: r.fqdn, dnssec_enabled: !!r.dnssec_enabled })))
     await execute("UPDATE zone_render_queue SET status = 'done', updated_at = NOW() WHERE id = ?", [job.id])
     console.log(`[worker] Job ${job.id} — ${domain.fqdn} has publish=0, synced named.conf, skipped render`)
     return
@@ -263,13 +293,12 @@ async function processJob(job: QueueRow): Promise<void> {
     throw new Error(`named-checkzone failed: ${validation.error}`)
   }
 
-  // Step 6: Ensure named.conf.local is up-to-date (covers newly added domains)
+  // Step 6: Ensure named.conf.local is up-to-date (covers newly added domains).
+  // Cached: skipped when the active zone set hasn't changed since the last render.
   const allDomains = await query<{ fqdn: string; dnssec_enabled: number }>(
     "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' AND publish = 1 ORDER BY fqdn"
   )
-  const allZones = allDomains.map(r => r.fqdn)
-  console.log(`[worker] Syncing named.conf.local with ${allZones.length} zones (includes ${domain.fqdn}: ${allZones.includes(domain.fqdn)})`)
-  await regenerateNamedConf(allDomains.map(r => ({ fqdn: r.fqdn, dnssec_enabled: !!r.dnssec_enabled })))
+  await ensureNamedConf(allDomains.map(r => ({ fqdn: r.fqdn, dnssec_enabled: !!r.dnssec_enabled })))
 
   // Step 7: Atomic file replace + rndc reload
   await deployZone(domain.fqdn, content)
@@ -319,8 +348,55 @@ async function processJob(job: QueueRow): Promise<void> {
 
 let running = true
 
-async function poll(): Promise<void> {
-  // Claim a batch of pending jobs with optimistic locking
+async function runJob(job: QueueRow): Promise<void> {
+  try {
+    await processJob(job)
+  } catch (err: any) {
+    console.error(`[worker] Job ${job.id} failed:`, err.message)
+    const newRetries = job.retries + 1
+    if (newRetries >= job.max_retries) {
+      await execute(
+        `UPDATE zone_render_queue SET status = 'failed', retries = ?, error = ?, updated_at = NOW() WHERE id = ?`,
+        [newRetries, err.message, job.id]
+      )
+      await execute("UPDATE domains SET zone_status = 'error' WHERE id = ?", [job.domain_id])
+      const failedDomain = await queryOne<{ fqdn: string; tenant_id: number }>('SELECT fqdn, tenant_id FROM domains WHERE id = ?', [job.domain_id])
+      if (failedDomain) {
+        broadcastEvent({ type: 'domain_status', domainId: job.domain_id, fqdn: failedDomain.fqdn, zone_status: 'error', tenantId: failedDomain.tenant_id, zone_error: err.message })
+        if (MAIL_ADMIN_TO) {
+          await queueMail(MAIL_ADMIN_TO, 'zone_deploy_failed', { fqdn: failedDomain.fqdn, jobId: job.id, retries: newRetries, error: err.message })
+        }
+      }
+    } else {
+      // Back to pending for retry
+      await execute(
+        `UPDATE zone_render_queue SET status = 'pending', retries = ?, error = ?, updated_at = NOW() WHERE id = ?`,
+        [newRetries, err.message, job.id]
+      )
+    }
+  }
+}
+
+// Spawn up to `concurrency` workers pulling from a shared index. Errors
+// inside fn must be handled by fn itself (we don't want one bad job to
+// poison the whole batch).
+async function parallelMap<T>(items: T[], concurrency: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let i = 0
+  const n = Math.min(concurrency, items.length)
+  const workers = Array.from({ length: n }, async () => {
+    while (true) {
+      const idx = i++
+      if (idx >= items.length) return
+      await fn(items[idx])
+    }
+  })
+  await Promise.all(workers)
+}
+
+async function poll(): Promise<boolean> {
+  // Claim a batch of pending jobs with optimistic locking.
+  // Returns true if at least one job was claimed, so the main loop can skip
+  // its idle sleep and immediately drain the rest of the queue.
   const candidates = await query<QueueRow>(
     `SELECT id, domain_id, retries, max_retries
      FROM zone_render_queue
@@ -330,42 +406,22 @@ async function poll(): Promise<void> {
     [BATCH_SIZE]
   )
 
+  // Claim phase — serial because each row is its own UPDATE.
+  const claimed: QueueRow[] = []
   for (const job of candidates) {
-    // Optimistic claim — only one worker will succeed per job
     const result = await execute(
       `UPDATE zone_render_queue SET status = 'processing', updated_at = NOW()
        WHERE id = ? AND status = 'pending'`,
       [job.id]
     )
-    if (result.affectedRows === 0) continue  // another worker claimed it
-
-    try {
-      await processJob(job)
-    } catch (err: any) {
-      console.error(`[worker] Job ${job.id} failed:`, err.message)
-      const newRetries = job.retries + 1
-      if (newRetries >= job.max_retries) {
-        await execute(
-          `UPDATE zone_render_queue SET status = 'failed', retries = ?, error = ?, updated_at = NOW() WHERE id = ?`,
-          [newRetries, err.message, job.id]
-        )
-        await execute("UPDATE domains SET zone_status = 'error' WHERE id = ?", [job.domain_id])
-        const failedDomain = await queryOne<{ fqdn: string; tenant_id: number }>('SELECT fqdn, tenant_id FROM domains WHERE id = ?', [job.domain_id])
-        if (failedDomain) {
-          broadcastEvent({ type: 'domain_status', domainId: job.domain_id, fqdn: failedDomain.fqdn, zone_status: 'error', tenantId: failedDomain.tenant_id, zone_error: err.message })
-          if (MAIL_ADMIN_TO) {
-            await queueMail(MAIL_ADMIN_TO, 'zone_deploy_failed', { fqdn: failedDomain.fqdn, jobId: job.id, retries: newRetries, error: err.message })
-          }
-        }
-      } else {
-        // Back to pending for retry
-        await execute(
-          `UPDATE zone_render_queue SET status = 'pending', retries = ?, error = ?, updated_at = NOW() WHERE id = ?`,
-          [newRetries, err.message, job.id]
-        )
-      }
-    }
+    if (result.affectedRows > 0) claimed.push(job)
   }
+  if (claimed.length === 0) return false
+
+  // Execute phase — bounded parallelism. Per-domain renders are independent
+  // (different DB rows, different zone files); ensureNamedConf is mutex-guarded.
+  await parallelMap(claimed, WORKER_CONCURRENCY, runJob)
+  return true
 }
 
 // ── named.conf.local maintenance ─────────────────────────────
@@ -377,7 +433,9 @@ async function syncNamedConf(): Promise<void> {
       "SELECT fqdn, dnssec_enabled FROM domains WHERE status = 'active' AND publish = 1 ORDER BY fqdn"
     )
     const zones = rows.map(r => ({ fqdn: r.fqdn, dnssec_enabled: !!r.dnssec_enabled }))
+    // Force regenerate (bypass per-job cache) so out-of-band drift gets corrected.
     await regenerateNamedConf(zones)
+    lastConfFingerprint = fingerprintZones(zones)
     console.log(`[worker] named.conf.local synced — ${zones.length} zones`)
   } catch (err: any) {
     console.error('[worker] named.conf.local sync failed:', err.message)
@@ -443,6 +501,38 @@ async function processDomainLifecycle(): Promise<void> {
 // ── Startup: re-queue zones with missing zone files ──────────
 
 const ZONE_DIR = process.env.ZONE_DIR ?? '/bind/primary/zones'
+
+// On startup, recover from an unclean shutdown:
+//  - rows stuck in 'processing' (worker died mid-flight) → reset to 'pending'
+//  - domains marked dirty with no live queue row (queue was wiped, or an enqueue
+//    was lost) → re-queue them
+async function recoverStuckJobs(): Promise<void> {
+  const reset = await execute(
+    "UPDATE zone_render_queue SET status = 'pending', updated_at = NOW() WHERE status = 'processing'"
+  )
+  if (reset.affectedRows > 0) {
+    console.log(`[worker] Recovered ${reset.affectedRows} stuck 'processing' jobs`)
+  }
+
+  const dirty = await query<{ id: number; fqdn: string }>(
+    `SELECT d.id, d.fqdn
+     FROM domains d
+     LEFT JOIN zone_render_queue q
+       ON q.domain_id = d.id AND q.status IN ('pending', 'processing')
+     WHERE d.status = 'active' AND d.publish = 1
+       AND d.zone_status = 'dirty' AND q.id IS NULL`
+  )
+  for (const d of dirty) {
+    await execute(
+      `INSERT INTO zone_render_queue (domain_id, priority) VALUES (?, 5)
+       ON DUPLICATE KEY UPDATE status = 'pending', retries = 0, error = NULL, updated_at = NOW()`,
+      [d.id]
+    )
+  }
+  if (dirty.length > 0) {
+    console.log(`[worker] Re-queued ${dirty.length} dirty domains without a live queue row`)
+  }
+}
 
 async function requeueMissingZones(): Promise<void> {
   const rows = await query<{ id: number; fqdn: string }>(
@@ -548,6 +638,10 @@ async function retryDnssecExtraction(): Promise<void> {
 
 console.log('[worker] Starting INFORENT Prisma Worker')
 
+// Recover from unclean shutdown: reset stuck 'processing' rows and queue any
+// dirty domains that lost their queue row.
+await recoverStuckJobs()
+
 // Re-queue any zones missing their zone files (e.g. after redeploy)
 await requeueMissingZones()
 
@@ -596,8 +690,9 @@ let shuttingDown = false
 // Poll loop. Promise resolves once the loop exits, so shutdown can await it.
 const loopFinished = (async function loop() {
   while (running) {
+    let didWork = false
     try {
-      await poll()
+      didWork = await poll()
       if (!running) break
       await pollBulkJobs()
       if (!running) break
@@ -608,7 +703,10 @@ const loopFinished = (async function loop() {
       console.error('[worker] Poll error:', err.message)
     }
     if (!running) break
-    // Sleep, but wake immediately on shutdown so we don't add up to POLL_INTERVAL_MS of latency.
+    // When poll() drained zone-render jobs, immediately re-poll to keep up with
+    // a backlog instead of waiting POLL_INTERVAL_MS between batches. Sleep only
+    // when the queue was empty. Always wake on shutdown so we don't add latency.
+    if (didWork) continue
     await new Promise<void>(resolve => {
       const t = setTimeout(resolve, POLL_INTERVAL_MS)
       shutdownWakeups.push(() => { clearTimeout(t); resolve() })
