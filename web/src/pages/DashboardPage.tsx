@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { usePageTitle } from '../hooks/usePageTitle'
 import { Link } from 'react-router-dom'
 import {
   getDomainStats,
@@ -17,6 +18,7 @@ const NS_LABELS: Record<string, string> = {
 }
 
 export default function DashboardPage() {
+  usePageTitle('Dashboard')
   const { t } = useI18n()
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'

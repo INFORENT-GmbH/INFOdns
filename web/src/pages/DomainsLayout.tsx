@@ -3,6 +3,7 @@ import { Outlet, useMatch } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getDomains, getLabelSuggestions, getTenants, type Domain, type LabelSuggestion, type Tenant } from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { usePageTitle } from '../hooks/usePageTitle'
 import DomainsPage from './DomainsPage'
 import DomainsTableView from './DomainsDashboard'
 import { getDirtyDomainFqdns } from '../hooks/domainEditCache'
@@ -25,6 +26,7 @@ const DOMAIN_FILTER_DEFAULTS = {
 }
 
 export default function DomainsLayout() {
+  usePageTitle('Domains')
   const { user } = useAuth()
   const isMobile = useIsMobile()
 

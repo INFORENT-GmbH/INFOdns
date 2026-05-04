@@ -1,12 +1,13 @@
-import React, { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { usePageTitle } from '../hooks/usePageTitle'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getMailQueue, getMailQueueItem, retryMail, type MailQueueItem } from '../api/client'
 import Dropdown, { DropdownItem } from '../components/Dropdown'
 import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
-import ListPage from '../components/ListPage'
 import ListTable from '../components/ListTable'
+import MasterDetailLayout from '../components/MasterDetailLayout'
 import { useI18n } from '../i18n/I18nContext'
 import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import * as s from '../styles/shell'
@@ -17,6 +18,7 @@ const LIMIT = 50
 const MAIL_FILTER_DEFAULTS = { search: '', status: '', template: '' }
 
 export default function MailQueuePage() {
+  usePageTitle('Mail Queue')
   const { t } = useI18n()
   const qc = useQueryClient()
   const {
@@ -33,7 +35,7 @@ export default function MailQueuePage() {
   const clearFilters = () => { clearFiltersInternal(); setPage(1) }
   const [page, setPage] = useState(1)
   const [acting, setActing] = useState<number | null>(null)
-  const [expanded, setExpanded] = useState<number | null>(null)
+  const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const params: Record<string, string> = {
     page: String(page),
@@ -54,6 +56,11 @@ export default function MailQueuePage() {
   const totalPages = data?.pages ?? 1
   const total = data?.total ?? 0
   const templates = data?.templates ?? []
+
+  const selectedItem = useMemo(
+    () => selectedId !== null ? items.find(m => m.id === selectedId) ?? null : null,
+    [items, selectedId]
+  )
 
   async function handleRetry(id: number) {
     setActing(id)
@@ -80,185 +87,209 @@ export default function MailQueuePage() {
     )
   }
 
-  const statusBtnLabel = statusFilter || t('mailQueue_allStatuses')
+  const statusBtnLabel   = statusFilter || t('mailQueue_allStatuses')
   const templateBtnLabel = templateFilter || t('mailQueue_allTemplates')
 
-  return (
-    <ListPage>
-        {/* Stats / count bar */}
-        <FilterBar>
-          <span style={localStyles.countPill}>
-            {total > 0
-              ? `${total.toLocaleString()} ${t('mailQueue_entries')}`
-              : t('mailQueue_noEntries')}
-          </span>
-        </FilterBar>
-
-        {/* Filter bar */}
-        <FilterBar>
-          <SearchInput
-            value={searchFilter}
-            onChange={setSearchFilter}
-            placeholder={t('mailQueue_searchPlaceholder')}
-            width={240}
-          />
-
+  // Shared filter bars
+  const filterBars = (
+    <>
+      <FilterBar>
+        <span style={localStyles.countPill}>
+          {total > 0
+            ? `${total.toLocaleString()} ${t('mailQueue_entries')}`
+            : t('mailQueue_noEntries')}
+        </span>
+      </FilterBar>
+      <FilterBar>
+        <SearchInput value={searchFilter} onChange={setSearchFilter} placeholder={t('mailQueue_searchPlaceholder')} width={240} />
+        <Dropdown
+          label={<span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: statusFilter ? '#111827' : '#9ca3af' }}>{statusBtnLabel}</span>}
+          active={!!statusFilter}
+          onClear={() => setStatusFilter('')}
+          width={160}
+        >
+          {close => (
+            <>
+              <DropdownItem onSelect={() => { setStatusFilter(''); close() }}><span style={{ color: '#6b7280' }}>{t('mailQueue_allStatuses')}</span></DropdownItem>
+              {STATUSES.map(opt => <DropdownItem key={opt} onSelect={() => { setStatusFilter(opt); close() }}>{opt}</DropdownItem>)}
+            </>
+          )}
+        </Dropdown>
+        {templates.length > 0 && (
           <Dropdown
-            label={
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: statusFilter ? '#111827' : '#9ca3af' }}>
-                {statusBtnLabel}
-              </span>
-            }
-            active={!!statusFilter}
-            onClear={() => setStatusFilter('')}
-            width={160}
+            label={<span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: templateFilter ? '#111827' : '#9ca3af' }}>{templateBtnLabel}</span>}
+            active={!!templateFilter}
+            onClear={() => setTemplateFilter('')}
+            width={200}
           >
             {close => (
               <>
-                <DropdownItem onSelect={() => { setStatusFilter(''); close() }}>
-                  <span style={{ color: '#6b7280' }}>{t('mailQueue_allStatuses')}</span>
-                </DropdownItem>
-                {STATUSES.map(opt => (
-                  <DropdownItem key={opt} onSelect={() => { setStatusFilter(opt); close() }}>
-                    {opt}
-                  </DropdownItem>
-                ))}
+                <DropdownItem onSelect={() => { setTemplateFilter(''); close() }}><span style={{ color: '#6b7280' }}>{t('mailQueue_allTemplates')}</span></DropdownItem>
+                {templates.map(tpl => <DropdownItem key={tpl} onSelect={() => { setTemplateFilter(tpl); close() }}>{tpl}</DropdownItem>)}
               </>
             )}
           </Dropdown>
+        )}
+        <FilterPersistControls
+          persist={filtersPersist}
+          setPersist={setFiltersPersist}
+          onClear={clearFilters}
+          hasActive={filtersHasActive}
+          style={{ marginLeft: 'auto' }}
+        />
+      </FilterBar>
+    </>
+  )
 
-          {templates.length > 0 && (
-            <Dropdown
-              label={
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: templateFilter ? '#111827' : '#9ca3af' }}>
-                  {templateBtnLabel}
-                </span>
-              }
-              active={!!templateFilter}
-              onClear={() => setTemplateFilter('')}
-              width={200}
-            >
-              {close => (
-                <>
-                  <DropdownItem onSelect={() => { setTemplateFilter(''); close() }}>
-                    <span style={{ color: '#6b7280' }}>{t('mailQueue_allTemplates')}</span>
-                  </DropdownItem>
-                  {templates.map(tpl => (
-                    <DropdownItem key={tpl} onSelect={() => { setTemplateFilter(tpl); close() }}>
-                      {tpl}
-                    </DropdownItem>
-                  ))}
-                </>
-              )}
-            </Dropdown>
-          )}
+  const pagination = totalPages > 1 && (
+    <div style={localStyles.pagination}>
+      <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={localStyles.pageBtn}>←</button>
+      <span style={localStyles.pageInfo}>{t('mailQueue_page')} {page} {t('mailQueue_of')} {totalPages}</span>
+      <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={localStyles.pageBtn}>→</button>
+    </div>
+  )
 
-          <FilterPersistControls
-            persist={filtersPersist}
-            setPersist={setFiltersPersist}
-            onClear={clearFilters}
-            hasActive={filtersHasActive}
-            style={{ marginLeft: 'auto' }}
-          />
-        </FilterBar>
-
-        {/* Table */}
-        <ListTable>
-          {isLoading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>{t('loading')}</div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', transition: 'opacity .15s', opacity: isFetching ? 0.6 : 1 }}>
-              <thead>
-                <tr>
-                  <th style={s.th}>ID</th>
-                  <th style={s.th}>{t('mailQueue_recipient')}</th>
-                  <th style={s.th}>{t('mailQueue_template')}</th>
-                  <th style={s.th}>{t('status')}</th>
-                  <th style={s.th}>{t('mailQueue_retries')}</th>
-                  <th style={s.th}>{t('created')}</th>
-                  <th style={s.th}>{t('mailQueue_error')}</th>
-                  <th style={s.th}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((m) => (
-                  <MailRow
+  // ── Dashboard ──────────────────────────────────────────────────
+  const dashboard = (
+    <>
+      {filterBars}
+      <ListTable>
+        {isLoading ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>{t('loading')}</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', transition: 'opacity .15s', opacity: isFetching ? 0.6 : 1 }}>
+            <thead>
+              <tr>
+                <th style={s.th}>ID</th>
+                <th style={s.th}>{t('mailQueue_recipient')}</th>
+                <th style={s.th}>{t('mailQueue_template')}</th>
+                <th style={s.th}>{t('status')}</th>
+                <th style={s.th}>{t('mailQueue_retries')}</th>
+                <th style={s.th}>{t('created')}</th>
+                <th style={s.th}>{t('mailQueue_error')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map(m => {
+                const isSel = selectedId === m.id
+                return (
+                  <tr
                     key={m.id}
-                    m={m}
-                    expanded={expanded === m.id}
-                    onToggle={() => setExpanded(expanded === m.id ? null : m.id)}
-                    onRetry={() => handleRetry(m.id)}
-                    acting={acting === m.id}
-                    statusBadge={statusBadge}
-                  />
-                ))}
-                {items.length === 0 && (
-                  <tr>
-                    <td colSpan={8} style={{ ...s.td, textAlign: 'center', color: '#9ca3af' }}>
-                      {t('mailQueue_noEntries')}
+                    onClick={() => setSelectedId(m.id)}
+                    style={{ cursor: 'pointer', background: isSel ? '#eff6ff' : undefined }}
+                    onMouseOver={e => { if (!isSel) e.currentTarget.style.background = '#f1f5f9' }}
+                    onMouseOut={e => { if (!isSel) e.currentTarget.style.background = '' }}
+                  >
+                    <td style={s.td}>{m.id}</td>
+                    <td style={s.td}>{m.to_email}</td>
+                    <td style={s.td}><code style={localStyles.code}>{m.template ?? '—'}</code></td>
+                    <td style={s.td}>{statusBadge(m.status)}</td>
+                    <td style={s.td}>{m.retries}/{m.max_retries}</td>
+                    <td style={{ ...s.td, color: '#64748b' }}>{new Date(m.created_at).toLocaleString()}</td>
+                    <td style={s.td}>
+                      {m.error && <span style={localStyles.errorText} title={m.error}>{m.error.slice(0, 60)}{m.error.length > 60 ? '…' : ''}</span>}
                     </td>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </ListTable>
-
-        {totalPages > 1 && (
-          <div style={localStyles.pagination}>
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} style={localStyles.pageBtn}>←</button>
-            <span style={localStyles.pageInfo}>{t('mailQueue_page')} {page} {t('mailQueue_of')} {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={localStyles.pageBtn}>→</button>
-          </div>
+                )
+              })}
+              {items.length === 0 && (
+                <tr><td colSpan={7} style={{ ...s.td, textAlign: 'center', color: '#9ca3af' }}>{t('mailQueue_noEntries')}</td></tr>
+              )}
+            </tbody>
+          </table>
         )}
-    </ListPage>
+      </ListTable>
+      {pagination}
+    </>
   )
-}
 
-function MailRow({
-  m, expanded, onToggle, onRetry, acting, statusBadge,
-}: {
-  m: MailQueueItem
-  expanded: boolean
-  onToggle: () => void
-  onRetry: () => void
-  acting: boolean
-  statusBadge: (s: string) => React.ReactNode
-}) {
-  const { t } = useI18n()
-  return (
-    <React.Fragment>
-      <tr>
-        <td style={s.td}>{m.id}</td>
-        <td style={s.td}>{m.to_email}</td>
-        <td style={s.td}><code style={localStyles.code}>{m.template ?? '—'}</code></td>
-        <td style={s.td}>{statusBadge(m.status)}</td>
-        <td style={s.td}>{m.retries}/{m.max_retries}</td>
-        <td style={{ ...s.td, color: '#64748b' }}>{new Date(m.created_at).toLocaleString()}</td>
-        <td style={s.td}>
-          {m.error && <span style={localStyles.errorText} title={m.error}>{m.error.slice(0, 60)}{m.error.length > 60 ? '…' : ''}</span>}
-        </td>
-        <td style={s.td}>
-          <div style={localStyles.actions}>
-            <button onClick={onToggle} style={localStyles.btnView}>
-              {expanded ? t('mailQueue_hide') : t('mailQueue_view')}
-            </button>
-            {m.status === 'failed' && (
-              <button onClick={onRetry} disabled={acting} style={localStyles.btnRetry}>
-                {acting ? t('mailQueue_retrying') : t('mailQueue_retry')}
-              </button>
+  // ── Sidebar ────────────────────────────────────────────────────
+  const sidebar = (
+    <>
+      <FilterBar>
+        <SearchInput value={searchFilter} onChange={setSearchFilter} placeholder={t('mailQueue_searchPlaceholder')} width="100%" />
+      </FilterBar>
+      <FilterBar>
+        <Dropdown
+          label={<span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: statusFilter ? '#111827' : '#9ca3af' }}>{statusBtnLabel}</span>}
+          active={!!statusFilter}
+          onClear={() => setStatusFilter('')}
+          width="100%"
+        >
+          {close => (
+            <>
+              <DropdownItem onSelect={() => { setStatusFilter(''); close() }}><span style={{ color: '#6b7280' }}>{t('mailQueue_allStatuses')}</span></DropdownItem>
+              {STATUSES.map(opt => <DropdownItem key={opt} onSelect={() => { setStatusFilter(opt); close() }}>{opt}</DropdownItem>)}
+            </>
+          )}
+        </Dropdown>
+      </FilterBar>
+      <ListTable>
+        {items.map(m => {
+          const isSel = selectedId === m.id
+          return (
+            <div
+              key={m.id}
+              onClick={() => setSelectedId(m.id)}
+              style={{
+                padding: '.5rem .75rem',
+                cursor: 'pointer',
+                borderBottom: '1px solid #f1f5f9',
+                background: isSel ? '#eff6ff' : 'transparent',
+              }}
+            >
+              <div style={{ fontSize: '.8125rem', fontWeight: isSel ? 600 : 500, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {m.to_email}
+              </div>
+              <div style={{ display: 'flex', gap: '.35rem', alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
+                {statusBadge(m.status)}
+                {m.template && <code style={localStyles.code}>{m.template}</code>}
+              </div>
+            </div>
+          )
+        })}
+      </ListTable>
+      {pagination}
+    </>
+  )
+
+  // ── Detail pane ────────────────────────────────────────────────
+  const detailPane = (
+    <div style={localStyles.detailPane}>
+      <div style={localStyles.detailHeader}>
+        <button onClick={() => setSelectedId(null)} style={localStyles.backBtn}>← {t('cancel')}</button>
+        <h3 style={localStyles.detailTitle}>{selectedItem ? `Mail #${selectedItem.id}` : ''}</h3>
+        {selectedItem && statusBadge(selectedItem.status)}
+        {selectedItem?.status === 'failed' && (
+          <button onClick={() => handleRetry(selectedItem.id)} disabled={acting === selectedItem.id} style={localStyles.btnRetry}>
+            {acting === selectedItem.id ? t('mailQueue_retrying') : t('mailQueue_retry')}
+          </button>
+        )}
+      </div>
+      {selectedItem && (
+        <>
+          <div style={localStyles.metaGrid}>
+            <div><strong>{t('mailQueue_recipient')}:</strong> {selectedItem.to_email}</div>
+            <div><strong>{t('mailQueue_template')}:</strong> {selectedItem.template ? <code style={localStyles.code}>{selectedItem.template}</code> : '—'}</div>
+            <div><strong>{t('mailQueue_retries')}:</strong> {selectedItem.retries}/{selectedItem.max_retries}</div>
+            <div><strong>{t('created')}:</strong> {new Date(selectedItem.created_at).toLocaleString()}</div>
+            {selectedItem.error && (
+              <div style={{ gridColumn: '1 / -1' }}><strong>{t('mailQueue_error')}:</strong> <span style={localStyles.errorText}>{selectedItem.error}</span></div>
             )}
           </div>
-        </td>
-      </tr>
-      {expanded && (
-        <tr>
-          <td colSpan={8} style={localStyles.detailCell}>
-            <MailDetail id={m.id} />
-          </td>
-        </tr>
+          <MailDetail id={selectedItem.id} />
+        </>
       )}
-    </React.Fragment>
+    </div>
+  )
+
+  return (
+    <MasterDetailLayout
+      dashboard={dashboard}
+      sidebar={sidebar}
+      detail={detailPane}
+      isOpen={selectedId !== null}
+    />
   )
 }
 
@@ -323,21 +354,23 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const localStyles: Record<string, React.CSSProperties> = {
-  countPill:   { display: 'inline-flex', alignItems: 'center', fontSize: '.8125rem', color: '#475569', background: '#e2e8f0', borderRadius: 4, padding: '1px 8px' },
-  muted:       { color: '#94a3b8', fontSize: '.875rem' },
-  code:        { background: '#f1f5f9', padding: '1px 6px', borderRadius: 3, fontSize: '.8rem', fontFamily: 'monospace' },
-  errorText:   { color: '#b91c1c', fontSize: '.8rem' },
-  actions:     { display: 'flex', gap: '.35rem' },
-  btnRetry:    { padding: '.25rem .5rem', background: '#fbbf24', color: '#78350f', border: 'none', borderRadius: 4, fontSize: '.75rem', fontWeight: 600, cursor: 'pointer' },
-  btnView:     { padding: '.25rem .5rem', background: '#fff', color: '#374151', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '.75rem', fontWeight: 500, cursor: 'pointer' },
-  pagination:  { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.75rem', padding: '.75rem 0', borderTop: '1px solid #e2e8f0', flexShrink: 0 },
-  pageBtn:     { padding: '.25rem .5rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, cursor: 'pointer', fontSize: '.8125rem', color: '#374151' },
-  pageInfo:    { fontSize: '.8125rem', color: '#64748b' },
-  detailCell:  { padding: '.75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
-  detailGrid:  { display: 'flex', flexDirection: 'column', gap: '.75rem' },
-  fieldLabel:  { fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 },
-  subjectText: { fontSize: '.875rem', color: '#1e293b', fontWeight: 500 },
-  pre:         { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, padding: '.5rem .75rem', margin: 0, fontSize: '.75rem', fontFamily: 'monospace', color: '#1e293b', overflow: 'auto', maxHeight: 240, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
-  iframe:      { width: '100%', minHeight: 320, border: '1px solid #e2e8f0', borderRadius: 4, background: '#fff' },
-  renderError: { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 4, padding: '.5rem .75rem', fontSize: '.8125rem' },
+  countPill:    { display: 'inline-flex', alignItems: 'center', fontSize: '.8125rem', color: '#475569', background: '#e2e8f0', borderRadius: 4, padding: '1px 8px' },
+  detailPane:   { padding: '1rem 1.5rem' },
+  detailHeader: { display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1rem', flexWrap: 'wrap' as const },
+  detailTitle:  { margin: 0, fontSize: '1rem', fontWeight: 700, color: '#1e293b', flex: 1 },
+  backBtn:      { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '.875rem', padding: 0 },
+  metaGrid:     { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '.5rem 1rem', fontSize: '.8125rem', color: '#374151', marginBottom: '1rem' },
+  muted:        { color: '#94a3b8', fontSize: '.875rem' },
+  code:         { background: '#f1f5f9', padding: '1px 6px', borderRadius: 3, fontSize: '.8rem', fontFamily: 'monospace' },
+  errorText:    { color: '#b91c1c', fontSize: '.8rem' },
+  btnRetry:     { padding: '.25rem .625rem', background: '#fbbf24', color: '#78350f', border: 'none', borderRadius: 4, fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' },
+  pagination:   { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.75rem', padding: '.75rem 0', borderTop: '1px solid #e2e8f0', flexShrink: 0 },
+  pageBtn:      { padding: '.25rem .5rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, cursor: 'pointer', fontSize: '.8125rem', color: '#374151' },
+  pageInfo:     { fontSize: '.8125rem', color: '#64748b' },
+  detailGrid:   { display: 'flex', flexDirection: 'column' as const, gap: '.75rem' },
+  fieldLabel:   { fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '.04em', marginBottom: 4 },
+  subjectText:  { fontSize: '.875rem', color: '#1e293b', fontWeight: 500 },
+  pre:          { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, padding: '.5rem .75rem', margin: 0, fontSize: '.75rem', fontFamily: 'monospace', color: '#1e293b', overflow: 'auto', maxHeight: 280, whiteSpace: 'pre-wrap' as const, wordBreak: 'break-word' as const },
+  iframe:       { width: '100%', minHeight: 320, border: '1px solid #e2e8f0', borderRadius: 4, background: '#fff' },
+  renderError:  { background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: 4, padding: '.5rem .75rem', fontSize: '.8125rem' },
 }

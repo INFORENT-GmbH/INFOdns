@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { usePageTitle } from '../hooks/usePageTitle'
 import { saveDomainEdits, loadDomainEdits, clearDomainEdits, setLiveDirty } from '../hooks/domainEditCache'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -191,6 +192,7 @@ function HeaderOverflowMenu({ items }: { items: OverflowItem[] }) {
 
 export default function DomainDetailPage() {
   const { name } = useParams<{ name: string }>()
+  usePageTitle(name)
   const qc = useQueryClient()
   const navigate = useNavigate()
   const { t } = useI18n()

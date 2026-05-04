@@ -2,10 +2,12 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
+import { usePageTitle } from '../hooks/usePageTitle'
 
 export default function LoginPage() {
   const { login } = useAuth()
   const { t, locale, setLocale } = useI18n()
+  usePageTitle()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -26,12 +28,24 @@ export default function LoginPage() {
     }
   }
 
+  const features = [
+    { icon: '☁️', title: t('login_feat1Title'), body: t('login_feat1Body') },
+    { icon: '🌐', title: t('login_feat2Title'), body: t('login_feat2Body') },
+    { icon: '💶', title: t('login_feat3Title'), body: t('login_feat3Body') },
+  ]
+
   return (
     <div style={styles.wrapper}>
       <span style={styles.copyright}>&copy; 1988&ndash;2026 INFORENT GmbH</span>
       <button onClick={() => setLocale(locale === 'de' ? 'en' : 'de')} style={styles.langBtn}>
         {locale === 'de' ? 'EN' : 'DE'}
       </button>
+
+      <div style={styles.welcome}>
+        <h1 style={styles.welcomeTitle}>{t('login_welcome')}</h1>
+        <p style={styles.welcomeSub}>{t('login_welcomeSub')}</p>
+      </div>
+
       <form onSubmit={handleSubmit} style={styles.card}>
         <img src="/inforent-original-logo.png" alt="INFORENT Prisma" style={styles.logo} />
         {error && <div style={styles.error}>{error}</div>}
@@ -61,15 +75,28 @@ export default function LoginPage() {
         </button>
         <Link to="/forgot-password" style={styles.forgotLink}>{t('login_forgotLink')}</Link>
       </form>
+
+      <div style={styles.featureRow}>
+        {features.map(f => (
+          <div key={f.title} style={styles.featureBox}>
+            <span style={styles.featureIcon}>{f.icon}</span>
+            <strong style={styles.featureTitle}>{f.title}</strong>
+            <p style={styles.featureBody}>{f.body}</p>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  wrapper: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'url(/header-skyline.png) no-repeat bottom center, url(/background.jpg) no-repeat center center', backgroundSize: '800px 123px, cover', gap: '1rem' },
+  wrapper: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'url(/header-skyline.png) no-repeat bottom center, url(/background.jpg) no-repeat center center', backgroundSize: '800px 123px, cover', gap: '1.25rem', padding: '2rem 1rem 8rem' },
   langBtn: { position: 'absolute', top: '1rem', right: '1rem', background: 'none', border: '1px solid #d1d5db', borderRadius: 4, padding: '.25rem .6rem', cursor: 'pointer', fontSize: '.8rem' },
   copyright: { position: 'absolute', bottom: '1rem', right: '1rem', fontSize: '.75rem', color: '#9ca3af' },
-card: { background: '#fff', padding: '2rem', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,.12)', width: 360, display: 'flex', flexDirection: 'column', gap: '1rem' },
+  welcome: { textAlign: 'center', color: '#fff', textShadow: '0 1px 4px rgba(0,0,0,.5)' },
+  welcomeTitle: { margin: '0 0 .375rem', fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-.01em' },
+  welcomeSub: { margin: 0, fontSize: '1rem', opacity: 0.9 },
+  card: { background: '#fff', padding: '2rem', borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,.12)', width: 360, display: 'flex', flexDirection: 'column', gap: '1rem' },
   logo: { height: 112, width: 'auto', alignSelf: 'center' },
   subtitle: { margin: 0, color: '#6b7280', fontSize: '.875rem' },
   error: { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 4, fontSize: '.875rem' },
@@ -77,4 +104,9 @@ card: { background: '#fff', padding: '2rem', borderRadius: 8, boxShadow: '0 2px 
   input: { padding: '.5rem .75rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '1rem' },
   btn: { padding: '.625rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 4, fontSize: '1rem', fontWeight: 600, cursor: 'pointer' },
   forgotLink: { textAlign: 'center', color: '#2563eb', fontSize: '.8125rem', textDecoration: 'none' },
+  featureRow: { display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center', maxWidth: 860 },
+  featureBox: { background: 'rgba(255,255,255,.18)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,.35)', borderRadius: 8, padding: '1.25rem 1.5rem', width: 248, display: 'flex', flexDirection: 'column', gap: '.375rem', color: '#fff', textShadow: '0 1px 3px rgba(0,0,0,.4)' },
+  featureIcon: { fontSize: '1.5rem', lineHeight: 1 },
+  featureTitle: { fontSize: '.9375rem', fontWeight: 700 },
+  featureBody: { margin: 0, fontSize: '.8125rem', lineHeight: 1.5, opacity: 0.9 },
 }

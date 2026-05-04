@@ -18,6 +18,14 @@ export const translations = {
 
     // Login
     login_subtitle:       'DNS Management',
+    login_welcome:        'Welcome to INFORENT Manager',
+    login_welcomeSub:     'Manager — INFORENT GmbH',
+    login_feat1Title:     'Public Cloud',
+    login_feat1Body:      'Manage your cloud infrastructure and services from a single, unified control panel.',
+    login_feat2Title:     'Domains',
+    login_feat2Body:      'Full DNS management for all your domains — records, zones, secondaries, and bulk operations.',
+    login_feat3Title:     'Accounting',
+    login_feat3Body:      'Keep track of usage, billing, and cost allocation across all your services and tenants.',
     login_email:          'Email',
     login_password:       'Password',
     login_submit:         'Sign in',
@@ -595,6 +603,14 @@ export const translations = {
 
     // Login
     login_subtitle:       'DNS-Verwaltung',
+    login_welcome:        'Willkommen beim INFORENT Manager',
+    login_welcomeSub:     'Manager — INFORENT GmbH',
+    login_feat1Title:     'Public Cloud',
+    login_feat1Body:      'Cloud-Infrastruktur und Dienste zentral über ein einheitliches Control Panel verwalten.',
+    login_feat2Title:     'Domains',
+    login_feat2Body:      'Vollständige DNS-Verwaltung für alle Domains — Records, Zonen, Secondaries und Massenoperationen.',
+    login_feat3Title:     'Abrechnung',
+    login_feat3Body:      'Nutzung, Abrechnung und Kostenzuordnung für alle Dienste und Mandanten im Blick behalten.',
     login_email:          'E-Mail',
     login_password:       'Passwort',
     login_submit:         'Anmelden',

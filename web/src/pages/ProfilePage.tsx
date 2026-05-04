@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from 'react'
+import { usePageTitle } from '../hooks/usePageTitle'
 import { updateUser } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../i18n/I18nContext'
 import { formatApiError } from '../lib/formError'
 
 export default function ProfilePage() {
+  usePageTitle('My Profile')
   const { user } = useAuth()
   const { t } = useI18n()
   const [currentPassword, setCurrentPassword] = useState('')

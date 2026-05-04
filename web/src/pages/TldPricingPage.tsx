@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { usePageTitle } from '../hooks/usePageTitle'
 import {
   getTldPricing, createTldPricing, updateTldPricing, deleteTldPricing,
   type TldPricing,
@@ -9,18 +10,17 @@ import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
 import Dropdown, { DropdownItem } from '../components/Dropdown'
-import ListPage from '../components/ListPage'
 import ListTable from '../components/ListTable'
+import MasterDetailLayout from '../components/MasterDetailLayout'
 import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import { formatApiError } from '../lib/formError'
 import * as s from '../styles/shell'
 
 const REGISTRARS = ['', 'CN', 'MARCARIA', 'UD', 'UDR'] as const
-
 const TLD_FILTER_DEFAULTS = { search: '', registrar: '' }
+type SelectedId = string | 'new' | null
 
 type EditState = Partial<Omit<TldPricing, 'created_at' | 'updated_at'>>
-
 const EMPTY: EditState = {
   zone: '', tld: '', description: '', cost: null, fee: null,
   default_registrar: null, note: '', price_udr: null, price_cn: null,
@@ -38,80 +38,17 @@ function dec(v: number | string | null): string | null {
   return isNaN(n) ? null : n.toFixed(2)
 }
 
-function fmt(v: number | null): string {
+function fmt(v: number | null | undefined): string {
   return v != null ? String(v) : ''
 }
 
-function EditRow({
-  initial, isNew, onSave, onCancel, saving,
-}: {
-  initial: EditState
-  isNew: boolean
-  onSave: (d: EditState) => void
-  onCancel: () => void
-  saving: boolean
-}) {
-  const [d, setD] = useState<EditState>(initial)
-  const set = (k: keyof EditState, v: unknown) => setD(prev => ({ ...prev, [k]: v }))
-
-  return (
-    <tr style={localStyles.editRow}>
-      <td style={s.td}>
-        {isNew
-          ? <input style={localStyles.inputSm} value={d.zone ?? ''} onChange={e => set('zone', e.target.value)} placeholder="e.g. co.uk" />
-          : <code style={localStyles.code}>{d.zone}</code>}
-      </td>
-      <td style={s.td}>
-        <input style={localStyles.inputSm} value={d.tld ?? ''} onChange={e => set('tld', e.target.value)} placeholder="e.g. uk" />
-      </td>
-      <td style={s.td}>
-        <input style={localStyles.inputSm} value={d.description ?? ''} onChange={e => set('description', e.target.value || null)} placeholder="description" />
-      </td>
-      <td style={s.td}>
-        <input style={localStyles.inputNum} value={fmt(d.cost ?? null)} onChange={e => set('cost', num(e.target.value))} placeholder="0.00" type="number" step="0.01" />
-      </td>
-      <td style={s.td}>
-        <input style={localStyles.inputNum} value={fmt(d.fee ?? null)} onChange={e => set('fee', num(e.target.value))} placeholder="0" type="number" step="1" />
-      </td>
-      <td style={s.td}>
-        <Select
-          style={localStyles.inputSm}
-          value={d.default_registrar ?? ''}
-          onChange={v => set('default_registrar', v || null)}
-          options={REGISTRARS.map(r => ({ value: r, label: r || '—' }))}
-        />
-      </td>
-      <td style={s.td}>
-        <input style={localStyles.inputNum} value={fmt(d.price_udr ?? null)} onChange={e => set('price_udr', num(e.target.value))} placeholder="—" type="number" step="0.01" />
-      </td>
-      <td style={s.td}>
-        <input style={localStyles.inputNum} value={fmt(d.price_cn ?? null)} onChange={e => set('price_cn', num(e.target.value))} placeholder="—" type="number" step="0.01" />
-      </td>
-      <td style={s.td}>
-        <input style={localStyles.inputNum} value={fmt(d.price_marcaria ?? null)} onChange={e => set('price_marcaria', num(e.target.value))} placeholder="—" type="number" step="0.01" />
-      </td>
-      <td style={s.td}>
-        <input style={localStyles.inputNum} value={fmt(d.price_ud ?? null)} onChange={e => set('price_ud', num(e.target.value))} placeholder="—" type="number" step="0.01" />
-      </td>
-      <td style={s.td}>
-        <input style={localStyles.inputSm} value={d.note ?? ''} onChange={e => set('note', e.target.value || null)} placeholder="note" />
-      </td>
-      <td style={localStyles.tdActions}>
-        <button style={localStyles.btnSave} onClick={() => onSave(d)} disabled={saving}>
-          {saving ? '…' : 'Save'}
-        </button>
-        <button style={localStyles.btnCancel} onClick={onCancel} disabled={saving}>Cancel</button>
-      </td>
-    </tr>
-  )
-}
-
 export default function TldPricingPage() {
+  usePageTitle('TLD Pricing')
   const qc = useQueryClient()
-  const [editZone, setEditZone] = useState<string | null>(null)
-  const [adding, setAdding]     = useState(false)
-  const [saving, setSaving]     = useState(false)
-  const [error, setError]       = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<SelectedId>(null)
+  const [form, setForm] = useState<EditState>(EMPTY)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const {
     filters, setFilter, persist, setPersist, clear: clearFilters, hasActive,
@@ -136,19 +73,33 @@ export default function TldPricingPage() {
     })
   }, [rows, search, registrar])
 
-  async function handleSave(d: EditState, isNew: boolean) {
+  const editTarget: TldPricing | null = useMemo(
+    () => typeof selectedId === 'string' && selectedId !== 'new' ? rows.find(r => r.zone === selectedId) ?? null : null,
+    [rows, selectedId]
+  )
+
+  useEffect(() => {
     setError(null)
-    setSaving(true)
+    if (selectedId === 'new') setForm(EMPTY)
+    else if (editTarget) setForm(editTarget)
+  }, [selectedId, editTarget])
+
+  function set(k: keyof EditState, v: unknown) {
+    setForm(prev => ({ ...prev, [k]: v }))
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null); setSaving(true)
     try {
-      if (isNew) {
-        await createTldPricing(d as any)
-      } else {
-        const { zone, ...rest } = d
+      if (selectedId === 'new') {
+        await createTldPricing(form as any)
+      } else if (editTarget) {
+        const { zone, ...rest } = form
         await updateTldPricing(zone!, rest)
       }
       qc.invalidateQueries({ queryKey: ['tld-pricing'] })
-      setEditZone(null)
-      setAdding(false)
+      setSelectedId(null)
     } catch (err: any) {
       setError(formatApiError(err))
     } finally {
@@ -158,10 +109,10 @@ export default function TldPricingPage() {
 
   async function handleDelete(zone: string) {
     if (!confirm(`Delete TLD zone '${zone}'?`)) return
-    setError(null)
     try {
       await deleteTldPricing(zone)
       qc.invalidateQueries({ queryKey: ['tld-pricing'] })
+      if (selectedId === zone) setSelectedId(null)
     } catch (err: any) {
       setError(formatApiError(err))
     }
@@ -169,18 +120,15 @@ export default function TldPricingPage() {
 
   const registrarLabel = registrar || 'All registrars'
 
-  return (
-    <ListPage>
+  // ── Dashboard ──────────────────────────────────────────────────
+  const dashboard = (
+    <>
       {error && <div style={localStyles.errorBanner}>{error}</div>}
-
       <FilterBar>
         <span style={localStyles.countPill}>
-          {hasActive
-            ? `${filtered.length} of ${rows.length}`
-            : `${rows.length} zones`}
+          {hasActive ? `${filtered.length} of ${rows.length}` : `${rows.length} zones`}
         </span>
       </FilterBar>
-
       <FilterBar>
         <SearchInput
           value={search}
@@ -188,7 +136,6 @@ export default function TldPricingPage() {
           placeholder="Search zone, TLD, description…"
           width={260}
         />
-
         <Dropdown
           label={
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: registrar ? '#111827' : '#9ca3af' }}>
@@ -212,7 +159,6 @@ export default function TldPricingPage() {
             </>
           )}
         </Dropdown>
-
         <FilterPersistControls
           persist={persist}
           setPersist={setPersist}
@@ -220,12 +166,8 @@ export default function TldPricingPage() {
           hasActive={hasActive}
           style={{ marginLeft: 'auto' }}
         />
-
-        <button style={s.actionBtn} onClick={() => { setAdding(true); setEditZone(null) }}>
-          + New TLD
-        </button>
+        <button style={s.actionBtn} onClick={() => setSelectedId('new')}>+ New TLD</button>
       </FilterBar>
-
       <ListTable>
         {isLoading ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>Loading…</div>
@@ -244,31 +186,19 @@ export default function TldPricingPage() {
                 <th style={s.th}>Marcaria</th>
                 <th style={s.th}>UD</th>
                 <th style={s.th}>Note</th>
-                <th style={s.th}></th>
               </tr>
             </thead>
             <tbody>
-              {adding && (
-                <EditRow
-                  initial={EMPTY}
-                  isNew
-                  saving={saving}
-                  onSave={d => handleSave(d, true)}
-                  onCancel={() => setAdding(false)}
-                />
-              )}
-              {filtered.map(row =>
-                editZone === row.zone ? (
-                  <EditRow
+              {filtered.map(row => {
+                const isSel = selectedId === row.zone
+                return (
+                  <tr
                     key={row.zone}
-                    initial={row}
-                    isNew={false}
-                    saving={saving}
-                    onSave={d => handleSave(d, false)}
-                    onCancel={() => setEditZone(null)}
-                  />
-                ) : (
-                  <tr key={row.zone}>
+                    onClick={() => setSelectedId(row.zone)}
+                    style={{ cursor: 'pointer', background: isSel ? '#eff6ff' : undefined }}
+                    onMouseOver={e => { if (!isSel) e.currentTarget.style.background = '#f1f5f9' }}
+                    onMouseOut={e => { if (!isSel) e.currentTarget.style.background = '' }}
+                  >
                     <td style={s.td}><code style={localStyles.code}>{row.zone}</code></td>
                     <td style={s.td}>{row.tld}</td>
                     <td style={s.td}>{row.description ?? <span style={localStyles.muted}>—</span>}</td>
@@ -284,37 +214,175 @@ export default function TldPricingPage() {
                     <td style={localStyles.tdNum}>{dec(row.price_marcaria) ?? <span style={localStyles.muted}>—</span>}</td>
                     <td style={localStyles.tdNum}>{dec(row.price_ud) ?? <span style={localStyles.muted}>—</span>}</td>
                     <td style={s.td}>{row.note ?? <span style={localStyles.muted}>—</span>}</td>
-                    <td style={localStyles.tdActions}>
-                      <button style={localStyles.btnEdit} onClick={() => { setEditZone(row.zone); setAdding(false) }}>Edit</button>
-                      <button style={localStyles.btnDelete} onClick={() => handleDelete(row.zone)}>Delete</button>
-                    </td>
                   </tr>
                 )
-              )}
-              {filtered.length === 0 && !adding && (
-                <tr><td colSpan={12} style={{ ...s.td, color: '#94a3b8', textAlign: 'center' }}>No zones found</td></tr>
+              })}
+              {filtered.length === 0 && (
+                <tr><td colSpan={11} style={{ ...s.td, color: '#94a3b8', textAlign: 'center', padding: '2rem' }}>No zones found</td></tr>
               )}
             </tbody>
           </table>
         )}
       </ListTable>
-    </ListPage>
+    </>
+  )
+
+  // ── Sidebar ────────────────────────────────────────────────────
+  const sidebar = (
+    <>
+      <FilterBar>
+        <SearchInput
+          value={search}
+          onChange={v => setFilter('search', v)}
+          placeholder="Search zones…"
+          width="100%"
+        />
+      </FilterBar>
+      <FilterBar>
+        <button style={{ ...s.actionBtn, width: '100%' }} onClick={() => setSelectedId('new')}>+ New TLD</button>
+      </FilterBar>
+      <ListTable>
+        {filtered.map(row => {
+          const isSel = selectedId === row.zone
+          return (
+            <div
+              key={row.zone}
+              onClick={() => setSelectedId(row.zone)}
+              style={{
+                padding: '.5rem .75rem',
+                cursor: 'pointer',
+                borderBottom: '1px solid #f1f5f9',
+                background: isSel ? '#eff6ff' : 'transparent',
+              }}
+            >
+              <div style={{ fontSize: '.8125rem', fontWeight: isSel ? 600 : 500, color: '#1e293b' }}>
+                <code style={localStyles.code}>{row.zone}</code>
+              </div>
+              <div style={{ fontSize: '.7rem', color: '#94a3b8', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {row.description || row.tld}
+              </div>
+            </div>
+          )
+        })}
+      </ListTable>
+    </>
+  )
+
+  // ── Detail pane ────────────────────────────────────────────────
+  const isNew = selectedId === 'new'
+  const detailPane = (
+    <div style={localStyles.detailPane}>
+      <div style={localStyles.detailHeader}>
+        <button onClick={() => setSelectedId(null)} style={localStyles.backBtn}>← Cancel</button>
+        <h3 style={localStyles.detailTitle}>{isNew ? 'New TLD' : (editTarget?.zone ?? '')}</h3>
+        {editTarget && (
+          <button onClick={() => handleDelete(editTarget.zone)} style={localStyles.btnDelete}>Delete</button>
+        )}
+      </div>
+
+      <form onSubmit={handleSave} style={localStyles.formBody}>
+        {error && <div style={localStyles.error}>{error}</div>}
+
+        <div style={localStyles.grid}>
+          <label style={localStyles.label}>
+            Zone
+            {isNew
+              ? <input value={form.zone ?? ''} onChange={e => set('zone', e.target.value)} placeholder="co.uk" required style={localStyles.input} />
+              : <code style={{ ...localStyles.code, alignSelf: 'flex-start', padding: '4px 12px', fontSize: '.875rem' }}>{form.zone}</code>}
+          </label>
+          <label style={localStyles.label}>
+            TLD
+            <input value={form.tld ?? ''} onChange={e => set('tld', e.target.value)} placeholder="uk" required style={localStyles.input} />
+          </label>
+        </div>
+
+        <label style={localStyles.label}>
+          Description
+          <input value={form.description ?? ''} onChange={e => set('description', e.target.value || null)} placeholder="UK domains" style={localStyles.input} />
+        </label>
+
+        <div style={localStyles.sectionDivider}><span style={localStyles.sectionLabel}>Pricing</span></div>
+        <div style={localStyles.grid}>
+          <label style={localStyles.label}>
+            Cost
+            <input type="number" step="0.01" value={fmt(form.cost ?? null)} onChange={e => set('cost', num(e.target.value))} style={localStyles.input} />
+          </label>
+          <label style={localStyles.label}>
+            Fee
+            <input type="number" step="1" value={fmt(form.fee ?? null)} onChange={e => set('fee', num(e.target.value))} style={localStyles.input} />
+          </label>
+          <label style={localStyles.label}>
+            Default registrar
+            <Select
+              value={form.default_registrar ?? ''}
+              onChange={v => set('default_registrar', v || null)}
+              options={REGISTRARS.map(r => ({ value: r, label: r || '—' }))}
+              style={{ width: '100%' }}
+            />
+          </label>
+        </div>
+
+        <div style={localStyles.sectionDivider}><span style={localStyles.sectionLabel}>Per-registrar prices</span></div>
+        <div style={localStyles.grid}>
+          <label style={localStyles.label}>
+            UDR
+            <input type="number" step="0.01" value={fmt(form.price_udr ?? null)} onChange={e => set('price_udr', num(e.target.value))} placeholder="—" style={localStyles.input} />
+          </label>
+          <label style={localStyles.label}>
+            CN
+            <input type="number" step="0.01" value={fmt(form.price_cn ?? null)} onChange={e => set('price_cn', num(e.target.value))} placeholder="—" style={localStyles.input} />
+          </label>
+          <label style={localStyles.label}>
+            Marcaria
+            <input type="number" step="0.01" value={fmt(form.price_marcaria ?? null)} onChange={e => set('price_marcaria', num(e.target.value))} placeholder="—" style={localStyles.input} />
+          </label>
+          <label style={localStyles.label}>
+            UD
+            <input type="number" step="0.01" value={fmt(form.price_ud ?? null)} onChange={e => set('price_ud', num(e.target.value))} placeholder="—" style={localStyles.input} />
+          </label>
+        </div>
+
+        <label style={localStyles.label}>
+          Note
+          <textarea value={form.note ?? ''} onChange={e => set('note', e.target.value || null)} rows={3} placeholder="Internal notes" style={{ ...localStyles.input, resize: 'vertical' }} />
+        </label>
+
+        <div style={localStyles.formFooter}>
+          <button type="button" onClick={() => setSelectedId(null)} style={s.secondaryBtn}>Cancel</button>
+          <button type="submit" disabled={saving} style={s.actionBtn}>{saving ? '…' : 'Save'}</button>
+        </div>
+      </form>
+    </div>
+  )
+
+  return (
+    <MasterDetailLayout
+      dashboard={dashboard}
+      sidebar={sidebar}
+      detail={detailPane}
+      isOpen={selectedId !== null}
+    />
   )
 }
 
 const localStyles: Record<string, React.CSSProperties> = {
   countPill:    { display: 'inline-flex', alignItems: 'center', fontSize: '.8125rem', color: '#475569', background: '#e2e8f0', borderRadius: 4, padding: '1px 8px' },
   errorBanner:  { color: '#b91c1c', fontSize: '.875rem', padding: '.5rem .75rem', background: '#fee2e2', borderBottom: '1px solid #fecaca', flexShrink: 0 },
+  detailPane:   { padding: '1rem 1.5rem' },
+  detailHeader: { display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1rem', flexWrap: 'wrap' as const },
+  detailTitle:  { margin: 0, fontSize: '1rem', fontWeight: 700, color: '#1e293b', flex: 1 },
+  backBtn:      { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '.875rem', padding: 0 },
+  formBody:     { display: 'flex', flexDirection: 'column' as const, gap: '.75rem', maxWidth: 640 },
+  formFooter:   { display: 'flex', gap: '.5rem', justifyContent: 'flex-end', paddingTop: '.75rem', borderTop: '1px solid #f1f5f9' },
+  error:        { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 4, fontSize: '.8125rem' },
+  sectionDivider: { borderBottom: '1px solid #f1f5f9', paddingBottom: 2, marginTop: '.5rem' },
+  sectionLabel: { fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '.04em' },
+  grid:         { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' },
+  label:        { display: 'flex', flexDirection: 'column' as const, gap: '.25rem', fontSize: '.8125rem', fontWeight: 500, color: '#374151' },
+  input:        { padding: '.375rem .625rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8125rem', color: '#1e293b' },
   muted:        { color: '#94a3b8', fontSize: '.8rem' },
-  editRow:      { borderBottom: '1px solid #e2e8f0', background: '#fffbeb' },
   tdNum:        { padding: '.4rem .6rem', fontSize: '.8rem', verticalAlign: 'middle', textAlign: 'right' as const, fontVariantNumeric: 'tabular-nums' as const, color: '#1e293b', borderBottom: '1px solid #f1f5f9' },
-  tdActions:    { padding: '.4rem .6rem', verticalAlign: 'middle', whiteSpace: 'nowrap' as const, borderBottom: '1px solid #f1f5f9' },
   code:         { background: '#f1f5f9', padding: '1px 5px', borderRadius: 3, fontSize: '.78rem', fontFamily: 'monospace' },
   regBadge:     { background: '#ede9fe', color: '#5b21b6', padding: '1px 6px', borderRadius: 3, fontSize: '.72rem', fontWeight: 700 },
-  inputSm:      { padding: '.2rem .4rem', border: '1px solid #e2e8f0', borderRadius: 3, fontSize: '.78rem', width: '100%', minWidth: 60 },
-  inputNum:     { padding: '.2rem .4rem', border: '1px solid #e2e8f0', borderRadius: 3, fontSize: '.78rem', width: 70, textAlign: 'right' as const },
-  btnSave:      { padding: '.2rem .55rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 3, fontSize: '.75rem', fontWeight: 600, cursor: 'pointer', marginRight: 3 },
-  btnCancel:    { padding: '.2rem .55rem', background: '#f1f5f9', color: '#374151', border: '1px solid #e2e8f0', borderRadius: 3, fontSize: '.75rem', cursor: 'pointer' },
-  btnEdit:      { padding: '.2rem .5rem', background: '#f1f5f9', color: '#374151', border: '1px solid #e2e8f0', borderRadius: 3, fontSize: '.75rem', cursor: 'pointer', marginRight: 3 },
-  btnDelete:    { padding: '.2rem .5rem', background: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', borderRadius: 3, fontSize: '.75rem', cursor: 'pointer' },
+  btnDelete:    { padding: '.25rem .625rem', background: '#fff', border: '1px solid #fca5a5', color: '#b91c1c', borderRadius: 4, fontSize: '.8125rem', fontWeight: 500, cursor: 'pointer' },
 }

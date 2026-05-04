@@ -8,6 +8,7 @@ import {
 } from '../api/client'
 import { useMemo } from 'react'
 import { useI18n } from '../i18n/I18nContext'
+import { usePageTitle } from '../hooks/usePageTitle'
 import { useAuth } from '../context/AuthContext'
 import Select from '../components/Select'
 import SearchInput from '../components/SearchInput'
@@ -43,6 +44,7 @@ interface NewRow extends RecordFormRow {
 }
 
 export default function TemplatesPage() {
+  usePageTitle('DNS Templates')
   const { t } = useI18n()
   const qc = useQueryClient()
   const { user } = useAuth()

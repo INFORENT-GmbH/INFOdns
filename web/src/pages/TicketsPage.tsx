@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { usePageTitle } from '../hooks/usePageTitle'
 import { Outlet, useMatch, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTickets, getUsers, createTicket, uploadAttachments, getTenants, type Ticket } from '../api/client'
@@ -44,6 +45,7 @@ function PriorityBadge({ priority, label }: { priority: string; label: string })
 }
 
 export default function TicketsPage() {
+  usePageTitle('Support Tickets')
   const { t } = useI18n()
   const { user } = useAuth()
   const qc = useQueryClient()
