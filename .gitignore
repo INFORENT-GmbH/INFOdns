@@ -30,3 +30,6 @@ dist/
 uploads/
 
 docs/
+
+# Generated on deploy by scripts/gource.sh
+web/public/gource.mp4
