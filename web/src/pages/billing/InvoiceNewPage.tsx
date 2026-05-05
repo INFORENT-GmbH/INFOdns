@@ -61,7 +61,7 @@ export default function InvoiceNewPage() {
           description: it.description,
           quantity: 1,
           unit_price_cents: it.unit_price_cents,
-          tax_rate_percent: it.tax_rate_percent ?? 19,
+          tax_rate_percent: it.tax_rate_percent != null ? Number(it.tax_rate_percent) : 19,
         }))
       const all = [...fromPicked, ...manualItems.filter(i => i.description)]
 
