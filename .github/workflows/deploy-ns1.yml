@@ -60,6 +60,7 @@ jobs:
             --exclude='worker/node_modules/' \
             --exclude='bind/primary/zones/' \
             --exclude='bind/primary/keys-dnssec/' \
+            --exclude='storage/' \
             ./ ${{ vars.SSH_PATH_NS1 }}/
 
       - name: Parse ns2 and ns3 hosts
