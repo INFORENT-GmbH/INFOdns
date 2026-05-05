@@ -18,9 +18,7 @@ TITLE="${GOURCE_TITLE:-INFORENT Prisma}"
 
 mkdir -p "${REPO_DIR}/web/public"
 
-if ! docker image inspect "${IMAGE}" >/dev/null 2>&1; then
-  docker build -t "${IMAGE}" -f "${REPO_DIR}/scripts/gource.Dockerfile" "${REPO_DIR}/scripts"
-fi
+docker build -t "${IMAGE}" -f "${REPO_DIR}/scripts/gource.Dockerfile" "${REPO_DIR}/scripts"
 
 docker run --rm \
   -v "${REPO_DIR}:/repo" \
