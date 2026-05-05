@@ -5,6 +5,10 @@ import { validateZone } from './validateZone.js'
 import { deployZone, rndcDnssecStatus, cleanupDnssecArtifacts, rndcReload } from './deployZone.js'
 import { regenerateNamedConf } from './namedConf.js'
 import { pollBulkJobs } from './bulkExecutor.js'
+import { pollBilling } from './billingPoller.js'
+import { pollInvoiceIssuing } from './invoiceIssuer.js'
+import { pollDunningOncePerDay } from './dunningPoller.js'
+import { pollUsageAggregation } from './usageAggregator.js'
 import { checkNsDelegation } from './nsDelegation.js'
 import { checkDnssec } from './dnssecCheck.js'
 import { broadcastEvent } from './broadcast.js'
@@ -691,6 +695,21 @@ safeInterval(() => checkDnssec('ok'), 10 * 60 * 1000, 'checkDnssec (ok)')
 // DNSSEC DS extraction retry: catches zones where KASP took longer than
 // processJob's fire-and-forget window
 safeInterval(retryDnssecExtraction, 30_000, 'retryDnssecExtraction')
+
+// Billing: alle 60s nach fälligen Posten suchen und Drafts anlegen.
+safeInterval(async () => { await pollBilling() }, 60_000, 'pollBilling')
+
+// Invoice-PDF + Mail: alle 10s nach issued-aber-pdf-losen Rechnungen suchen.
+// Schnellerer Tick als billingPoller weil der User auf den Issue-Click wartet.
+safeInterval(async () => { await pollInvoiceIssuing() }, 10_000, 'pollInvoiceIssuing')
+
+// Mahnungen: alle 5min anstoßen, der Wrapper sorgt für genau 1x pro Kalendertag.
+safeInterval(async () => { await pollDunningOncePerDay() }, 5 * 60_000, 'pollDunning')
+
+// Pay-per-use: alle 60min nach abgeschlossenen Monaten suchen und sub-day-
+// Items zu Rechnungspositionen aggregieren. Idempotent — nur unconsumed
+// Datenpunkte werden bearbeitet.
+safeInterval(async () => { await pollUsageAggregation() }, 60 * 60_000, 'pollUsageAggregation')
 
 // Graceful shutdown plumbing — declared before the loop so the loop's sleep can register wakeups.
 const shutdownWakeups: Array<() => void> = []

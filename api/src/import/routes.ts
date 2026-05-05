@@ -174,7 +174,7 @@ export async function importRoutes(app: FastifyInstance) {
   })
 
   // POST /import/run
-  app.post('/import/run', { preHandler: requireAdmin }, async (req, reply) => {
+  app.post('/import/run', { preHandler: requireAdmin }, async (req: any, reply) => {
     const body = RunBody.safeParse(req.body)
     if (!body.success) {
       return reply.status(400).send({ code: 'VALIDATION_ERROR', message: body.error.message })
@@ -228,7 +228,7 @@ export async function importRoutes(app: FastifyInstance) {
            FROM isp.domains WHERE DOMAIN IN (${placeholders})`,
           domain_fqdns
         )
-        const res = await importDomains(rows as IspDomain[], conn)
+        const res = await importDomains(rows as IspDomain[], conn, req.user.sub)
         domains.inserted = res.inserted
         domains.skipped  = res.skipped
         fqdnToId = res.fqdnToId

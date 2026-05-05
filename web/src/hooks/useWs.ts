@@ -117,15 +117,18 @@ export function useWs(token: string | null): WsStatus {
 
           case 'ticket_created':
             qc.invalidateQueries({ queryKey: ['tickets'] })
+            qc.invalidateQueries({ queryKey: ['ticket-stats'] })
             break
 
           case 'ticket_updated':
             qc.invalidateQueries({ queryKey: ['tickets'] })
             qc.invalidateQueries({ queryKey: ['ticket', event.ticketId] })
+            qc.invalidateQueries({ queryKey: ['ticket-stats'] })
             break
 
           case 'ticket_message_added':
             qc.invalidateQueries({ queryKey: ['ticket', event.ticketId] })
+            qc.invalidateQueries({ queryKey: ['tickets'] })
             break
         }
       }

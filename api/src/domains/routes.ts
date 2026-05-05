@@ -8,6 +8,11 @@ import { requireAuth } from '../middleware/auth.js'
 import { writeAuditLog } from '../audit/middleware.js'
 import { enqueueRender } from '../lib/queue.js'
 import { broadcast } from '../ws/hub.js'
+import {
+  createBillingItemForDomain,
+  endBillingItemForDomain,
+  restoreBillingItemForDomain,
+} from '../billing/items.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -270,6 +275,20 @@ export async function domainRoutes(app: FastifyInstance) {
     const created = await queryOne('SELECT * FROM domains WHERE id = ?', [result.insertId])
     await writeAuditLog({ req, entityType: 'domain', entityId: result.insertId, domainId: result.insertId, action: 'create', newValue: created })
     await enqueueRender(result.insertId)
+
+    // Auto-anlage des Abrechnungspostens (best-effort — Domain-Erstellung schlägt
+    // nicht fehl wenn Billing aus irgendeinem Grund nicht klappt).
+    try {
+      await createBillingItemForDomain({
+        domainId: result.insertId,
+        tenantId: body.data.tenant_id,
+        fqdn: body.data.fqdn,
+        createdBy: req.user.sub,
+      })
+    } catch (err) {
+      req.log?.warn({ err }, `billing_item auto-create failed for domain ${result.insertId}`)
+    }
+
     return reply.status(201).send(created)
   })
 
@@ -596,6 +615,12 @@ export async function domainRoutes(app: FastifyInstance) {
     await writeAuditLog({ req, entityType: 'domain', entityId: Number(req.params.id), domainId: Number(req.params.id), action: 'delete', oldValue: old })
     await enqueueRender(Number(req.params.id))
 
+    try {
+      await endBillingItemForDomain(Number(req.params.id), new Date())
+    } catch (err) {
+      req.log?.warn({ err }, `billing_item end-hook failed for domain ${req.params.id}`)
+    }
+
     const admins = await query<{ email: string }>('SELECT email FROM users WHERE role = ? AND is_active = 1', ['admin'])
     for (const admin of admins) {
       await queueMail(admin.email, 'domain_deleted', {
@@ -620,6 +645,13 @@ export async function domainRoutes(app: FastifyInstance) {
     const restored = await queryOne('SELECT * FROM domains WHERE id = ?', [req.params.id])
     await writeAuditLog({ req, entityType: 'domain', entityId: Number(req.params.id), domainId: Number(req.params.id), action: 'restore', oldValue: old, newValue: restored })
     await enqueueRender(Number(req.params.id))
+
+    try {
+      await restoreBillingItemForDomain(Number(req.params.id))
+    } catch (err) {
+      req.log?.warn({ err }, `billing_item restore-hook failed for domain ${req.params.id}`)
+    }
+
     return restored
   })
 

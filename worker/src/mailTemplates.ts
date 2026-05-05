@@ -333,6 +333,42 @@ ${infoTable([
   return { subject, html: wrap(subject, bodyHtml), text }
 }
 
+// ── Ticket customer reply (staff notification) ──────────────
+
+interface TicketCustomerReplyPayload {
+  ticketId: number
+  subject: string
+  requesterName: string
+  requesterEmail: string
+  messageBody: string
+  portalUrl: string
+}
+
+function ticketCustomerReply(_locale: Locale, p: TicketCustomerReplyPayload): MailContent {
+  const ref = `[#${p.ticketId}]`
+  const subject = `Re: ${ref} ${p.subject}`
+  const fromLine = p.requesterName
+    ? `${esc(p.requesterName)} &lt;${esc(p.requesterEmail)}&gt;`
+    : esc(p.requesterEmail)
+
+  const bodyHtml = `<h2>Customer reply</h2>
+<p><strong>${fromLine}</strong> replied to ticket ${ref}.</p>
+<div style="border-left:3px solid #2563eb;padding:8px 16px;margin:16px 0;background:#f0f7ff">
+  <p style="margin:0;white-space:pre-wrap">${esc(p.messageBody)}</p>
+</div>
+${p.portalUrl ? `<p><a href="${esc(p.portalUrl)}/tickets/${p.ticketId}">View ticket in portal</a></p>` : ''}`
+
+  const text = [
+    `Customer reply to ${ref}`,
+    `From: ${p.requesterName} <${p.requesterEmail}>`,
+    '',
+    p.messageBody,
+    '',
+    p.portalUrl ? `${p.portalUrl}/tickets/${p.ticketId}` : '',
+  ].join('\n')
+  return { subject, html: wrap(subject, bodyHtml), text }
+}
+
 // ── Ticket new (admin notification) ──────────────────────────
 
 interface TicketNewAdminPayload {
@@ -501,6 +537,7 @@ const templates: Record<string, (locale: Locale, payload: any) => MailContent> =
   ticket_reply: ticketReply,
   ticket_assigned: ticketAssigned,
   ticket_new_admin: ticketNewAdmin,
+  ticket_customer_reply: ticketCustomerReply,
   domain_deleted: domainDeleted,
   domain_purge_reminder: domainPurgeReminder,
   ns_delegation_ok: nsDelegationOk,

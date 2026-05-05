@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getMailQueue, getMailQueueItem, retryMail, type MailQueueItem } from '../api/client'
+import { getMailQueue, getMailQueueItem, retryMail, dismissMail, dismissAllFailedMail, type MailQueueItem } from '../api/client'
 import Dropdown, { DropdownItem } from '../components/Dropdown'
 import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
@@ -12,7 +12,7 @@ import { useI18n } from '../i18n/I18nContext'
 import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import * as s from '../styles/shell'
 
-const STATUSES = ['pending', 'processing', 'done', 'failed']
+const STATUSES = ['pending', 'processing', 'done', 'failed', 'dismissed']
 const LIMIT = 50
 
 const MAIL_FILTER_DEFAULTS = { search: '', status: '', template: '' }
@@ -72,12 +72,45 @@ export default function MailQueuePage() {
     }
   }
 
+  async function handleDismiss(id: number) {
+    setActing(id)
+    try {
+      await dismissMail(id)
+      qc.invalidateQueries({ queryKey: ['mail-queue'] })
+      // If we just dismissed the currently-selected item it will fall out of the
+      // failed filter — close the detail pane so the table reflows cleanly.
+      if (selectedId === id) setSelectedId(null)
+    } finally {
+      setActing(null)
+    }
+  }
+
+  const [bulkActing, setBulkActing] = useState(false)
+  async function handleDismissAllFailed() {
+    // Use the unfiltered failed-count here, not the current page — `total` reflects
+    // the active filter set, which the user has narrowed to status=failed.
+    const n = total
+    if (n === 0) return
+    if (!window.confirm(t('mailQueue_dismissAllConfirm', n))) return
+    setBulkActing(true)
+    try {
+      const r = await dismissAllFailedMail()
+      qc.invalidateQueries({ queryKey: ['mail-queue'] })
+      window.alert(t('mailQueue_dismissed', r.data.dismissed))
+    } finally {
+      setBulkActing(false)
+    }
+  }
+
   const statusBadge = (status: string) => {
     const colors: Record<string, { bg: string; fg: string }> = {
       pending:    { bg: '#fef3c7', fg: '#92400e' },
       processing: { bg: '#dbeafe', fg: '#1e40af' },
       done:       { bg: '#d1fae5', fg: '#065f46' },
       failed:     { bg: '#fee2e2', fg: '#991b1b' },
+      // Dismissed = manually acknowledged failure. Slate so it reads as
+      // "intentionally set aside", clearly different from green 'done'.
+      dismissed:  { bg: '#e2e8f0', fg: '#475569' },
     }
     const c = colors[status] ?? { bg: '#f3f4f6', fg: '#374151' }
     return (
@@ -99,6 +132,16 @@ export default function MailQueuePage() {
             ? `${total.toLocaleString()} ${t('mailQueue_entries')}`
             : t('mailQueue_noEntries')}
         </span>
+        {statusFilter === 'failed' && total > 0 && (
+          <button
+            onClick={handleDismissAllFailed}
+            disabled={bulkActing}
+            style={localStyles.btnDismissAll}
+            title={t('mailQueue_dismissAll')}
+          >
+            {bulkActing ? t('mailQueue_dismissing') : t('mailQueue_dismissAll')}
+          </button>
+        )}
       </FilterBar>
       <FilterBar>
         <SearchInput value={searchFilter} onChange={setSearchFilter} placeholder={t('mailQueue_searchPlaceholder')} width={240} />
@@ -261,9 +304,14 @@ export default function MailQueuePage() {
         <h3 style={localStyles.detailTitle}>{selectedItem ? `Mail #${selectedItem.id}` : ''}</h3>
         {selectedItem && statusBadge(selectedItem.status)}
         {selectedItem?.status === 'failed' && (
-          <button onClick={() => handleRetry(selectedItem.id)} disabled={acting === selectedItem.id} style={localStyles.btnRetry}>
-            {acting === selectedItem.id ? t('mailQueue_retrying') : t('mailQueue_retry')}
-          </button>
+          <>
+            <button onClick={() => handleRetry(selectedItem.id)} disabled={acting === selectedItem.id} style={localStyles.btnRetry}>
+              {acting === selectedItem.id ? t('mailQueue_retrying') : t('mailQueue_retry')}
+            </button>
+            <button onClick={() => handleDismiss(selectedItem.id)} disabled={acting === selectedItem.id} style={localStyles.btnDismiss}>
+              {acting === selectedItem.id ? t('mailQueue_dismissing') : t('mailQueue_dismiss')}
+            </button>
+          </>
         )}
       </div>
       {selectedItem && (
@@ -364,6 +412,8 @@ const localStyles: Record<string, React.CSSProperties> = {
   code:         { background: '#f1f5f9', padding: '1px 6px', borderRadius: 3, fontSize: '.8rem', fontFamily: 'monospace' },
   errorText:    { color: '#b91c1c', fontSize: '.8rem' },
   btnRetry:     { padding: '.25rem .625rem', background: '#fbbf24', color: '#78350f', border: 'none', borderRadius: 4, fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' },
+  btnDismiss:   { padding: '.25rem .625rem', background: '#fff', color: '#374151', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: '.8125rem', fontWeight: 600, cursor: 'pointer' },
+  btnDismissAll:{ padding: '.25rem .625rem', background: '#fff', color: '#475569', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: '.75rem', fontWeight: 600, cursor: 'pointer', marginLeft: '.5rem' },
   pagination:   { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.75rem', padding: '.75rem 0', borderTop: '1px solid #e2e8f0', flexShrink: 0 },
   pageBtn:      { padding: '.25rem .5rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, cursor: 'pointer', fontSize: '.8125rem', color: '#374151' },
   pageInfo:     { fontSize: '.8125rem', color: '#64748b' },

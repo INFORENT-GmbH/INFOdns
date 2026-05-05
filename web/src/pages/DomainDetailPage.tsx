@@ -20,6 +20,7 @@ import ColorPicker from '../components/ColorPicker'
 import ImportZoneModal from '../components/ImportZoneModal'
 import DnssecModal from '../components/DnssecModal'
 import DnsCheckModal from '../components/DnsCheckModal'
+import EditPencilIcon from '../components/EditPencilIcon'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
 import { formatApiError } from '../lib/formError'
@@ -45,6 +46,7 @@ const INLINE_STYLES = `
   .ddp-row-dirty    > td:first-child { box-shadow: inset 4px 0 0 #f59e0b; }
   .ddp-row-deleted  > td:first-child { box-shadow: inset 4px 0 0 #dc2626; }
   .ddp-row-template > td:first-child { box-shadow: inset 4px 0 0 #38bdf8; }
+  .editable-trigger:hover .edit-pencil-icon { opacity: .85 !important; }
 `
 
 const RECORD_TYPES = ['A','AAAA','CNAME','MX','NS','TXT','SRV','CAA','PTR','NAPTR','TLSA','SSHFP','DS']
@@ -858,10 +860,14 @@ export default function DomainDetailPage() {
             />
           ) : (
             <strong
-              style={{ cursor: 'pointer', borderBottom: '1px dashed #9ca3af' }}
+              className="editable-trigger"
+              style={{ cursor: 'pointer', borderBottom: '1px dashed #9ca3af', display: 'inline-flex', alignItems: 'center', gap: 3 }}
               title={t('domainDetail_clickToEdit')}
               onClick={() => { setTtlDraft(String(domain.default_ttl)); setEditingTtl(true) }}
-            >{domain.default_ttl}s</strong>
+            >
+              {domain.default_ttl}s
+              <EditPencilIcon size={11} style={{ color: '#94a3b8' }} title={t('domainDetail_clickToEdit')} />
+            </strong>
           )}
         </span>
         <span>{t('serial')}: <code>{domain.last_serial || '—'}</code></span>

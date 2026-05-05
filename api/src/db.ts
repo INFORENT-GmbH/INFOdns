@@ -96,13 +96,13 @@ export async function runMigrations(): Promise<void> {
     const sql = await readFile(join(dir, file), 'utf-8')
     const conn = await pool.getConnection()
     try {
-      // Execute each statement separately (mysql2 doesn't support multi-statement by default)
-      const statements = sql
+      // Execute each statement separately (mysql2 doesn't support multi-statement by default).
+      // Strip line comments (-- ...) BEFORE splitting on ';' so a stray
+      // semicolon inside a comment doesn't fragment a statement.
+      const stripped = sql.replace(/--[^\n]*/g, '')
+      const statements = stripped
         .split(';')
         .map(s => s.trim())
-        .filter(s => s.length > 0)
-        // Strip leading SQL comment lines from each chunk
-        .map(s => s.replace(/^(\s*--.*\n?)+/, '').trim())
         .filter(s => s.length > 0)
       for (const stmt of statements) {
         await conn.execute(stmt)

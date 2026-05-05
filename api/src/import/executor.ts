@@ -1,4 +1,5 @@
 import type { PoolConnection } from 'mysql2/promise.js'
+import { createBillingItemForDomain } from '../billing/items.js'
 
 // ── Source row types (read from isp.*) ───────────────────────
 
@@ -130,7 +131,8 @@ export async function importTldPricing(
 
 export async function importDomains(
   rows: IspDomain[],
-  conn: PoolConnection
+  conn: PoolConnection,
+  createdBy: number
 ): Promise<{ inserted: number; skipped: number; fqdnToId: Map<string, number> }> {
   let inserted = 0
   let skipped = 0
@@ -192,6 +194,19 @@ export async function importDomains(
         [newId]
       )
       await conn.execute("UPDATE domains SET zone_status = 'dirty' WHERE id = ?", [newId])
+    }
+
+    // Abrechnungsposten mitschreiben (idempotent — gleicher Connection, gleiche Transaktion)
+    try {
+      await createBillingItemForDomain({
+        domainId: newId,
+        tenantId: row.tenant_id,
+        fqdn: row.fqdn,
+        createdBy,
+        conn,
+      })
+    } catch (err) {
+      console.warn(`[import] billing_item auto-create skipped for ${row.fqdn}:`, (err as Error).message)
     }
   }
 

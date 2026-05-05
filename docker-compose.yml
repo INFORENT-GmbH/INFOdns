@@ -58,11 +58,13 @@ services:
       NS_RECORDS: ${NS_RECORDS}
       NS2_IP: ${NS2_IP:-80.243.196.38}
       NS3_IP: ${NS3_IP:-80.243.196.39}
+      INVOICE_STORAGE_DIR: /storage/invoices
     ports:
       - "3000:3000"
     volumes:
       - ./mariadb/migrations:/app/migrations:ro
       - ./uploads:/app/uploads
+      - ./storage/invoices:/storage/invoices:ro
     networks:
       - internal
       - public
@@ -107,11 +109,13 @@ services:
       IMAP_POLL_INTERVAL_SECONDS: ${IMAP_POLL_INTERVAL_SECONDS:-60}
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
       BIND_KEYS_DIR: /bind/primary/keys
+      INVOICE_STORAGE_DIR: /storage/invoices
     volumes:
       - ./bind/primary/zones:/bind/primary/zones
       - ./bind/primary:/bind/primary/conf
       - ./bind/keys:/etc/rndc:ro
       - ./bind/primary/keys-dnssec:/bind/primary/keys:ro
+      - ./storage/invoices:/storage/invoices
     networks:
       - internal
       - public
