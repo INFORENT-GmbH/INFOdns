@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, Fragment } from 'react'
+import { useMemo, useState, useEffect, Fragment } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import {
@@ -7,16 +7,20 @@ import {
   type BulkJob, type BulkJobDomain, type ZoneRenderJob,
 } from '../api/client'
 import { useI18n } from '../i18n/I18nContext'
+import { usePageTitle } from '../hooks/usePageTitle'
 import Select from '../components/Select'
 import Dropdown, { DropdownItem } from '../components/Dropdown'
 import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
-import ListPage from '../components/ListPage'
+import ListTable from '../components/ListTable'
+import MasterDetailLayout from '../components/MasterDetailLayout'
 import { useAuth } from '../context/AuthContext'
 import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import { formatApiError } from '../lib/formError'
 import * as s from '../styles/shell'
+
+type SelectedJob = number | 'wizard' | null
 
 const JOB_STATUS_OPTIONS = ['draft', 'previewing', 'approved', 'running', 'done', 'failed']
 const RENDER_STATUS_OPTIONS = ['pending', 'processing', 'done', 'failed']
@@ -312,14 +316,16 @@ function JobDetail({ job }: { job: BulkJob }) {
 // ── Main page ─────────────────────────────────────────────────
 
 export default function JobsPage() {
+  usePageTitle('Jobs')
   const { t } = useI18n()
   const { user } = useAuth()
   const isStaff = user?.role === 'admin' || user?.role === 'operator'
   const qc = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [expanded, setExpanded]     = useState<number | null>(null)
-  const [showWizard, setShowWizard] = useState(false)
+  const [selectedJob, setSelectedJob] = useState<SelectedJob>(null)
   const [step, setStep]             = useState<Step>('search')
+
+  const showWizard = selectedJob === 'wizard'
 
   const {
     filters: jobFilters, setFilter: setJobFilter,
@@ -341,7 +347,7 @@ export default function JobsPage() {
   // Auto-open wizard if URL params were provided
   useEffect(() => {
     if (searchParams.get('type')) {
-      setShowWizard(true)
+      setSelectedJob('wizard')
       setSearchParams({}, { replace: true })  // clean URL without triggering re-render loop
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -477,7 +483,7 @@ export default function JobsPage() {
   }
 
   function resetWizard() {
-    setShowWizard(false)
+    setSelectedJob(null)
     setStep('search')
     setSearchType('A')
     setSearchName('')
@@ -496,21 +502,20 @@ export default function JobsPage() {
     ? (typeof currentJob.preview_json === 'string' ? JSON.parse(currentJob.preview_json) : currentJob.preview_json)
     : null
 
-  return (
-    <ListPage style={{ overflowY: 'auto' }}>
-      {/* ── Wizard ── */}
-      {showWizard && (
-        <div style={styles.wizardCard}>
-          <div style={styles.wizardTitle}>
-            <span style={{ fontWeight: 700 }}>
-              {step === 'search'  && t('bulk_findDomains')}
-              {step === 'preview' && t('bulk_previewChanges')}
-              {step === 'done'    && t('bulk_done')}
-            </span>
-            <button onClick={resetWizard} style={styles.closeBtn}>✕</button>
-          </div>
+  // ── Wizard pane ──────────────────────────────────────────────
+  const wizardPane = (
+    <div style={{ padding: '1rem 1.5rem' }}>
+      <div style={styles.wizardCard}>
+        <div style={styles.wizardTitle}>
+          <span style={{ fontWeight: 700 }}>
+            {step === 'search'  && t('bulk_findDomains')}
+            {step === 'preview' && t('bulk_previewChanges')}
+            {step === 'done'    && t('bulk_done')}
+          </span>
+          <button onClick={resetWizard} style={styles.closeBtn}>✕</button>
+        </div>
 
-          {wizardError && <div style={styles.errorBox}>{wizardError}</div>}
+        {wizardError && <div style={styles.errorBox}>{wizardError}</div>}
 
           {/* Step 1: Search + select + configure */}
           {step === 'search' && (
@@ -719,9 +724,29 @@ export default function JobsPage() {
               <button onClick={resetWizard} style={styles.btnPrimary}>{t('bulk_done')}</button>
             </div>
           )}
-        </div>
-      )}
+      </div>
+    </div>
+  )
 
+  // ── Selected bulk job detail pane ────────────────────────────
+  const selectedBulkJob = typeof selectedJob === 'number' ? (jobs as BulkJob[]).find(j => j.id === selectedJob) : null
+  const bulkJobDetailPane = selectedBulkJob ? (
+    <div style={{ padding: '1rem 1.5rem' }}>
+      <div style={styles.detailHeader}>
+        <button onClick={() => setSelectedJob(null)} style={styles.backBtn}>← {t('cancel')}</button>
+        <h3 style={styles.detailTitle}>Bulk job #{selectedBulkJob.id}</h3>
+        <code style={styles.code}>{selectedBulkJob.operation}</code>
+        <StatusBadge status={selectedBulkJob.status} />
+      </div>
+      <JobDetail job={selectedBulkJob} />
+    </div>
+  ) : null
+
+  const detailPane = showWizard ? wizardPane : bulkJobDetailPane
+
+  // ── Dashboard ────────────────────────────────────────────────
+  const dashboard = (
+    <>
       {/* ── Jobs table ── */}
       <div>
         <FilterBar>
@@ -792,7 +817,7 @@ export default function JobsPage() {
             style={{ marginLeft: 'auto' }}
           />
 
-          <button onClick={() => setShowWizard(true)} style={s.actionBtn}>{t('bulk_newJob')}</button>
+          <button onClick={() => setSelectedJob('wizard')} style={s.actionBtn}>{t('bulk_newJob')}</button>
         </FilterBar>
 
         <div style={{ overflowX: 'auto' }}>
@@ -808,13 +833,19 @@ export default function JobsPage() {
                   <th style={s.th}>{t('jobs_domains')}</th>
                   <th style={s.th}>{t('jobs_progress')}</th>
                   <th style={s.th}>{t('jobs_created')}</th>
-                  <th style={s.th}></th>
                 </tr>
               </thead>
               <tbody>
-                {filteredJobs.map(job => (
-                  <React.Fragment key={job.id}>
-                    <tr>
+                {filteredJobs.map(job => {
+                  const isSel = selectedJob === job.id
+                  return (
+                    <tr
+                      key={job.id}
+                      onClick={() => setSelectedJob(job.id)}
+                      style={{ cursor: 'pointer', background: isSel ? '#eff6ff' : undefined }}
+                      onMouseOver={e => { if (!isSel) e.currentTarget.style.background = '#f1f5f9' }}
+                      onMouseOut={e => { if (!isSel) e.currentTarget.style.background = '' }}
+                    >
                       <td style={styles.tdMono}>{job.id}</td>
                       <td style={s.td}><code style={styles.code}>{job.operation}</code></td>
                       <td style={s.td}><StatusBadge status={job.status} /></td>
@@ -838,27 +869,12 @@ export default function JobsPage() {
                         ) : '—'}
                       </td>
                       <td style={styles.tdMono}>{new Date(job.created_at).toLocaleString()}</td>
-                      <td style={{ ...s.td, textAlign: 'right' }}>
-                        <button
-                          onClick={() => setExpanded(expanded === job.id ? null : job.id)}
-                          style={styles.detailBtn}
-                        >
-                          {expanded === job.id ? t('jobs_hide') : t('jobs_detail')}
-                        </button>
-                      </td>
                     </tr>
-                    {expanded === job.id && (
-                      <tr>
-                        <td colSpan={7} style={{ padding: 0, borderBottom: '1px solid #e5e7eb' }}>
-                          <JobDetail job={job} />
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                ))}
+                  )
+                })}
                 {filteredJobs.length === 0 && (
                   <tr>
-                    <td colSpan={7} style={{ ...s.td, textAlign: 'center', color: '#9ca3af' }}>
+                    <td colSpan={6} style={{ ...s.td, textAlign: 'center', color: '#9ca3af' }}>
                       {t('jobs_noJobs')}
                     </td>
                   </tr>
@@ -970,12 +986,90 @@ export default function JobsPage() {
           </div>
         </>
       )}
-    </ListPage>
+    </>
+  )
+
+  // ── Sidebar (compact bulk job list) ──────────────────────────
+  const sidebar = (
+    <>
+      <FilterBar>
+        <Dropdown
+          label={
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: jobFilters.status ? '#111827' : '#9ca3af' }}>
+              {jobStatusBtnLabel}
+            </span>
+          }
+          active={!!jobFilters.status}
+          onClear={() => setJobFilter('status', '')}
+          width="100%"
+        >
+          {close => (
+            <>
+              <DropdownItem onSelect={() => { setJobFilter('status', ''); close() }}>
+                <span style={{ color: '#6b7280' }}>{t('jobs_allStatuses')}</span>
+              </DropdownItem>
+              {JOB_STATUS_OPTIONS.map(opt => (
+                <DropdownItem key={opt} onSelect={() => { setJobFilter('status', opt); close() }}>
+                  {opt}
+                </DropdownItem>
+              ))}
+            </>
+          )}
+        </Dropdown>
+      </FilterBar>
+      <FilterBar>
+        <button onClick={() => setSelectedJob('wizard')} style={{ ...s.actionBtn, width: '100%' }}>{t('bulk_newJob')}</button>
+      </FilterBar>
+      <ListTable>
+        {filteredJobs.map(job => {
+          const isSel = selectedJob === job.id
+          return (
+            <div
+              key={job.id}
+              onClick={() => setSelectedJob(job.id)}
+              style={{
+                padding: '.5rem .75rem',
+                cursor: 'pointer',
+                borderBottom: '1px solid #f1f5f9',
+                background: isSel ? '#eff6ff' : 'transparent',
+              }}
+            >
+              <div style={{ fontSize: '.8125rem', fontWeight: isSel ? 600 : 500, color: '#1e293b' }}>
+                #{job.id} <code style={styles.code}>{job.operation}</code>
+              </div>
+              <div style={{ display: 'flex', gap: '.35rem', alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
+                <StatusBadge status={job.status} />
+                {job.affected_domains != null && (
+                  <span style={{ fontSize: '.7rem', color: '#94a3b8' }}>
+                    {job.processed_domains ?? 0}/{job.affected_domains}
+                  </span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+        {filteredJobs.length === 0 && (
+          <div style={{ padding: '1rem', textAlign: 'center', color: '#94a3b8', fontSize: '.8125rem' }}>{t('jobs_noJobs')}</div>
+        )}
+      </ListTable>
+    </>
+  )
+
+  return (
+    <MasterDetailLayout
+      dashboard={<div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>{dashboard}</div>}
+      sidebar={sidebar}
+      detail={detailPane}
+      isOpen={selectedJob !== null}
+    />
   )
 }
 
 const styles: Record<string, React.CSSProperties> = {
   countPill:    { display: 'inline-flex', alignItems: 'center', fontSize: '.8125rem', color: '#475569', background: '#e2e8f0', borderRadius: 4, padding: '1px 8px' },
+  detailHeader: { display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1rem', flexWrap: 'wrap' as const },
+  detailTitle:  { margin: 0, fontSize: '1rem', fontWeight: 700, color: '#1e293b', flex: 1 },
+  backBtn:      { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '.875rem', padding: 0 },
   sectionHeader:{ padding: '.625rem .75rem', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderTop: '1px solid #e2e8f0', display: 'flex', alignItems: 'center' },
   sectionTitle: { margin: 0, fontSize: '.8125rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '.04em' },
   activeBadge:  { background: '#ede9fe', color: '#6d28d9', padding: '1px 7px', borderRadius: 4, fontSize: '.75rem', fontWeight: 600 },

@@ -65,8 +65,9 @@ app.get('/ready', async (_req, reply) => {
   }
 })
 
-// ── Run pending DB migrations ────────────────────────────────
-import { runMigrations } from './db.js'
+// ── Wait for DB, then run pending migrations ─────────────────
+import { runMigrations, waitForDb } from './db.js'
+await waitForDb()
 await runMigrations()
 
 // ── NS status poller ─────────────────────────────────────────

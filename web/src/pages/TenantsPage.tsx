@@ -1,20 +1,19 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { usePageTitle } from '../hooks/usePageTitle'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTenants, createTenant, updateTenant, deleteTenant, type Tenant } from '../api/client'
 import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
 import Dropdown, { DropdownItem } from '../components/Dropdown'
-import ListPage from '../components/ListPage'
 import ListTable from '../components/ListTable'
+import MasterDetailLayout from '../components/MasterDetailLayout'
 import { useI18n } from '../i18n/I18nContext'
 import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import { formatApiError } from '../lib/formError'
 import * as s from '../styles/shell'
 
 const INLINE_STYLES = `
-  .tenant-row { transition: background 0.08s; cursor: pointer; }
-  .tenant-row:hover td { background: #f1f5f9; }
   .tenant-input:focus { border-color: #2563eb !important; outline: none; box-shadow: 0 0 0 2px #bfdbfe; }
 `
 
@@ -24,10 +23,12 @@ const emptyForm = {
   phone: '', fax: '', email: '', vat_id: '', notes: '',
 }
 
+type SelectedId = number | 'new' | null
 type StatusFilter = '' | 'active' | 'inactive'
 const TENANT_FILTER_DEFAULTS = { search: '', status: '' as StatusFilter, country: '' }
 
 export default function TenantsPage() {
+  usePageTitle('Tenants')
   const { t } = useI18n()
   const qc = useQueryClient()
 
@@ -36,8 +37,7 @@ export default function TenantsPage() {
   } = usePersistedFilters('tenants', TENANT_FILTER_DEFAULTS)
   const { search, status, country } = filters
 
-  const [showForm, setShowForm] = useState(false)
-  const [editTarget, setEditTarget] = useState<Tenant | null>(null)
+  const [selectedId, setSelectedId] = useState<SelectedId>(null)
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -70,32 +70,38 @@ export default function TenantsPage() {
     return Array.from(set).sort()
   }, [tenants])
 
+  const editTarget: Tenant | null = useMemo(
+    () => typeof selectedId === 'number' ? tenants.find(c => c.id === selectedId) ?? null : null,
+    [tenants, selectedId]
+  )
+
+  // Sync form whenever the selection changes.
+  useEffect(() => {
+    setError(null)
+    if (selectedId === 'new') {
+      setForm(emptyForm)
+    } else if (editTarget) {
+      setForm({
+        name: editTarget.name,
+        company_name: editTarget.company_name ?? '',
+        first_name: editTarget.first_name ?? '',
+        last_name: editTarget.last_name ?? '',
+        street: editTarget.street ?? '',
+        zip: editTarget.zip ?? '',
+        city: editTarget.city ?? '',
+        country: editTarget.country ?? '',
+        phone: editTarget.phone ?? '',
+        fax: editTarget.fax ?? '',
+        email: editTarget.email ?? '',
+        vat_id: editTarget.vat_id ?? '',
+        notes: editTarget.notes ?? '',
+      })
+    }
+  }, [selectedId, editTarget])
+
   function set(field: keyof typeof emptyForm) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setForm(f => ({ ...f, [field]: e.target.value }))
-  }
-
-  function openCreate() {
-    setEditTarget(null); setForm(emptyForm); setError(null); setShowForm(true)
-  }
-  function openEdit(c: Tenant) {
-    setEditTarget(c)
-    setForm({
-      name: c.name,
-      company_name: c.company_name ?? '',
-      first_name: c.first_name ?? '',
-      last_name: c.last_name ?? '',
-      street: c.street ?? '',
-      zip: c.zip ?? '',
-      city: c.city ?? '',
-      country: c.country ?? '',
-      phone: c.phone ?? '',
-      fax: c.fax ?? '',
-      email: c.email ?? '',
-      vat_id: c.vat_id ?? '',
-      notes: c.notes ?? '',
-    })
-    setError(null); setShowForm(true)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -113,7 +119,7 @@ export default function TenantsPage() {
         await createTenant(payload)
       }
       qc.invalidateQueries({ queryKey: ['tenants'] })
-      setShowForm(false)
+      setSelectedId(null)
     } catch (err: any) {
       setError(formatApiError(err))
     } finally {
@@ -125,255 +131,306 @@ export default function TenantsPage() {
     if (!confirm(t('tenants_deleteConfirm', c.name))) return
     await deleteTenant(c.id)
     qc.invalidateQueries({ queryKey: ['tenants'] })
+    if (selectedId === c.id) setSelectedId(null)
   }
 
-  return (
-    <ListPage>
+  // ── Dashboard view ──────────────────────────────────────────────
+  const dashboard = (
+    <>
       <style>{INLINE_STYLES}</style>
 
-      {showForm && (
-        <form onSubmit={handleSubmit} style={localStyles.formCard}>
-          <div style={localStyles.formHeader}>
-            <h4 style={localStyles.formTitle}>{editTarget ? t('tenants_editTitle') : t('tenants_newTitle')}</h4>
-          </div>
-          {error && <div style={localStyles.error}>{error}</div>}
+      <FilterBar>
+        <span style={localStyles.countPill}>
+          {hasActive
+            ? t('tenants_filteredCount', filteredTenants.length, tenants.length)
+            : `${tenants.length} ${t('tenants_title').toLowerCase()}`}
+        </span>
+      </FilterBar>
 
-          <div style={localStyles.formBody}>
-            {/* General */}
-            <div style={localStyles.grid}>
-              <label style={localStyles.label}>
-                {t('name')}
-                <input className="tenant-input" value={form.name} onChange={set('name')} required style={localStyles.input} />
-              </label>
-              <label style={localStyles.label}>
-                {t('tenants_companyName')}
-                <input className="tenant-input" value={form.company_name} onChange={set('company_name')} style={localStyles.input} />
-              </label>
-            </div>
+      <FilterBar>
+        <SearchInput
+          value={search}
+          onChange={v => setFilter('search', v)}
+          placeholder={t('tenants_searchPlaceholder')}
+          width={280}
+        />
 
-            {/* Contact */}
-            <div style={localStyles.sectionDivider}>
-              <span style={localStyles.sectionLabel}>{t('tenants_contactSection')}</span>
-            </div>
-            <div style={localStyles.grid}>
-              <label style={localStyles.label}>
-                {t('tenants_firstName')}
-                <input className="tenant-input" value={form.first_name} onChange={set('first_name')} style={localStyles.input} />
-              </label>
-              <label style={localStyles.label}>
-                {t('tenants_lastName')}
-                <input className="tenant-input" value={form.last_name} onChange={set('last_name')} style={localStyles.input} />
-              </label>
-              <label style={localStyles.label}>
-                {t('tenants_email')}
-                <input className="tenant-input" type="email" value={form.email} onChange={set('email')} style={localStyles.input} />
-              </label>
-              <label style={localStyles.label}>
-                {t('tenants_phone')}
-                <input className="tenant-input" value={form.phone} onChange={set('phone')} style={localStyles.input} />
-              </label>
-              <label style={localStyles.label}>
-                {t('tenants_fax')}
-                <input className="tenant-input" value={form.fax} onChange={set('fax')} style={localStyles.input} />
-              </label>
-            </div>
+        <Dropdown
+          label={
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: status ? '#111827' : '#9ca3af' }}>
+              {status === 'active' ? t('users_active') : status === 'inactive' ? 'Inactive' : t('domains_allStatuses')}
+            </span>
+          }
+          active={!!status}
+          onClear={() => setFilter('status', '' as StatusFilter)}
+          width={140}
+        >
+          {close => (
+            <>
+              <DropdownItem onSelect={() => { setFilter('status', '' as StatusFilter); close() }}>
+                <span style={{ color: '#6b7280' }}>{t('domains_allStatuses')}</span>
+              </DropdownItem>
+              <DropdownItem onSelect={() => { setFilter('status', 'active' as StatusFilter); close() }}>
+                {t('users_active')}
+              </DropdownItem>
+              <DropdownItem onSelect={() => { setFilter('status', 'inactive' as StatusFilter); close() }}>
+                Inactive
+              </DropdownItem>
+            </>
+          )}
+        </Dropdown>
 
-            {/* Address */}
-            <div style={localStyles.sectionDivider}>
-              <span style={localStyles.sectionLabel}>{t('tenants_addressSection')}</span>
-            </div>
-            <div style={localStyles.grid}>
-              <label style={{ ...localStyles.label, gridColumn: '1 / -1' }}>
-                {t('tenants_street')}
-                <input className="tenant-input" value={form.street} onChange={set('street')} style={localStyles.input} />
-              </label>
-              <label style={localStyles.label}>
-                {t('tenants_zip')}
-                <input className="tenant-input" value={form.zip} onChange={set('zip')} style={localStyles.input} />
-              </label>
-              <label style={localStyles.label}>
-                {t('tenants_city')}
-                <input className="tenant-input" value={form.city} onChange={set('city')} style={localStyles.input} />
-              </label>
-              <label style={localStyles.label}>
-                {t('tenants_country')}
-                <input className="tenant-input" value={form.country} onChange={set('country')} maxLength={2} style={localStyles.input} placeholder="DE" />
-              </label>
-            </div>
-
-            {/* Billing */}
-            <div style={localStyles.sectionDivider}>
-              <span style={localStyles.sectionLabel}>{t('tenants_billingSection')}</span>
-            </div>
-            <label style={localStyles.label}>
-              {t('tenants_vatId')}
-              <input className="tenant-input" value={form.vat_id} onChange={set('vat_id')} style={localStyles.input} />
-            </label>
-
-            {/* Notes */}
-            <div style={localStyles.sectionDivider}>
-              <span style={localStyles.sectionLabel}>{t('tenants_notes')}</span>
-            </div>
-            <textarea className="tenant-input" value={form.notes} onChange={set('notes')} rows={3} style={{ ...localStyles.input, resize: 'vertical' }} />
-          </div>
-
-          <div style={localStyles.formFooter}>
-            <button type="button" onClick={() => setShowForm(false)} style={s.secondaryBtn}>{t('cancel')}</button>
-            <button type="submit" disabled={saving} style={s.actionBtn}>{saving ? t('saving') : t('save')}</button>
-          </div>
-        </form>
-      )}
-
-        {/* Stats / count bar */}
-        <FilterBar>
-          <span style={localStyles.countPill}>
-            {hasActive
-              ? t('tenants_filteredCount', filteredTenants.length, tenants.length)
-              : `${tenants.length} ${t('tenants_title').toLowerCase()}`}
-          </span>
-        </FilterBar>
-
-        {/* Filter bar */}
-        <FilterBar>
-          <SearchInput
-            value={search}
-            onChange={v => setFilter('search', v)}
-            placeholder={t('tenants_searchPlaceholder')}
-            width={280}
-          />
-
+        {countryOptions.length > 0 && (
           <Dropdown
             label={
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: status ? '#111827' : '#9ca3af' }}>
-                {status === 'active' ? t('users_active') : status === 'inactive' ? 'Inactive' : t('domains_allStatuses')}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: country ? '#111827' : '#9ca3af' }}>
+                {country || t('tenants_country')}
               </span>
             }
-            active={!!status}
-            onClear={() => setFilter('status', '' as StatusFilter)}
-            width={140}
+            active={!!country}
+            onClear={() => setFilter('country', '')}
+            width={120}
           >
             {close => (
               <>
-                <DropdownItem onSelect={() => { setFilter('status', '' as StatusFilter); close() }}>
-                  <span style={{ color: '#6b7280' }}>{t('domains_allStatuses')}</span>
+                <DropdownItem onSelect={() => { setFilter('country', ''); close() }}>
+                  <span style={{ color: '#6b7280' }}>{t('tenants_country')}</span>
                 </DropdownItem>
-                <DropdownItem onSelect={() => { setFilter('status', 'active' as StatusFilter); close() }}>
-                  {t('users_active')}
-                </DropdownItem>
-                <DropdownItem onSelect={() => { setFilter('status', 'inactive' as StatusFilter); close() }}>
-                  Inactive
-                </DropdownItem>
+                {countryOptions.map(c => (
+                  <DropdownItem key={c} onSelect={() => { setFilter('country', c); close() }}>
+                    {c}
+                  </DropdownItem>
+                ))}
               </>
             )}
           </Dropdown>
+        )}
 
-          {countryOptions.length > 0 && (
-            <Dropdown
-              label={
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: country ? '#111827' : '#9ca3af' }}>
-                  {country || t('tenants_country')}
-                </span>
-              }
-              active={!!country}
-              onClear={() => setFilter('country', '')}
-              width={120}
-            >
-              {close => (
-                <>
-                  <DropdownItem onSelect={() => { setFilter('country', ''); close() }}>
-                    <span style={{ color: '#6b7280' }}>{t('tenants_country')}</span>
-                  </DropdownItem>
-                  {countryOptions.map(c => (
-                    <DropdownItem key={c} onSelect={() => { setFilter('country', c); close() }}>
-                      {c}
-                    </DropdownItem>
-                  ))}
-                </>
-              )}
-            </Dropdown>
-          )}
+        <FilterPersistControls
+          persist={persist}
+          setPersist={setPersist}
+          onClear={clearFilters}
+          hasActive={hasActive}
+          style={{ marginLeft: 'auto' }}
+        />
 
-          <FilterPersistControls
-            persist={persist}
-            setPersist={setPersist}
-            onClear={clearFilters}
-            hasActive={hasActive}
-            style={{ marginLeft: 'auto' }}
-          />
+        <button onClick={() => setSelectedId('new')} style={s.actionBtn}>{t('tenants_add')}</button>
+      </FilterBar>
 
-          <button onClick={openCreate} style={s.actionBtn}>{t('tenants_add')}</button>
-        </FilterBar>
-
-        {/* Table */}
-        <ListTable>
-          {isLoading ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>{t('loading')}</div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={s.th}>{t('name')}</th>
-                  <th style={s.th}>{t('tenants_companyName')}</th>
-                  <th style={s.th}>{t('tenants_email')}</th>
-                  <th style={s.th}>{t('tenants_phone')}</th>
-                  <th style={s.th}>{t('active')}</th>
-                  <th style={s.th}>{t('created')}</th>
-                  <th style={{ ...s.th, width: 1 }}></th>
+      <ListTable>
+        {isLoading ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '.875rem' }}>{t('loading')}</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={s.th}>{t('name')}</th>
+                <th style={s.th}>{t('tenants_companyName')}</th>
+                <th style={s.th}>{t('tenants_email')}</th>
+                <th style={s.th}>{t('tenants_phone')}</th>
+                <th style={s.th}>{t('active')}</th>
+                <th style={s.th}>{t('created')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTenants.map((c: Tenant) => (
+                <tr
+                  key={c.id}
+                  onClick={() => setSelectedId(c.id)}
+                  style={{ cursor: 'pointer', background: selectedId === c.id ? '#eff6ff' : undefined }}
+                  onMouseOver={e => { if (selectedId !== c.id) e.currentTarget.style.background = '#f1f5f9' }}
+                  onMouseOut={e => { if (selectedId !== c.id) e.currentTarget.style.background = '' }}
+                >
+                  <td style={s.td}>
+                    <span style={{ fontWeight: 600, color: '#1e293b' }}>{c.name}</span>
+                  </td>
+                  <td style={{ ...s.td, color: '#64748b' }}>{c.company_name ?? ''}</td>
+                  <td style={{ ...s.td, color: '#64748b' }}>{c.email ?? ''}</td>
+                  <td style={{ ...s.td, color: '#64748b' }}>{c.phone ?? ''}</td>
+                  <td style={s.td}>
+                    {c.is_active
+                      ? <span style={localStyles.badgeActive}>Active</span>
+                      : <span style={localStyles.badgeInactive}>Inactive</span>}
+                  </td>
+                  <td style={{ ...s.td, color: '#64748b' }}>{new Date(c.created_at).toLocaleDateString()}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredTenants.map((c: Tenant) => (
-                  <tr key={c.id} className="tenant-row" onClick={() => openEdit(c)}>
-                    <td style={s.td}>
-                      <span style={{ fontWeight: 600, color: '#1e293b' }}>{c.name}</span>
-                    </td>
-                    <td style={{ ...s.td, color: '#64748b' }}>{c.company_name ?? ''}</td>
-                    <td style={{ ...s.td, color: '#64748b' }}>{c.email ?? ''}</td>
-                    <td style={{ ...s.td, color: '#64748b' }}>{c.phone ?? ''}</td>
-                    <td style={s.td}>
-                      {c.is_active
-                        ? <span style={localStyles.badgeActive}>Active</span>
-                        : <span style={localStyles.badgeInactive}>Inactive</span>}
-                    </td>
-                    <td style={{ ...s.td, color: '#64748b' }}>{new Date(c.created_at).toLocaleDateString()}</td>
-                    <td style={{ ...s.td, whiteSpace: 'nowrap' }} onClick={e => e.stopPropagation()}>
-                      <button onClick={() => openEdit(c)} style={localStyles.btnEdit}>{t('edit')}</button>
-                      <button onClick={() => handleDelete(c)} style={localStyles.btnDanger}>{t('delete')}</button>
-                    </td>
-                  </tr>
-                ))}
-                {filteredTenants.length === 0 && (
-                  <tr><td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '.8125rem' }}>{t('tenants_none')}</td></tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </ListTable>
-    </ListPage>
+              ))}
+              {filteredTenants.length === 0 && (
+                <tr><td colSpan={6} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', fontSize: '.8125rem' }}>{t('tenants_none')}</td></tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </ListTable>
+    </>
+  )
+
+  // ── Sidebar view (compact list when detail is open) ─────────────
+  const sidebar = (
+    <>
+      <FilterBar>
+        <SearchInput
+          value={search}
+          onChange={v => setFilter('search', v)}
+          placeholder={t('tenants_searchPlaceholder')}
+          width="100%"
+        />
+      </FilterBar>
+      <FilterBar>
+        <button onClick={() => setSelectedId('new')} style={{ ...s.actionBtn, width: '100%' }}>{t('tenants_add')}</button>
+      </FilterBar>
+      <ListTable>
+        {filteredTenants.map((c: Tenant) => {
+          const isSel = selectedId === c.id
+          return (
+            <div
+              key={c.id}
+              onClick={() => setSelectedId(c.id)}
+              style={{
+                padding: '.5rem .75rem',
+                cursor: 'pointer',
+                borderBottom: '1px solid #f1f5f9',
+                background: isSel ? '#eff6ff' : 'transparent',
+              }}
+            >
+              <div style={{ fontSize: '.8125rem', fontWeight: isSel ? 600 : 500, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {c.name}
+              </div>
+              <div style={{ fontSize: '.7rem', color: '#94a3b8', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {c.company_name || c.email || '—'}
+              </div>
+            </div>
+          )
+        })}
+        {filteredTenants.length === 0 && (
+          <div style={{ padding: '1rem', textAlign: 'center', color: '#94a3b8', fontSize: '.8125rem' }}>{t('tenants_none')}</div>
+        )}
+      </ListTable>
+    </>
+  )
+
+  // ── Detail pane ─────────────────────────────────────────────────
+  const detailPane = (
+    <div style={localStyles.detailPane}>
+      <style>{INLINE_STYLES}</style>
+      <div style={localStyles.detailHeader}>
+        <button onClick={() => setSelectedId(null)} style={localStyles.backBtn}>← {t('cancel')}</button>
+        <h3 style={localStyles.detailTitle}>
+          {selectedId === 'new' ? t('tenants_newTitle') : (editTarget?.name ?? '')}
+        </h3>
+        {editTarget && (
+          <button onClick={() => handleDelete(editTarget)} style={localStyles.btnDanger}>{t('delete')}</button>
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit} style={localStyles.formBody}>
+        {error && <div style={localStyles.error}>{error}</div>}
+
+        <div style={localStyles.grid}>
+          <label style={localStyles.label}>
+            {t('name')}
+            <input className="tenant-input" value={form.name} onChange={set('name')} required style={localStyles.input} />
+          </label>
+          <label style={localStyles.label}>
+            {t('tenants_companyName')}
+            <input className="tenant-input" value={form.company_name} onChange={set('company_name')} style={localStyles.input} />
+          </label>
+        </div>
+
+        <div style={localStyles.sectionDivider}>
+          <span style={localStyles.sectionLabel}>{t('tenants_contactSection')}</span>
+        </div>
+        <div style={localStyles.grid}>
+          <label style={localStyles.label}>
+            {t('tenants_firstName')}
+            <input className="tenant-input" value={form.first_name} onChange={set('first_name')} style={localStyles.input} />
+          </label>
+          <label style={localStyles.label}>
+            {t('tenants_lastName')}
+            <input className="tenant-input" value={form.last_name} onChange={set('last_name')} style={localStyles.input} />
+          </label>
+          <label style={localStyles.label}>
+            {t('tenants_email')}
+            <input className="tenant-input" type="email" value={form.email} onChange={set('email')} style={localStyles.input} />
+          </label>
+          <label style={localStyles.label}>
+            {t('tenants_phone')}
+            <input className="tenant-input" value={form.phone} onChange={set('phone')} style={localStyles.input} />
+          </label>
+          <label style={localStyles.label}>
+            {t('tenants_fax')}
+            <input className="tenant-input" value={form.fax} onChange={set('fax')} style={localStyles.input} />
+          </label>
+        </div>
+
+        <div style={localStyles.sectionDivider}>
+          <span style={localStyles.sectionLabel}>{t('tenants_addressSection')}</span>
+        </div>
+        <div style={localStyles.grid}>
+          <label style={{ ...localStyles.label, gridColumn: '1 / -1' }}>
+            {t('tenants_street')}
+            <input className="tenant-input" value={form.street} onChange={set('street')} style={localStyles.input} />
+          </label>
+          <label style={localStyles.label}>
+            {t('tenants_zip')}
+            <input className="tenant-input" value={form.zip} onChange={set('zip')} style={localStyles.input} />
+          </label>
+          <label style={localStyles.label}>
+            {t('tenants_city')}
+            <input className="tenant-input" value={form.city} onChange={set('city')} style={localStyles.input} />
+          </label>
+          <label style={localStyles.label}>
+            {t('tenants_country')}
+            <input className="tenant-input" value={form.country} onChange={set('country')} maxLength={2} style={localStyles.input} placeholder="DE" />
+          </label>
+        </div>
+
+        <div style={localStyles.sectionDivider}>
+          <span style={localStyles.sectionLabel}>{t('tenants_billingSection')}</span>
+        </div>
+        <label style={localStyles.label}>
+          {t('tenants_vatId')}
+          <input className="tenant-input" value={form.vat_id} onChange={set('vat_id')} style={localStyles.input} />
+        </label>
+
+        <div style={localStyles.sectionDivider}>
+          <span style={localStyles.sectionLabel}>{t('tenants_notes')}</span>
+        </div>
+        <textarea className="tenant-input" value={form.notes} onChange={set('notes')} rows={3} style={{ ...localStyles.input, resize: 'vertical' }} />
+
+        <div style={localStyles.formFooter}>
+          <button type="button" onClick={() => setSelectedId(null)} style={s.secondaryBtn}>{t('cancel')}</button>
+          <button type="submit" disabled={saving} style={s.actionBtn}>{saving ? t('saving') : t('save')}</button>
+        </div>
+      </form>
+    </div>
+  )
+
+  return (
+    <MasterDetailLayout
+      dashboard={dashboard}
+      sidebar={sidebar}
+      detail={detailPane}
+      isOpen={selectedId !== null}
+    />
   )
 }
 
 const localStyles: Record<string, React.CSSProperties> = {
-  // Form
-  formCard: { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, margin: '.75rem .75rem 0', flexShrink: 0, maxHeight: '70vh', overflowY: 'auto' },
-  formHeader: { padding: '.625rem .75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' },
-  formTitle: { margin: 0, fontSize: '.875rem', fontWeight: 600, color: '#1e293b' },
-  formBody: { padding: '.75rem', display: 'flex', flexDirection: 'column', gap: '.75rem' },
-  formFooter: { display: 'flex', gap: '.5rem', justifyContent: 'flex-end', padding: '.625rem .75rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0' },
-  error: { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 4, fontSize: '.8125rem', margin: '.75rem .75rem 0' },
-
-  sectionDivider: { borderBottom: '1px solid #f1f5f9', paddingBottom: 2, marginTop: '.25rem' },
-  sectionLabel: { fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '.04em' },
-
-  grid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' },
-  label: { display: 'flex', flexDirection: 'column', gap: '.25rem', fontSize: '.8125rem', fontWeight: 500, color: '#374151' },
-  input: { padding: '.375rem .625rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8125rem', color: '#1e293b' },
-
-  countPill: { display: 'inline-flex', alignItems: 'center', fontSize: '.8125rem', color: '#475569', background: '#e2e8f0', borderRadius: 4, padding: '1px 8px' },
-
-  badgeActive: { display: 'inline-block', background: '#dcfce7', color: '#15803d', padding: '1px 8px', borderRadius: 10, fontSize: '.75rem', fontWeight: 600 },
-  badgeInactive: { display: 'inline-block', background: '#f1f5f9', color: '#64748b', padding: '1px 8px', borderRadius: 10, fontSize: '.75rem', fontWeight: 600 },
-
-  btnEdit:   { background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer', fontSize: '.8125rem', padding: '2px 6px', fontWeight: 500 },
-  btnDanger: { background: 'none', border: 'none', color: '#b91c1c', cursor: 'pointer', fontSize: '.8125rem', padding: '2px 6px', fontWeight: 500 },
+  countPill:    { display: 'inline-flex', alignItems: 'center', fontSize: '.8125rem', color: '#475569', background: '#e2e8f0', borderRadius: 4, padding: '1px 8px' },
+  detailPane:   { padding: '1rem 1.5rem' },
+  detailHeader: { display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '1rem', flexWrap: 'wrap' as const },
+  detailTitle:  { margin: 0, fontSize: '1rem', fontWeight: 700, color: '#1e293b', flex: 1 },
+  backBtn:      { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '.875rem', padding: 0 },
+  formBody:     { display: 'flex', flexDirection: 'column' as const, gap: '.75rem', maxWidth: 600 },
+  formFooter:   { display: 'flex', gap: '.5rem', justifyContent: 'flex-end', paddingTop: '.75rem', borderTop: '1px solid #f1f5f9' },
+  error:        { background: '#fee2e2', color: '#b91c1c', padding: '.5rem .75rem', borderRadius: 4, fontSize: '.8125rem' },
+  sectionDivider: { borderBottom: '1px solid #f1f5f9', paddingBottom: 2, marginTop: '.5rem' },
+  sectionLabel: { fontSize: '.6875rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' as const, letterSpacing: '.04em' },
+  grid:         { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' },
+  label:        { display: 'flex', flexDirection: 'column' as const, gap: '.25rem', fontSize: '.8125rem', fontWeight: 500, color: '#374151' },
+  input:        { padding: '.375rem .625rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8125rem', color: '#1e293b' },
+  badgeActive:  { display: 'inline-block', background: '#dcfce7', color: '#15803d', padding: '1px 8px', borderRadius: 10, fontSize: '.75rem', fontWeight: 600 },
+  badgeInactive:{ display: 'inline-block', background: '#f1f5f9', color: '#64748b', padding: '1px 8px', borderRadius: 10, fontSize: '.75rem', fontWeight: 600 },
+  btnDanger:    { background: 'none', border: '1px solid #fca5a5', color: '#b91c1c', cursor: 'pointer', fontSize: '.8125rem', padding: '.25rem .625rem', borderRadius: 4, fontWeight: 500 },
 }

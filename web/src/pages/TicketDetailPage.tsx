@@ -99,7 +99,7 @@ export default function TicketDetailPage() {
   const priorityLabel = (p: string) => t(`ticket_priority_${p}` as any) || p
 
   return (
-    <div>
+    <div style={{ padding: '1rem 1.5rem' }}>
       <div style={styles.breadcrumb}>
         <Link to="/tickets" style={styles.backLink}>{t('ticketDetail_back')}</Link>
       </div>

@@ -51,6 +51,22 @@ export async function transaction<T>(fn: (conn: mysql.PoolConnection) => Promise
   }
 }
 
+/** Ping the DB until it responds, so api can boot in parallel with mariadb. */
+export async function waitForDb(timeoutMs = 60_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  let lastErr: unknown
+  while (Date.now() < deadline) {
+    try {
+      await pool.query('SELECT 1')
+      return
+    } catch (err) {
+      lastErr = err
+      await new Promise(r => setTimeout(r, 200))
+    }
+  }
+  throw new Error(`waitForDb: DB not reachable after ${timeoutMs}ms: ${(lastErr as Error)?.message}`)
+}
+
 /** Run pending SQL migrations from /app/migrations/ on startup. */
 export async function runMigrations(): Promise<void> {
   await pool.execute(`
