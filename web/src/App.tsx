@@ -22,6 +22,17 @@ import ImportPage from './pages/ImportPage'
 import TldPricingPage from './pages/TldPricingPage'
 import RegistrarsPage from './pages/RegistrarsPage'
 import TemplatesPage from './pages/TemplatesPage'
+import BillingSettingsPage from './pages/billing/SettingsPage'
+import BillingDashboardPage from './pages/billing/DashboardPage'
+import BillingItemsPage from './pages/billing/ItemsPage'
+import ItemDetailPage from './pages/billing/ItemDetailPage'
+import InvoicesPage from './pages/billing/InvoicesPage'
+import InvoiceNewPage from './pages/billing/InvoiceNewPage'
+import InvoiceDetailPage from './pages/billing/InvoiceDetailPage'
+import PostalQueuePage from './pages/billing/PostalQueuePage'
+import DunningQueuePage from './pages/billing/DunningQueuePage'
+import PortalInvoicesPage from './pages/portal/PortalInvoicesPage'
+import PortalInvoiceDetailPage from './pages/portal/PortalInvoiceDetailPage'
 
 const qc = new QueryClient({
   defaultOptions: {
@@ -83,6 +94,17 @@ export default function App() {
               <Route path="tld-pricing" element={<TldPricingPage />} />
               <Route path="registrars" element={<RegistrarsPage />} />
               <Route path="templates" element={<TemplatesPage />} />
+              <Route path="billing/dashboard" element={<BillingDashboardPage />} />
+              <Route path="billing/settings" element={<BillingSettingsPage />} />
+              <Route path="billing/items" element={<BillingItemsPage />} />
+              <Route path="billing/items/:id" element={<ItemDetailPage />} />
+              <Route path="billing/invoices" element={<InvoicesPage />} />
+              <Route path="billing/invoices/new" element={<InvoiceNewPage />} />
+              <Route path="billing/invoices/:id" element={<InvoiceDetailPage />} />
+              <Route path="billing/postal" element={<PostalQueuePage />} />
+              <Route path="billing/dunning" element={<DunningQueuePage />} />
+              <Route path="portal/invoices" element={<PortalInvoicesPage />} />
+              <Route path="portal/invoices/:id" element={<PortalInvoiceDetailPage />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

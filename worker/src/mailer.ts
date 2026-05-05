@@ -42,6 +42,7 @@ interface MailRow {
   subject: string | null
   body_html: string | null
   body_text: string | null
+  attachments_json: string | null
   retries: number
   max_retries: number
 }
@@ -49,8 +50,13 @@ interface MailRow {
 export async function pollMailQueue(): Promise<void> {
   if (!transport) return
 
+  // attachments_json existiert seit Migration 034 — defensiv mit IFNULL falls
+  // ältere Datenbanken die Spalte noch nicht haben. (Wird durch information_schema
+  // hier nicht extra geprüft; falls Migration nicht durchläuft, scheitert die
+  // Query lautstark, was OK ist — Mails werden dann nicht versendet.)
   const candidates = await query<MailRow>(
-    `SELECT id, to_email, template, payload, subject, body_html, body_text, retries, max_retries
+    `SELECT id, to_email, template, payload, subject, body_html, body_text,
+            attachments_json, retries, max_retries
      FROM mail_queue
      WHERE status = 'pending'
      ORDER BY created_at ASC
@@ -84,12 +90,26 @@ export async function pollMailQueue(): Promise<void> {
 
       if (!subject) throw new Error('Mail has no subject (no template and no pre-rendered subject)')
 
+      // Anhänge (z.B. Rechnungs-PDF). Format: [{path, filename, contentType?}]
+      let attachments: Array<{ path: string; filename: string; contentType?: string }> | undefined
+      if (mail.attachments_json) {
+        try {
+          const parsed = typeof mail.attachments_json === 'string'
+            ? JSON.parse(mail.attachments_json)
+            : mail.attachments_json
+          if (Array.isArray(parsed) && parsed.length > 0) attachments = parsed
+        } catch (err) {
+          console.warn(`[mailer] invalid attachments_json on mail ${mail.id}:`, err)
+        }
+      }
+
       await transport.sendMail({
         from: mailFrom,
         to: mail.to_email,
         subject,
         html: html ?? undefined,
         text: text ?? undefined,
+        attachments,
       })
 
       await execute(

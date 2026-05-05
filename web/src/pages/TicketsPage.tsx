@@ -18,7 +18,7 @@ import * as s from '../styles/shell'
 
 const LIMIT = 50
 
-const TICKET_FILTER_DEFAULTS = { search: '', status: '', priority: '', assignee: '', source: '', tenant: '' }
+const TICKET_FILTER_DEFAULTS = { search: '', status: '', priority: '', assignee: '', source: '', tenant: '', needsReply: '' }
 
 const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
   open:        { bg: '#fef3c7', fg: '#92400e' },
@@ -59,18 +59,20 @@ export default function TicketsPage() {
     persist: filtersPersist, setPersist: setFiltersPersist,
     clear: clearFiltersInternal, hasActive: filtersHasActive,
   } = usePersistedFilters('tickets', TICKET_FILTER_DEFAULTS)
-  const searchFilter   = ticketFilters.search
-  const statusFilter   = ticketFilters.status
-  const priorityFilter = ticketFilters.priority
-  const assigneeFilter = ticketFilters.assignee
-  const sourceFilter   = ticketFilters.source
-  const tenantFilter   = ticketFilters.tenant
-  const setSearchFilter   = (v: string) => { setTicketFilter('search', v); setPage(1) }
-  const setStatusFilter   = (v: string) => { setTicketFilter('status', v); setPage(1) }
-  const setPriorityFilter = (v: string) => { setTicketFilter('priority', v); setPage(1) }
-  const setAssigneeFilter = (v: string) => { setTicketFilter('assignee', v); setPage(1) }
-  const setSourceFilter   = (v: string) => { setTicketFilter('source', v); setPage(1) }
-  const setTenantFilter   = (v: string) => { setTicketFilter('tenant', v); setPage(1) }
+  const searchFilter     = ticketFilters.search
+  const statusFilter     = ticketFilters.status
+  const priorityFilter   = ticketFilters.priority
+  const assigneeFilter   = ticketFilters.assignee
+  const sourceFilter     = ticketFilters.source
+  const tenantFilter     = ticketFilters.tenant
+  const needsReplyFilter = ticketFilters.needsReply === '1'
+  const setSearchFilter     = (v: string) => { setTicketFilter('search', v); setPage(1) }
+  const setStatusFilter     = (v: string) => { setTicketFilter('status', v); setPage(1) }
+  const setPriorityFilter   = (v: string) => { setTicketFilter('priority', v); setPage(1) }
+  const setAssigneeFilter   = (v: string) => { setTicketFilter('assignee', v); setPage(1) }
+  const setSourceFilter     = (v: string) => { setTicketFilter('source', v); setPage(1) }
+  const setTenantFilter     = (v: string) => { setTicketFilter('tenant', v); setPage(1) }
+  const setNeedsReplyFilter = (v: boolean) => { setTicketFilter('needsReply', v ? '1' : ''); setPage(1) }
   const clearFilters = () => { clearFiltersInternal(); setPage(1) }
   const [page, setPage]                     = useState(1)
   const [showCreate, setShowCreate]         = useState(false)
@@ -78,6 +80,12 @@ export default function TicketsPage() {
   const [createError, setCreateError]       = useState<string | null>(null)
   const [form, setForm] = useState({ subject: '', body: '', priority: 'normal' })
   const [createFiles, setCreateFiles] = useState<File[]>([])
+  const [createDrag, setCreateDrag] = useState(false)
+
+  const appendCreateFiles = (incoming: File[]) => {
+    if (incoming.length === 0) return
+    setCreateFiles(prev => [...prev, ...incoming].slice(0, 20))
+  }
 
   const params: Record<string, string> = {
     page: String(page),
@@ -88,6 +96,7 @@ export default function TicketsPage() {
     ...(assigneeFilter ? { assigned_to: assigneeFilter }  : {}),
     ...(sourceFilter   ? { source: sourceFilter }         : {}),
     ...(tenantFilter   ? { tenant_id: tenantFilter }      : {}),
+    ...(needsReplyFilter ? { needs_reply: '1' }           : {}),
   }
 
   const { data, isLoading, isFetching } = useQuery({
@@ -166,7 +175,13 @@ export default function TicketsPage() {
 
   // Compose dashboard (full-width table when no detail open) and sidebar (compact list when open)
   const createForm = showCreate && (
-        <form onSubmit={handleCreate} style={localStyles.createForm}>
+        <form
+          onSubmit={handleCreate}
+          style={{ ...localStyles.createForm, ...(createDrag ? localStyles.createFormDrag : {}) }}
+          onDragOver={e => { e.preventDefault(); setCreateDrag(true) }}
+          onDragLeave={() => setCreateDrag(false)}
+          onDrop={e => { e.preventDefault(); setCreateDrag(false); appendCreateFiles(Array.from(e.dataTransfer?.files ?? [])) }}
+        >
           <input
             style={localStyles.input}
             placeholder={t('tickets_subjectPh')}
@@ -179,6 +194,10 @@ export default function TicketsPage() {
             placeholder={t('tickets_bodyPh')}
             value={form.body}
             onChange={e => setForm(f => ({ ...f, body: e.target.value }))}
+            onPaste={e => {
+              const pasted = Array.from(e.clipboardData?.files ?? [])
+              if (pasted.length > 0) { e.preventDefault(); appendCreateFiles(pasted) }
+            }}
             required
           />
           <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -188,9 +207,10 @@ export default function TicketsPage() {
                 type="file"
                 multiple
                 style={{ display: 'none' }}
-                onChange={e => setCreateFiles(Array.from(e.target.files ?? []).slice(0, 20))}
+                onChange={e => appendCreateFiles(Array.from(e.target.files ?? []))}
               />
             </label>
+            <span style={localStyles.dragHint}>{t('ticketDetail_dragHint')}</span>
             {createFiles.length > 0 && (
               <span style={localStyles.fileNames}>
                 {createFiles.map(f => f.name).join(', ')}
@@ -356,6 +376,17 @@ export default function TicketsPage() {
             )}
           </Dropdown>
 
+          {isStaff && (
+            <button
+              type="button"
+              onClick={() => setNeedsReplyFilter(!needsReplyFilter)}
+              style={needsReplyFilter ? localStyles.toggleActive : localStyles.toggleIdle}
+              title={t('tickets_needsReplyHint')}
+            >
+              {t('tickets_needsReply')}
+            </button>
+          )}
+
           <FilterPersistControls
             persist={filtersPersist}
             setPersist={setFiltersPersist}
@@ -501,12 +532,16 @@ export default function TicketsPage() {
 }
 
 const localStyles: Record<string, React.CSSProperties> = {
-  createForm:   { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '1rem', margin: '.75rem .75rem 0', display: 'flex', flexDirection: 'column', gap: '.5rem', flexShrink: 0, maxHeight: '70vh', overflowY: 'auto' },
-  input:        { padding: '.375rem .75rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.875rem', width: '100%', boxSizing: 'border-box' },
-  selectInForm: { padding: '.3rem .6rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8125rem', background: '#fff' },
-  fileLabel:    { padding: '.25rem .6rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8rem', cursor: 'pointer', color: '#374151' },
-  fileNames:    { fontSize: '.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '.35rem' },
-  fileClear:    { background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '.85rem', padding: 0 },
+  createForm:     { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: '1rem', margin: '.75rem .75rem 0', display: 'flex', flexDirection: 'column', gap: '.5rem', flexShrink: 0, maxHeight: '70vh', overflowY: 'auto' },
+  createFormDrag: { outline: '2px dashed #93c5fd', outlineOffset: 2, background: '#eff6ff' },
+  input:          { padding: '.375rem .75rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.875rem', width: '100%', boxSizing: 'border-box' },
+  selectInForm:   { padding: '.3rem .6rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8125rem', background: '#fff' },
+  fileLabel:      { padding: '.25rem .6rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8rem', cursor: 'pointer', color: '#374151' },
+  fileNames:      { fontSize: '.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '.35rem' },
+  fileClear:      { background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '.85rem', padding: 0 },
+  dragHint:       { fontSize: '.75rem', color: '#94a3b8' },
+  toggleIdle:     { padding: '.25rem .65rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8125rem', color: '#374151', cursor: 'pointer' },
+  toggleActive:   { padding: '.25rem .65rem', background: '#dbeafe', border: '1px solid #2563eb', borderRadius: 4, fontSize: '.8125rem', color: '#1e40af', cursor: 'pointer', fontWeight: 600 },
   errorText:    { color: '#b91c1c', fontSize: '.875rem', margin: 0 },
   countPill:    { display: 'inline-flex', alignItems: 'center', fontSize: '.8125rem', color: '#475569', background: '#e2e8f0', borderRadius: 4, padding: '1px 8px' },
   link:         { color: '#2563eb', textDecoration: 'none', fontWeight: 500 },

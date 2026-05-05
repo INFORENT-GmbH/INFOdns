@@ -1,17 +1,30 @@
 import { useEffect, useMemo, useState } from 'react'
 import { usePageTitle } from '../hooks/usePageTitle'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { getTenants, createTenant, updateTenant, deleteTenant, type Tenant } from '../api/client'
+import { getTenants, createTenant, updateTenant, deleteTenant, validateVatId, type Tenant } from '../api/client'
 import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import FilterPersistControls from '../components/FilterPersistControls'
 import Dropdown, { DropdownItem } from '../components/Dropdown'
+import Select, { type SelectOption } from '../components/Select'
+import PhoneInput from '../components/PhoneInput'
 import ListTable from '../components/ListTable'
 import MasterDetailLayout from '../components/MasterDetailLayout'
 import { useI18n } from '../i18n/I18nContext'
 import { usePersistedFilters } from '../hooks/usePersistedFilters'
 import { formatApiError } from '../lib/formError'
 import * as s from '../styles/shell'
+
+const TAX_MODE_OPTIONS: SelectOption[] = [
+  { value: 'standard',       label: 'Standard (Inland, regulär besteuert)' },
+  { value: 'reverse_charge', label: 'Reverse-Charge (EU-B2B, §13b UStG)' },
+  { value: 'small_business', label: 'Kleinunternehmer (§19 UStG)' },
+  { value: 'non_eu',         label: 'Drittland (nicht steuerbar)' },
+]
+const LOCALE_OPTIONS: SelectOption[] = [
+  { value: 'de', label: 'Deutsch' },
+  { value: 'en', label: 'English' },
+]
 
 const INLINE_STYLES = `
   .tenant-input:focus { border-color: #2563eb !important; outline: none; box-shadow: 0 0 0 2px #bfdbfe; }
@@ -21,6 +34,11 @@ const emptyForm = {
   name: '', company_name: '', first_name: '', last_name: '',
   street: '', zip: '', city: '', country: '',
   phone: '', fax: '', email: '', vat_id: '', notes: '',
+  // Billing-Profil
+  billing_email: '', tax_mode: 'standard' as 'standard' | 'reverse_charge' | 'small_business' | 'non_eu',
+  tax_rate_percent_override: '', payment_terms_days_override: '',
+  postal_delivery_default: false, invoice_locale: 'de' as 'de' | 'en',
+  dunning_paused: false, billing_notes: '',
 }
 
 type SelectedId = number | 'new' | null
@@ -95,22 +113,56 @@ export default function TenantsPage() {
         email: editTarget.email ?? '',
         vat_id: editTarget.vat_id ?? '',
         notes: editTarget.notes ?? '',
+        billing_email: editTarget.billing_email ?? '',
+        tax_mode: editTarget.tax_mode ?? 'standard',
+        tax_rate_percent_override: editTarget.tax_rate_percent_override != null ? String(editTarget.tax_rate_percent_override) : '',
+        payment_terms_days_override: editTarget.payment_terms_days_override != null ? String(editTarget.payment_terms_days_override) : '',
+        postal_delivery_default: !!editTarget.postal_delivery_default,
+        invoice_locale: editTarget.invoice_locale ?? 'de',
+        dunning_paused: !!editTarget.dunning_paused,
+        billing_notes: editTarget.billing_notes ?? '',
       })
     }
   }, [selectedId, editTarget])
 
   function set(field: keyof typeof emptyForm) {
-    return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setForm(f => ({ ...f, [field]: e.target.value }))
+  }
+
+  function setRaw<K extends keyof typeof emptyForm>(field: K, value: typeof emptyForm[K]) {
+    setForm(f => ({ ...f, [field]: value }))
+  }
+
+  async function handleValidateVatId() {
+    if (!editTarget) return
+    setSaving(true); setError(null)
+    try {
+      const r = await validateVatId(editTarget.id)
+      qc.invalidateQueries({ queryKey: ['tenants'] })
+      alert(r.data.valid
+        ? `USt-IdNr. gültig.\nName: ${r.data.name ?? '—'}\nAdresse: ${r.data.address ?? '—'}`
+        : `USt-IdNr. NICHT gültig laut VIES.`)
+    } catch (err: any) {
+      setError(formatApiError(err))
+    } finally { setSaving(false) }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true); setError(null)
     const payload: any = { name: form.name }
+    const numericFields = new Set(['tax_rate_percent_override', 'payment_terms_days_override'])
+    const booleanFields = new Set(['postal_delivery_default', 'dunning_paused'])
     for (const [k, v] of Object.entries(form)) {
       if (k === 'name') continue
-      payload[k] = v || null
+      if (numericFields.has(k)) {
+        payload[k] = v === '' || v == null ? null : Number(v)
+      } else if (booleanFields.has(k)) {
+        payload[k] = !!v
+      } else {
+        payload[k] = v === '' ? null : v
+      }
     }
     try {
       if (editTarget) {
@@ -355,11 +407,11 @@ export default function TenantsPage() {
           </label>
           <label style={localStyles.label}>
             {t('tenants_phone')}
-            <input className="tenant-input" value={form.phone} onChange={set('phone')} style={localStyles.input} />
+            <PhoneInput value={form.phone} onChange={v => setRaw('phone', v)} style={{ width: '100%' }} />
           </label>
           <label style={localStyles.label}>
             {t('tenants_fax')}
-            <input className="tenant-input" value={form.fax} onChange={set('fax')} style={localStyles.input} />
+            <PhoneInput value={form.fax} onChange={v => setRaw('fax', v)} style={{ width: '100%' }} />
           </label>
         </div>
 
@@ -390,7 +442,81 @@ export default function TenantsPage() {
         </div>
         <label style={localStyles.label}>
           {t('tenants_vatId')}
-          <input className="tenant-input" value={form.vat_id} onChange={set('vat_id')} style={localStyles.input} />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+            <input className="tenant-input" value={form.vat_id} onChange={set('vat_id')}
+              style={{ ...localStyles.input, flex: 1 }} />
+            {editTarget && form.vat_id && (
+              <button type="button" style={s.secondaryBtn} onClick={handleValidateVatId} disabled={saving}>
+                VIES prüfen
+              </button>
+            )}
+          </div>
+          {editTarget?.vat_id_validated_at && (
+            <div style={{ fontSize: '.75rem', marginTop: 4,
+                           color: editTarget.vat_id_valid ? '#15803d' : '#b91c1c' }}>
+              {editTarget.vat_id_valid
+                ? `✓ Gültig (geprüft ${editTarget.vat_id_validated_at.slice(0,10)})${editTarget.vat_id_check_name ? ' — ' + editTarget.vat_id_check_name : ''}`
+                : `✗ Nicht gültig (geprüft ${editTarget.vat_id_validated_at.slice(0,10)})`}
+            </div>
+          )}
+        </label>
+        <label style={localStyles.label}>
+          Rechnungs-E-Mail (überschreibt Kontakt-E-Mail für Rechnungen)
+          <input className="tenant-input" type="email" value={form.billing_email} onChange={set('billing_email')} style={localStyles.input} />
+        </label>
+        <label style={localStyles.label}>
+          Steuermodus
+          <Select
+            value={form.tax_mode}
+            onChange={v => setRaw('tax_mode', v as typeof form.tax_mode)}
+            options={TAX_MODE_OPTIONS}
+            style={{ minWidth: '100%' }}
+          />
+        </label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' }}>
+          <label style={localStyles.label}>
+            Steuersatz-Override (%)
+            <input className="tenant-input" type="number" step="0.01"
+              value={form.tax_rate_percent_override} onChange={set('tax_rate_percent_override')}
+              placeholder="Default aus Settings" style={localStyles.input} />
+          </label>
+          <label style={localStyles.label}>
+            Zahlungsziel-Override (Tage)
+            <input className="tenant-input" type="number"
+              value={form.payment_terms_days_override} onChange={set('payment_terms_days_override')}
+              placeholder="Default aus Settings" style={localStyles.input} />
+          </label>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' }}>
+          <label style={localStyles.label}>
+            Rechnungs-Sprache
+            <Select
+              value={form.invoice_locale}
+              onChange={v => setRaw('invoice_locale', v as typeof form.invoice_locale)}
+              options={LOCALE_OPTIONS}
+              style={{ minWidth: '100%' }}
+            />
+          </label>
+          <label style={{ ...localStyles.label, justifyContent: 'flex-end' }}>
+            <span style={{ visibility: 'hidden' }}>spacer</span>
+            <span style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.8125rem' }}>
+                <input type="checkbox" checked={form.postal_delivery_default}
+                  onChange={e => setRaw('postal_delivery_default', e.target.checked)} />
+                Postversand als Standard
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.8125rem' }}>
+                <input type="checkbox" checked={form.dunning_paused}
+                  onChange={e => setRaw('dunning_paused', e.target.checked)} />
+                Mahnungen pausiert
+              </label>
+            </span>
+          </label>
+        </div>
+        <label style={localStyles.label}>
+          Interne Abrechnungs-Notizen
+          <textarea className="tenant-input" value={form.billing_notes} onChange={set('billing_notes')}
+            rows={2} style={{ ...localStyles.input, resize: 'vertical' }} />
         </label>
 
         <div style={localStyles.sectionDivider}>

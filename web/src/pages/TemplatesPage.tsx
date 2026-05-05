@@ -15,6 +15,7 @@ import SearchInput from '../components/SearchInput'
 import FilterBar from '../components/FilterBar'
 import ListTable from '../components/ListTable'
 import MasterDetailLayout from '../components/MasterDetailLayout'
+import EditPencilIcon from '../components/EditPencilIcon'
 import * as sh from '../styles/shell'
 import { formatApiError } from '../lib/formError'
 
@@ -24,6 +25,7 @@ const MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Con
 const INLINE_STYLES = `
   .inline-field:hover { border-color: #d1d5db !important; background: #fff !important; }
   .inline-field:focus { border-color: #2563eb !important; background: #fff !important; outline: none !important; box-shadow: 0 0 0 2px #bfdbfe; }
+  .editable-trigger:hover .edit-pencil-icon { opacity: .85 !important; }
 `
 
 function typeNeedsPriority(type: string) { return type === 'MX' || type === 'SRV' }
@@ -425,11 +427,13 @@ export default function TemplatesPage() {
                   />
                 ) : (
                   <h3
-                    style={{ ...styles.h3, cursor: canEditTemplate(detail) ? 'text' : 'default' }}
+                    className={canEditTemplate(detail) ? 'editable-trigger' : undefined}
+                    style={{ ...styles.h3, cursor: canEditTemplate(detail) ? 'text' : 'default', display: 'inline-flex', alignItems: 'center', gap: '.35rem' }}
                     onClick={() => canEditTemplate(detail) && setEditName(detail.name)}
                     title={canEditTemplate(detail) ? t('edit') : undefined}
                   >
                     {detail.name}
+                    {canEditTemplate(detail) && <EditPencilIcon size={13} style={{ color: '#94a3b8' }} title={t('edit')} />}
                   </h3>
                 )}
                 <span style={styles.badge}>{tenantName(detail.tenant_id)}</span>
@@ -445,10 +449,15 @@ export default function TemplatesPage() {
                 />
               ) : (
                 <p
-                  style={{ fontSize: '.8125rem', color: '#64748b', margin: '0 0 .75rem', cursor: canEditTemplate(detail) ? 'text' : 'default', minHeight: '1.25rem' }}
+                  className={canEditTemplate(detail) ? 'editable-trigger' : undefined}
+                  style={{ fontSize: '.8125rem', color: '#64748b', margin: '0 0 .75rem', cursor: canEditTemplate(detail) ? 'text' : 'default', minHeight: '1.25rem', display: 'flex', alignItems: 'flex-start', gap: '.35rem' }}
                   onClick={() => canEditTemplate(detail) && setEditDesc(detail.description ?? '')}
+                  title={canEditTemplate(detail) ? t('edit') : undefined}
                 >
-                  {detail.description || (canEditTemplate(detail) ? <em>{t('templates_descPh')}</em> : null)}
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    {detail.description || (canEditTemplate(detail) ? <em>{t('templates_descPh')}</em> : null)}
+                  </span>
+                  {canEditTemplate(detail) && <EditPencilIcon style={{ color: '#94a3b8', marginTop: 3 }} title={t('edit')} />}
                 </p>
               )}
 

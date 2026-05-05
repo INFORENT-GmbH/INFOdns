@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { query, queryOne, execute } from '../db.js'
 import { requireAdmin } from '../middleware/auth.js'
 import { renderTemplate, type Locale } from '../lib/mailTemplates.js'
+import { broadcast } from '../ws/hub.js'
 
 export async function mailQueueRoutes(app: FastifyInstance) {
   // GET /mail-queue  (admin only)
@@ -95,6 +96,41 @@ export async function mailQueueRoutes(app: FastifyInstance) {
       `UPDATE mail_queue SET status = 'pending', retries = 0, error = NULL, updated_at = NOW() WHERE id = ?`,
       [id]
     )
+    broadcast({ type: 'mail_queue_update', mailId: id, status: 'pending', retries: 0, error: null })
     return { ok: true }
+  })
+
+  // POST /mail-queue/:id/dismiss  (admin only — acknowledge a failed mail without retrying)
+  // Marks the row as 'dismissed' so the worker won't pick it up again and the
+  // failure counter on the dashboard drops. The error message and full payload
+  // are preserved indefinitely — dismissed rows are never purged.
+  app.post<{ Params: { id: string } }>('/mail-queue/:id/dismiss', { preHandler: requireAdmin }, async (req, reply) => {
+    const id = Number(req.params.id)
+    const mail = await queryOne<{ status: string }>('SELECT status FROM mail_queue WHERE id = ?', [id])
+    if (!mail) return reply.status(404).send({ code: 'NOT_FOUND' })
+    if (mail.status !== 'failed') return reply.status(400).send({ code: 'NOT_FAILED' })
+
+    await execute(
+      `UPDATE mail_queue SET status = 'dismissed', updated_at = NOW() WHERE id = ?`,
+      [id]
+    )
+    broadcast({ type: 'mail_queue_update', mailId: id, status: 'dismissed' })
+    return { ok: true }
+  })
+
+  // POST /mail-queue/dismiss-all-failed  (admin only — bulk acknowledge every failed mail)
+  app.post('/mail-queue/dismiss-all-failed', { preHandler: requireAdmin }, async () => {
+    const failed = await query<{ id: number }>(
+      `SELECT id FROM mail_queue WHERE status = 'failed'`
+    ) as { id: number }[]
+    if (failed.length === 0) return { ok: true, dismissed: 0 }
+
+    await execute(
+      `UPDATE mail_queue SET status = 'dismissed', updated_at = NOW() WHERE status = 'failed'`
+    )
+    for (const row of failed) {
+      broadcast({ type: 'mail_queue_update', mailId: row.id, status: 'dismissed' })
+    }
+    return { ok: true, dismissed: failed.length }
   })
 }

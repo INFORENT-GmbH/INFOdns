@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTicket, getUsers, updateTicket, addTicketMessage, uploadAttachments, downloadAttachment, type TicketMessage, type TicketAttachment } from '../api/client'
 import Select from '../components/Select'
+import { usePageTitle } from '../hooks/usePageTitle'
 import { useI18n } from '../i18n/I18nContext'
 import { useAuth } from '../context/AuthContext'
 import { formatApiError } from '../lib/formError'
@@ -32,6 +33,46 @@ function Badge({ value, colors }: { value: string; colors: Record<string, { bg: 
   return <span style={{ background: c.bg, color: c.fg, padding: '2px 8px', borderRadius: 4, fontSize: '.75rem', fontWeight: 600 }}>{value}</span>
 }
 
+// Renders a system event message ("Alice changed status from open → closed").
+// The body column for events stores JSON: { event, old, new }. We translate the
+// event type and value labels rather than the server-side string so the line
+// reads correctly in the viewer's locale.
+function EventLine({ msg }: { msg: TicketMessage }) {
+  const { t } = useI18n()
+  let payload: { event?: string; old?: unknown; new?: unknown } = {}
+  try { payload = JSON.parse(msg.body) } catch { /* show raw on parse failure */ }
+
+  const author = msg.author_name || msg.author_email || 'system'
+  const when = new Date(msg.created_at).toLocaleString()
+
+  const labelFor = (event: string, value: unknown): string => {
+    if (value === null || value === undefined || value === '') return t('ticketDetail_event_none')
+    const s = String(value)
+    if (event === 'status_changed')   return t(`ticket_status_${s}` as any) || s
+    if (event === 'priority_changed') return t(`ticket_priority_${s}` as any) || s
+    if (event === 'assignee_changed') return s // user id; keep raw — UI will show name on next reload
+    return s
+  }
+
+  const event = payload.event ?? 'unknown'
+  const oldLabel = labelFor(event, payload.old)
+  const newLabel = labelFor(event, payload.new)
+  const verb =
+    event === 'status_changed'   ? t('ticketDetail_event_statusChanged') :
+    event === 'priority_changed' ? t('ticketDetail_event_priorityChanged') :
+    event === 'assignee_changed' ? t('ticketDetail_event_assigneeChanged') :
+                                   event
+
+  return (
+    <div style={styles.eventLine}>
+      <span style={styles.eventText}>
+        {author} · {verb}: {oldLabel} → {newLabel}
+      </span>
+      <span style={styles.eventTime}>{when}</span>
+    </div>
+  )
+}
+
 export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>()
   const ticketId = Number(id)
@@ -46,11 +87,17 @@ export default function TicketDetailPage() {
   const [sending, setSending]           = useState(false)
   const [sendError, setSendError]       = useState<string | null>(null)
   const [updating, setUpdating]         = useState(false)
+  const [dragOver, setDragOver]         = useState(false)
+  const textareaRef                     = useRef<HTMLTextAreaElement>(null)
 
   const { data: ticket, isLoading } = useQuery({
     queryKey: ['ticket', ticketId],
     queryFn: () => getTicket(ticketId).then(r => r.data),
   })
+
+  // Window title shows the ticket ID/subject so the browser tab is meaningful when
+  // multiple tickets are open. Falls back to the static label while loading.
+  usePageTitle(ticket ? `#${ticket.id} — ${ticket.subject}` : 'Support Ticket')
 
   const { data: users } = useQuery({
     queryKey: ['users'],
@@ -68,6 +115,44 @@ export default function TicketDetailPage() {
       qc.invalidateQueries({ queryKey: ['tickets'] })
     } finally {
       setUpdating(false)
+    }
+  }
+
+  function appendFiles(incoming: File[]) {
+    if (incoming.length === 0) return
+    setFiles(prev => [...prev, ...incoming].slice(0, 20))
+  }
+
+  // Build a quoted reply prefix from a previous message and prepend it to the
+  // textarea, focusing it. Mirrors the conventional email-client behavior.
+  function quoteMessage(msg: TicketMessage) {
+    const author = msg.author_name || msg.author_email || 'Unknown'
+    const date = new Date(msg.created_at).toLocaleString()
+    const lines = msg.body.split('\n').map(l => `> ${l}`).join('\n')
+    const prefix = `${t('ticketDetail_onWrote', author, date)}\n${lines}\n\n`
+    setReplyBody(prev => prefix + prev)
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current
+      if (ta) {
+        ta.focus()
+        ta.setSelectionRange(0, 0)
+        ta.scrollTop = 0
+      }
+    })
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragOver(false)
+    const dropped = Array.from(e.dataTransfer?.files ?? [])
+    appendFiles(dropped)
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const pasted = Array.from(e.clipboardData?.files ?? [])
+    if (pasted.length > 0) {
+      e.preventDefault() // skip pasting filename text
+      appendFiles(pasted)
     }
   }
 
@@ -157,42 +242,63 @@ export default function TicketDetailPage() {
       <div style={styles.thread}>
         {ticket.messages.length === 0 ? (
           <p style={styles.muted}>{t('ticketDetail_noMessages')}</p>
-        ) : ticket.messages.map((msg: TicketMessage) => (
-          <div key={msg.id} style={{ ...styles.message, ...(msg.is_internal ? styles.messageInternal : {}) }}>
-            <div style={styles.msgHeader}>
-              <strong>{msg.author_name || msg.author_email}</strong>
-              <span style={styles.muted}>{new Date(msg.created_at).toLocaleString()}</span>
-              {msg.is_internal ? (
-                <span style={styles.internalBadge}>{t('ticketDetail_internalNote')}</span>
-              ) : (
-                <span style={styles.sourceBadge}>{msg.source}</span>
+        ) : ticket.messages.map((msg: TicketMessage) => {
+          if (msg.kind === 'event') {
+            return <EventLine key={msg.id} msg={msg} />
+          }
+          return (
+            <div key={msg.id} style={{ ...styles.message, ...(msg.is_internal ? styles.messageInternal : {}) }}>
+              <div style={styles.msgHeader}>
+                <strong>{msg.author_name || msg.author_email}</strong>
+                <span style={styles.muted}>{new Date(msg.created_at).toLocaleString()}</span>
+                {msg.is_internal ? (
+                  <span style={styles.internalBadge}>{t('ticketDetail_internalNote')}</span>
+                ) : (
+                  <span style={styles.sourceBadge}>{msg.source}</span>
+                )}
+                <button
+                  type="button"
+                  style={styles.quoteBtn}
+                  onClick={() => quoteMessage(msg)}
+                  title={t('ticketDetail_quoteTitle')}
+                >
+                  {t('ticketDetail_quote')}
+                </button>
+              </div>
+              <div style={styles.msgBody}>{msg.body}</div>
+              {msg.attachments?.length > 0 && (
+                <div style={styles.attachList}>
+                  {msg.attachments.map((att: TicketAttachment) => (
+                    <button
+                      key={att.id}
+                      style={styles.attachBtn}
+                      onClick={() => downloadAttachment(ticket.id, att.id, att.original_name)}
+                      type="button"
+                    >
+                      📎 {att.original_name} <span style={styles.attachSize}>({formatBytes(att.size)})</span>
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
-            <div style={styles.msgBody}>{msg.body}</div>
-            {msg.attachments?.length > 0 && (
-              <div style={styles.attachList}>
-                {msg.attachments.map((att: TicketAttachment) => (
-                  <button
-                    key={att.id}
-                    style={styles.attachBtn}
-                    onClick={() => downloadAttachment(ticket.id, att.id, att.original_name)}
-                    type="button"
-                  >
-                    📎 {att.original_name} <span style={styles.attachSize}>({formatBytes(att.size)})</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+          )
+        })}
       </div>
 
-      <form onSubmit={handleReply} style={styles.replyForm}>
+      <form
+        onSubmit={handleReply}
+        style={{ ...styles.replyForm, ...(dragOver ? styles.replyFormDrag : {}) }}
+        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+      >
         <textarea
+          ref={textareaRef}
           style={styles.textarea}
           placeholder={t('ticketDetail_replyPh')}
           value={replyBody}
           onChange={e => setReplyBody(e.target.value)}
+          onPaste={handlePaste}
           required
           rows={4}
         />
@@ -203,9 +309,10 @@ export default function TicketDetailPage() {
               type="file"
               multiple
               style={{ display: 'none' }}
-              onChange={e => setFiles(Array.from(e.target.files ?? []).slice(0, 20))}
+              onChange={e => appendFiles(Array.from(e.target.files ?? []))}
             />
           </label>
+          <span style={styles.dragHint}>{t('ticketDetail_dragHint')}</span>
           {files.length > 0 && (
             <span style={styles.fileNames}>
               {files.map(f => f.name).join(', ')}
@@ -263,4 +370,10 @@ const styles: Record<string, React.CSSProperties> = {
   fileLabel:       { padding: '.25rem .6rem', border: '1px solid #e2e8f0', borderRadius: 4, fontSize: '.8rem', cursor: 'pointer', color: '#374151' },
   fileNames:       { fontSize: '.8rem', color: '#64748b', display: 'flex', alignItems: 'center', gap: '.35rem' },
   fileClear:       { background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: '.85rem', padding: 0 },
+  dragHint:        { fontSize: '.75rem', color: '#94a3b8' },
+  replyFormDrag:   { outline: '2px dashed #93c5fd', outlineOffset: 2, background: '#eff6ff' },
+  quoteBtn:        { marginLeft: 'auto', background: 'none', border: '1px solid #e2e8f0', borderRadius: 4, padding: '1px 8px', fontSize: '.7rem', color: '#64748b', cursor: 'pointer' },
+  eventLine:       { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.5rem', padding: '.25rem 0', fontSize: '.75rem', color: '#94a3b8' },
+  eventText:       { fontStyle: 'italic' as const },
+  eventTime:       { color: '#cbd5e1' },
 }

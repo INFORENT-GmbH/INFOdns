@@ -20,7 +20,7 @@ export default function Layout() {
   const navigate = useNavigate()
   const location = useLocation()
   const isMobile = useIsMobile()
-  const FULL_BLEED_PREFIXES = ['/domains', '/users', '/tenants', '/audit-logs', '/mail-queue', '/jobs', '/registrars', '/tld-pricing', '/templates', '/tickets']
+  const FULL_BLEED_PREFIXES = ['/domains', '/users', '/tenants', '/audit-logs', '/mail-queue', '/jobs', '/registrars', '/tld-pricing', '/templates', '/tickets', '/billing', '/portal']
   const fullBleed = FULL_BLEED_PREFIXES.some(p => location.pathname === p || location.pathname.startsWith(`${p}/`))
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [copiedNs, setCopiedNs] = useState<string | null>(null)
@@ -91,6 +91,12 @@ export default function Layout() {
         {t('nav_templates')}
       </NavLink>
 
+      {user?.role !== 'admin' && (
+        <NavLink to="/portal/invoices" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
+          Meine Rechnungen
+        </NavLink>
+      )}
+
       <div style={styles.sectionHeader}>{t('nav_help')}</div>
       <NavLink to="/tickets" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
         {t('nav_support')}
@@ -123,6 +129,24 @@ export default function Layout() {
         </NavLink>
         <NavLink to="/import" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
           INFOease Import
+        </NavLink>
+        <NavLink to="/billing/dashboard" className="sb-item" style={navItemStyle} onClick={closeSidebar}>
+          Abrechnung
+        </NavLink>
+        <NavLink to="/billing/invoices" className="sb-item" style={subNavItemStyle} onClick={closeSidebar}>
+          Rechnungen
+        </NavLink>
+        <NavLink to="/billing/items" className="sb-item" style={subNavItemStyle} onClick={closeSidebar}>
+          Posten
+        </NavLink>
+        <NavLink to="/billing/dunning" className="sb-item" style={subNavItemStyle} onClick={closeSidebar}>
+          Mahnungen
+        </NavLink>
+        <NavLink to="/billing/postal" className="sb-item" style={subNavItemStyle} onClick={closeSidebar}>
+          Postversand
+        </NavLink>
+        <NavLink to="/billing/settings" className="sb-item" style={subNavItemStyle} onClick={closeSidebar}>
+          Einstellungen
         </NavLink>
       </>)}
     </div>

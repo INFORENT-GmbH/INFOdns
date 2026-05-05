@@ -65,3 +65,22 @@ UNIQUE KEY on `domain_id` — only one pending job per domain. Rapid edits coale
 - Queries always enabled — no "search first" gates
 - Zod errors come back as JSON string inside `message` — unwrap to `field: message` for display
 - No unnecessary abstractions or extra error handling for impossible cases
+
+## UI components — mandatory wrappers
+
+Native HTML inputs are **not** used directly when a wrapper exists. Otherwise the UI looks inconsistent and shared formatting/validation is missing.
+
+| Instead of native… | Use… | Where |
+|---|---|---|
+| `<select>` | `<Select value onChange options>` | `web/src/components/Select.tsx`. Single-choice dropdowns including filters and 2-item selects. |
+| `<select multiple>` | `<MultiSelect values onChange options>` | `web/src/components/MultiSelect.tsx`. Multi-pick (e.g. Geschäftsführer-Picker). |
+| `<input type="number">` for money | `<EuroInput cents onChange>` | `web/src/components/EuroInput.tsx`. Storage in cents, inline euro input ("12,34 €"). Accepts both "12,34" and "12.34". `allowNegative` for storno/credit-note rows. |
+| `<input>` for phone numbers | `<PhoneInput value onChange>` | `web/src/components/PhoneInput.tsx`. Normalises "0…" → "+49 …" on blur, groups readably, uses an explicit list of known dial codes (no greedy matching). |
+| `<input>` for search/filter | `<SearchInput>` | `web/src/components/SearchInput.tsx`. |
+| Action menus (filter modes etc.) | `<Dropdown>` | `web/src/components/Dropdown.tsx`. Render-prop API. |
+
+`Select`/`MultiSelect` options are passed as `SelectOption[]` (`{ value, label }`), **not** as `<option>` children. Define them as top-level constants or `useMemo`d arrays — react-select rerenders if the array reference changes.
+
+When adding a new page: scan `web/src/components/` first to see if a wrapper for the UI primitive already exists. Consistency beats convenience.
+
+**Worker code reuse pattern:** worker and api are separate Docker images; the worker can't import from `api/src/`. Pure billing helpers (`nextDue`, `prorate`, `taxRules`) are duplicated in `worker/src/` with a `// COPY — keep in sync with api/src/billing/<file>` header comment. Edits must be applied to both. If this list grows, factor a `shared/` package.

@@ -35,6 +35,65 @@ function extractTicketRef(subject: string): number | null {
   return m ? Number(m[1]) : null
 }
 
+// ── Reply body cleanup ────────────────────────────────────────
+//
+// Inbound emails routinely include the entire prior conversation as quoted history
+// plus a signature. Storing the raw body verbatim makes long threads unreadable.
+// This stripper handles the four most common patterns: the RFC 3676 signature
+// delimiter, "On … wrote:" / "Am … schrieb:" reply headers (Apple Mail, Gmail,
+// most German clients), Outlook's "-----Original Message-----" / "From:/Sent:"
+// blocks, and a contiguous trailing run of `>`-prefixed quote lines.
+//
+// We cut at the first match of each pattern. False positives are rare but possible —
+// a user who legitimately writes "On Tuesday, Alice wrote:" mid-message will lose
+// the rest. Acceptable trade-off given how much it improves the common case.
+export function cleanReply(body: string): string {
+  let s = body.replace(/\r\n/g, '\n')
+
+  // 1. Signature delimiter (RFC 3676): a line containing exactly "-- "
+  const sigMatch = s.match(/^-- $/m)
+  if (sigMatch && sigMatch.index !== undefined) {
+    s = s.slice(0, sigMatch.index)
+  }
+
+  // 2. Reply header — English ("On <date>, <name> wrote:")
+  const onWrote = s.match(/^On\s.+\swrote:\s*$/m)
+  if (onWrote && onWrote.index !== undefined) {
+    s = s.slice(0, onWrote.index)
+  }
+
+  // 3. Reply header — German ("Am <date> schrieb <name>:")
+  const amSchrieb = s.match(/^Am\s.+\sschrieb\s.+:\s*$/m)
+  if (amSchrieb && amSchrieb.index !== undefined) {
+    s = s.slice(0, amSchrieb.index)
+  }
+
+  // 4. Outlook "-----Original Message-----" or From:/Sent: block
+  const outlookSep = s.match(/^-+\s*Original Message\s*-+\s*$/mi)
+  if (outlookSep && outlookSep.index !== undefined) {
+    s = s.slice(0, outlookSep.index)
+  }
+  const outlookHdr = s.match(/^From:\s.+\nSent:\s/mi)
+  if (outlookHdr && outlookHdr.index !== undefined) {
+    s = s.slice(0, outlookHdr.index)
+  }
+
+  // 5. Trailing run of `>`-prefixed quote lines (with intervening blank lines).
+  //    Only strip if there's at least one quote line at the bottom.
+  const lines = s.split('\n')
+  let i = lines.length - 1
+  let sawQuote = false
+  while (i >= 0) {
+    const line = lines[i]
+    if (/^\s*>/.test(line)) { sawQuote = true; i--; continue }
+    if (line.trim() === '') { i--; continue }
+    break
+  }
+  if (sawQuote) lines.length = i + 1
+
+  return lines.join('\n').trimEnd()
+}
+
 async function lookupTenantByEmail(email: string): Promise<number | null> {
   const row = await queryOne<{ tenant_id: number }>(
     `SELECT uc.tenant_id FROM users u
@@ -51,7 +110,8 @@ async function handleParsedEmail(parsed: Awaited<ReturnType<typeof simpleParser>
   const fromAddr  = parsed.from?.value?.[0]?.address ?? ''
   const fromName  = parsed.from?.value?.[0]?.name ?? ''
   const subject   = parsed.subject ?? '(no subject)'
-  const body      = parsed.text ?? (parsed.html ? parsed.html.replace(/<[^>]+>/g, '') : '')
+  const rawBody   = parsed.text ?? (parsed.html ? parsed.html.replace(/<[^>]+>/g, '') : '')
+  const body      = cleanReply(rawBody)
   const msgId     = parsed.messageId ?? null
   const inReplyTo = parsed.inReplyTo ?? null
   const references = parsed.references
@@ -161,15 +221,30 @@ async function runImapSession(): Promise<void> {
     if (!uids || uids.length === 0) return
 
     for (const uid of uids as number[]) {
+      // Stage the work in two phases so a delete failure after a successful insert
+      // is logged distinctly from a parse/insert failure. If insert succeeded but
+      // delete failed, the next poll re-fetches the message and the UNIQUE index on
+      // ticket_messages.message_id (Message-ID header) makes the second insert a
+      // no-op, so the worst case is one extra fetch — never a duplicate ticket.
+      let processed = false
       try {
         const msg = await client.fetchOne(String(uid), { source: true }, { uid: true })
         if (!msg || !('source' in msg) || !msg.source) continue
 
         const parsed = await simpleParser(msg.source as Buffer)
         await handleParsedEmail(parsed)
-        await client.messageDelete(String(uid), { uid: true })
+        processed = true
       } catch (err: any) {
-        console.error(`[imap] Failed to process UID ${uid}:`, err.message)
+        console.error(`[imap] Failed to process UID ${uid} (left in inbox for retry):`, err.message)
+        continue
+      }
+
+      if (processed) {
+        try {
+          await client.messageDelete(String(uid), { uid: true })
+        } catch (err: any) {
+          console.error(`[imap] Insert OK but delete failed for UID ${uid} — will dedup on retry:`, err.message)
+        }
       }
     }
   } finally {

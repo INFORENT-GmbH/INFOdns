@@ -7,6 +7,7 @@ import path from 'node:path'
 import { query, queryOne, execute } from '../db.js'
 import { requireAuth, requireOperatorOrAdmin } from '../middleware/auth.js'
 import { broadcast } from '../ws/hub.js'
+import { writeAuditLog } from '../audit/middleware.js'
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR ?? '/app/uploads'
 
@@ -33,13 +34,39 @@ function tenantFilter(userId: number, email: string): { clause: string; params: 
   }
 }
 
+// System "event" message — recorded in the thread when staff change status / priority /
+// assignee. Body is JSON ({event, old, new}) so the UI can render it localized. Status
+// changes are visible to the requester; priority/assignee changes are staff-only.
+async function writeEventMessage(
+  ticketId: number,
+  authorUserId: number | null,
+  authorName: string,
+  event: 'status_changed' | 'priority_changed' | 'assignee_changed',
+  oldValue: unknown,
+  newValue: unknown,
+): Promise<void> {
+  const isInternal = event !== 'status_changed' ? 1 : 0
+  await execute(
+    `INSERT INTO ticket_messages
+       (ticket_id, author_user_id, author_name, author_email, body, kind, is_internal, source)
+     VALUES (?, ?, ?, '', ?, 'event', ?, 'web')`,
+    [
+      ticketId,
+      authorUserId,
+      authorName,
+      JSON.stringify({ event, old: oldValue, new: newValue }),
+      isInternal,
+    ],
+  )
+}
+
 // ── Route plugin ─────────────────────────────────────────────
 
 export async function ticketRoutes(app: FastifyInstance) {
 
   // GET /tickets
   app.get('/tickets', { preHandler: requireAuth }, async (req: any) => {
-    const { status, priority, assigned_to, tenant_id, source, search, page = '1', limit = '50' } = req.query as Record<string, string>
+    const { status, priority, assigned_to, tenant_id, source, search, needs_reply, page = '1', limit = '50' } = req.query as Record<string, string>
     const pageNum  = Math.max(1, Number(page))
     const limitNum = Math.min(200, Math.max(1, Number(limit)))
     const offset   = (pageNum - 1) * limitNum
@@ -60,10 +87,39 @@ export async function ticketRoutes(app: FastifyInstance) {
     if (tenant_id) { clauses.push('t.tenant_id = ?'); params.push(Number(tenant_id)) }
     if (source)    { clauses.push('t.source = ?'); params.push(source) }
     if (search) {
+      // Subject + requester are LIKE-matched. Message bodies use FULLTEXT (faster, ranked)
+      // with a LIKE fallback so short tokens (under MariaDB's ft_min_word_len, default 4)
+      // still match. Events (kind='event') store JSON metadata, never user content, so
+      // they're excluded.
       const escaped = search.replace(/\\/g, '\\\\').replace(/[%_]/g, '\\$&')
       const pattern = `%${escaped}%`
-      clauses.push('(t.subject LIKE ? OR t.requester_email LIKE ? OR t.requester_name LIKE ?)')
-      params.push(pattern, pattern, pattern)
+      clauses.push(`(
+        t.subject LIKE ?
+        OR t.requester_email LIKE ?
+        OR t.requester_name LIKE ?
+        OR EXISTS (
+          SELECT 1 FROM ticket_messages m
+          WHERE m.ticket_id = t.id AND m.kind = 'reply'
+          AND (m.body LIKE ? OR MATCH(m.body) AGAINST(? IN NATURAL LANGUAGE MODE))
+        )
+      )`)
+      params.push(pattern, pattern, pattern, pattern, search)
+    }
+    if (needs_reply === '1') {
+      // Latest reply in the ticket is from the requester (either an email reply with
+      // no linked user, or a portal message from a tenant role).
+      clauses.push(`t.status IN ('open','in_progress','waiting')`)
+      clauses.push(`(
+        SELECT CASE
+          WHEN m.author_user_id IS NULL THEN 1
+          WHEN u2.role = 'tenant'      THEN 1
+          ELSE 0 END
+        FROM ticket_messages m
+        LEFT JOIN users u2 ON u2.id = m.author_user_id
+        WHERE m.ticket_id = t.id AND m.kind = 'reply'
+        ORDER BY m.created_at DESC
+        LIMIT 1
+      ) = 1`)
     }
 
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
@@ -171,6 +227,44 @@ export async function ticketRoutes(app: FastifyInstance) {
     return reply.status(201).send({ id: ticketId, messageId: msgResult.insertId, subject: data.subject, status: 'open', priority: data.priority })
   })
 
+  // GET /tickets/stats — aggregate counts for the dashboard
+  app.get('/tickets/stats', { preHandler: requireAuth }, async (req: any) => {
+    const clauses: string[] = [`t.status IN ('open','in_progress','waiting')`]
+    const params: unknown[] = []
+
+    if (!isStaff(req.user.role)) {
+      const userRow = await queryOne<{ email: string }>('SELECT email FROM users WHERE id = ?', [req.user.sub])
+      const f = tenantFilter(req.user.sub, userRow?.email ?? '')
+      clauses.push(f.clause)
+      params.push(...f.params)
+    }
+
+    const where = `WHERE ${clauses.join(' AND ')}`
+    const row = await queryOne<{
+      open: number; urgent: number; high: number; normal: number; low: number
+    }>(
+      `SELECT
+         COUNT(*) AS open,
+         SUM(t.priority='urgent') AS urgent,
+         SUM(t.priority='high')   AS high,
+         SUM(t.priority='normal') AS normal,
+         SUM(t.priority='low')    AS low
+       FROM support_tickets t
+       ${where}`,
+      params,
+    )
+
+    return {
+      open: Number(row?.open ?? 0),
+      by_priority: {
+        urgent: Number(row?.urgent ?? 0),
+        high:   Number(row?.high   ?? 0),
+        normal: Number(row?.normal ?? 0),
+        low:    Number(row?.low    ?? 0),
+      },
+    }
+  })
+
   // GET /tickets/:id
   app.get<{ Params: { id: string } }>('/tickets/:id', { preHandler: requireAuth }, async (req: any, reply) => {
     const id = Number(req.params.id)
@@ -200,7 +294,7 @@ export async function ticketRoutes(app: FastifyInstance) {
     const internalFilter = isStaff(req.user.role) ? '' : 'AND m.is_internal = 0'
     const messages = await query(
       `SELECT m.id, m.ticket_id, m.author_user_id, m.author_name, m.author_email,
-              m.body, m.is_internal, m.source, m.created_at
+              m.body, m.kind, m.is_internal, m.source, m.created_at
        FROM ticket_messages m
        WHERE m.ticket_id = ? ${internalFilter}
        ORDER BY m.created_at ASC`,
@@ -238,16 +332,28 @@ export async function ticketRoutes(app: FastifyInstance) {
     const data = parsed.data
 
     const ticket = await queryOne<any>(
-      'SELECT id, subject, assigned_to, requester_email FROM support_tickets WHERE id = ?', [id]
+      'SELECT id, subject, status, priority, assigned_to, requester_email FROM support_tickets WHERE id = ?', [id]
     )
     if (!ticket) return reply.status(404).send({ code: 'NOT_FOUND' })
 
+    // Compute the diff up front so we can write event messages and audit log
+    // entries with correct old/new values *after* the UPDATE.
+    const changes: Array<{ field: 'status' | 'priority' | 'assigned_to'; from: unknown; to: unknown }> = []
     const sets: string[] = []
     const params: unknown[] = []
 
-    if (data.status      !== undefined) { sets.push('status = ?');      params.push(data.status) }
-    if (data.priority    !== undefined) { sets.push('priority = ?');    params.push(data.priority) }
-    if ('assigned_to' in data)          { sets.push('assigned_to = ?'); params.push(data.assigned_to) }
+    if (data.status !== undefined && data.status !== ticket.status) {
+      sets.push('status = ?'); params.push(data.status)
+      changes.push({ field: 'status', from: ticket.status, to: data.status })
+    }
+    if (data.priority !== undefined && data.priority !== ticket.priority) {
+      sets.push('priority = ?'); params.push(data.priority)
+      changes.push({ field: 'priority', from: ticket.priority, to: data.priority })
+    }
+    if ('assigned_to' in data && data.assigned_to !== ticket.assigned_to) {
+      sets.push('assigned_to = ?'); params.push(data.assigned_to)
+      changes.push({ field: 'assigned_to', from: ticket.assigned_to, to: data.assigned_to })
+    }
 
     if (sets.length === 0) return reply.status(400).send({ code: 'NO_CHANGES' })
 
@@ -256,19 +362,47 @@ export async function ticketRoutes(app: FastifyInstance) {
       [...params, id]
     )
 
+    // Author identity for the system event messages and audit log
+    const actor = await queryOne<{ full_name: string }>(
+      'SELECT full_name FROM users WHERE id = ?', [req.user.sub]
+    )
+    const actorName = actor?.full_name ?? 'system'
+
+    for (const change of changes) {
+      const event =
+        change.field === 'status'   ? 'status_changed' :
+        change.field === 'priority' ? 'priority_changed' :
+                                      'assignee_changed'
+      await writeEventMessage(id, req.user.sub, actorName, event, change.from, change.to)
+    }
+
+    // Single audit_logs entry summarizing all changes — keeps the audit log scoped to
+    // one row per request, consistent with the rest of the app.
+    await writeAuditLog({
+      req,
+      entityType: 'ticket',
+      entityId: id,
+      action: 'update',
+      oldValue: changes.reduce<Record<string, unknown>>((a, c) => (a[c.field] = c.from, a), {}),
+      newValue: changes.reduce<Record<string, unknown>>((a, c) => (a[c.field] = c.to,   a), {}),
+    })
+
     broadcast({ type: 'ticket_updated', ticketId: id })
 
-    // Notify newly assigned staff member
-    if ('assigned_to' in data && data.assigned_to && data.assigned_to !== ticket.assigned_to) {
+    // Notify newly assigned staff member. Use the ticket's *actual* priority — the
+    // previous code defaulted to 'normal' when the request body didn't include a
+    // priority change, sending wrong info on most assignment notifications.
+    const assigneeChange = changes.find(c => c.field === 'assigned_to')
+    if (assigneeChange && assigneeChange.to) {
       const assignee = await queryOne<{ email: string; full_name: string }>(
-        'SELECT email, full_name FROM users WHERE id = ?', [data.assigned_to]
+        'SELECT email, full_name FROM users WHERE id = ?', [assigneeChange.to as number]
       )
       if (assignee) {
         await queueMail(assignee.email, 'ticket_assigned', {
           ticketId: id,
           subject: ticket.subject,
           requesterEmail: ticket.requester_email,
-          priority: data.priority ?? 'normal',
+          priority: data.priority ?? ticket.priority,
           portalUrl: process.env.APP_PUBLIC_URL ?? '',
         })
       }
@@ -296,7 +430,7 @@ export async function ticketRoutes(app: FastifyInstance) {
     }
 
     const ticket = await queryOne<any>(
-      'SELECT id, subject, requester_email FROM support_tickets WHERE id = ?', [id]
+      'SELECT id, subject, requester_email, requester_name, assigned_to FROM support_tickets WHERE id = ?', [id]
     )
     if (!ticket) return reply.status(404).send({ code: 'NOT_FOUND' })
 
@@ -337,6 +471,31 @@ export async function ticketRoutes(app: FastifyInstance) {
         messageBody: data.body,
         portalUrl: process.env.APP_PUBLIC_URL ?? '',
       })
+    }
+
+    // Notify staff when the requester adds a message. Without this, tenant replies
+    // sat unnoticed unless someone happened to scroll the list. Goes to the assignee
+    // if there is one, otherwise to all admins.
+    if (!data.is_internal && !isStaff(req.user.role)) {
+      const payload = {
+        ticketId: id,
+        subject: ticket.subject,
+        requesterName: ticket.requester_name || userRow?.full_name || '',
+        requesterEmail: ticket.requester_email || userRow?.email || '',
+        messageBody: data.body,
+        portalUrl: process.env.APP_PUBLIC_URL ?? '',
+      }
+      if (ticket.assigned_to) {
+        const assignee = await queryOne<{ email: string }>(
+          'SELECT email FROM users WHERE id = ?', [ticket.assigned_to]
+        )
+        if (assignee?.email) await queueMail(assignee.email, 'ticket_customer_reply', payload)
+      } else {
+        const admins = await query<{ email: string }>(`SELECT email FROM users WHERE role = 'admin'`)
+        for (const admin of admins) {
+          await queueMail(admin.email, 'ticket_customer_reply', payload)
+        }
+      }
     }
 
     return reply.status(201).send({ id: result.insertId })

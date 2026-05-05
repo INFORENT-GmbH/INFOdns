@@ -143,9 +143,22 @@ export interface Tenant {
   fax: string | null
   email: string | null
   vat_id: string | null
+  vat_id_valid: number | null
+  vat_id_validated_at: string | null
+  vat_id_check_name: string | null
+  vat_id_check_address: string | null
   notes: string | null
   is_active: number
   created_at: string
+  // Billing-Profil (Migration 027)
+  billing_email: string | null
+  tax_mode: 'standard' | 'reverse_charge' | 'small_business' | 'non_eu'
+  tax_rate_percent_override: number | null
+  payment_terms_days_override: number | null
+  postal_delivery_default: number
+  invoice_locale: 'de' | 'en'
+  dunning_paused: number
+  billing_notes: string | null
 }
 
 export interface User {
@@ -433,7 +446,7 @@ export interface MailQueueItem {
   id: number
   to_email: string
   template: string | null
-  status: 'pending' | 'processing' | 'done' | 'failed'
+  status: 'pending' | 'processing' | 'done' | 'failed' | 'dismissed'
   retries: number
   max_retries: number
   error: string | null
@@ -463,6 +476,9 @@ export const getMailQueue = (params?: Record<string, string>) =>
 export const getMailQueueItem = (id: number) =>
   api.get<MailQueueDetail>(`/mail-queue/${id}`)
 export const retryMail = (id: number) => api.post(`/mail-queue/${id}/retry`)
+export const dismissMail = (id: number) => api.post(`/mail-queue/${id}/dismiss`)
+export const dismissAllFailedMail = () =>
+  api.post<{ ok: true; dismissed: number }>('/mail-queue/dismiss-all-failed')
 
 // Tickets
 export interface Ticket {
@@ -499,10 +515,17 @@ export interface TicketMessage {
   author_name: string
   author_email: string
   body: string
-  is_internal: number
+  /** "reply" = user-written content; "event" = system entry, body is JSON metadata */
+  kind: 'reply' | 'event'
+  is_internal: 0 | 1
   source: 'web' | 'email'
   created_at: string
   attachments: TicketAttachment[]
+}
+
+export interface TicketStats {
+  open: number
+  by_priority: { urgent: number; high: number; normal: number; low: number }
 }
 
 export interface TicketDetail extends Ticket {
@@ -519,6 +542,9 @@ export interface TicketListPage {
 
 export const getTickets = (params?: Record<string, string>) =>
   api.get<TicketListPage>('/tickets', { params })
+
+export const getTicketStats = () =>
+  api.get<TicketStats>('/tickets/stats')
 
 export const getTicket = (id: number) =>
   api.get<TicketDetail>(`/tickets/${id}`)
@@ -763,4 +789,367 @@ export const downloadAttachment = async (ticketId: number, fileId: number, origi
   a.download = originalName
   a.click()
   URL.revokeObjectURL(url)
+}
+
+// ── Billing ─────────────────────────────────────────────────
+
+export interface CompanySettings {
+  id: number
+  company_name: string
+  address_line1: string
+  address_line2: string | null
+  zip: string
+  city: string
+  country: string
+  phone: string | null
+  email: string
+  website: string | null
+  tax_id: string | null
+  vat_id: string | null
+  commercial_register: string | null
+  managing_director: string | null
+  managing_director_ids: number[]
+  bank_name: string
+  iban: string
+  bic: string
+  account_holder: string
+  default_currency: string
+  default_payment_terms_days: number
+  default_tax_rate_percent: number
+  postal_fee_cents: number
+  invoice_number_format: string
+  invoice_footer_text: string | null
+  logo_path: string | null
+  auto_issue_drafts: boolean
+  auto_issue_threshold_cents: number | null
+  updated_at: string
+}
+
+export interface DunningLevel {
+  level: number
+  label: string
+  days_after_due: number
+  fee_cents: number
+  template_key: string
+}
+
+export const getBillingSettings = () =>
+  api.get<CompanySettings>('/billing/settings')
+
+export const updateBillingSettings = (patch: Partial<CompanySettings>) =>
+  api.patch<CompanySettings>('/billing/settings', patch)
+
+export const getDunningLevels = () =>
+  api.get<DunningLevel[]>('/billing/dunning-levels')
+
+export const updateDunningLevel = (level: number, patch: Partial<Omit<DunningLevel, 'level'>>) =>
+  api.patch<DunningLevel>(`/billing/dunning-levels/${level}`, patch)
+
+export type BillingIntervalUnit =
+  'second'|'minute'|'hour'|'day'|'week'|'month'|'year'|'lifetime'
+export type BillingItemType = 'domain'|'dnssec'|'mail_forward'|'manual'|'usage'
+export type BillingItemStatus = 'active'|'paused'|'cancelled'
+
+export interface BillingItem {
+  id: number
+  tenant_id: number
+  item_type: BillingItemType
+  ref_table: string | null
+  ref_id: number | null
+  description: string
+  description_template: string | null
+  unit_price_cents: number
+  tax_rate_percent: number | null
+  currency: string
+  interval_unit: BillingIntervalUnit
+  interval_count: number
+  started_at: string
+  ends_at: string | null
+  last_billed_until: string | null
+  next_due_at: string | null
+  status: BillingItemStatus
+  notes: string | null
+  created_by: number
+  created_at: string
+  updated_at: string
+}
+
+export type BillingItemCreate = Omit<BillingItem,
+  'id'|'last_billed_until'|'next_due_at'|'created_by'|'created_at'|'updated_at'> & {
+  started_at?: string
+}
+
+export const getBillingItems = (params?: { tenant_id?: number; status?: string; item_type?: string; ref_table?: string; ref_id?: number }) =>
+  api.get<BillingItem[]>('/billing/items', { params })
+
+export const getBillingItem = (id: number) =>
+  api.get<BillingItem>(`/billing/items/${id}`)
+
+export const createBillingItem = (data: Partial<BillingItemCreate>) =>
+  api.post<BillingItem>('/billing/items', data)
+
+export const updateBillingItem = (id: number, patch: Partial<BillingItemCreate>) =>
+  api.patch<BillingItem>(`/billing/items/${id}`, patch)
+
+export const deleteBillingItem = (id: number) =>
+  api.delete<{ ok: true }>(`/billing/items/${id}`)
+
+// ── Invoices ────────────────────────────────────────────────
+
+export type InvoiceStatus = 'draft'|'issued'|'sent'|'paid'|'partial'|'overdue'|'cancelled'|'credit_note'
+export type InvoiceKind = 'invoice'|'credit_note'|'dunning_invoice'
+
+export interface InvoiceItem {
+  id: number
+  invoice_id: number
+  billing_item_id: number | null
+  position: number
+  description: string
+  period_start: string | null
+  period_end: string | null
+  quantity: number
+  unit: string | null
+  unit_price_cents: number
+  tax_rate_percent: number
+  line_subtotal_cents: number
+  line_tax_cents: number
+  line_total_cents: number
+}
+
+export interface Invoice {
+  id: number
+  invoice_number: string | null
+  tenant_id: number
+  status: InvoiceStatus
+  kind: InvoiceKind
+  original_invoice_id: number | null
+  invoice_date: string | null
+  service_period_start: string | null
+  service_period_end: string | null
+  due_date: string | null
+  currency: string
+  subtotal_cents: number
+  tax_total_cents: number
+  total_cents: number
+  paid_cents: number
+  tax_mode: 'standard' | 'reverse_charge' | 'small_business' | 'non_eu'
+  tax_note: string | null
+  postal_delivery: number
+  postal_fee_cents: number
+  pdf_path: string | null
+  sent_at: string | null
+  sent_via: 'email' | 'postal' | 'both' | 'none' | null
+  billing_address_snapshot: any
+  company_snapshot: any
+  created_by: number
+  cancelled_by: number | null
+  cancelled_at: string | null
+  cancellation_reason: string | null
+  notes: string | null
+  customer_notes: string | null
+  created_at: string
+  updated_at: string
+  items?: InvoiceItem[]
+}
+
+export interface InvoiceItemInput {
+  billing_item_id?: number | null
+  position?: number
+  description: string
+  period_start?: string | null
+  period_end?: string | null
+  quantity: number
+  unit?: string | null
+  unit_price_cents: number
+  tax_rate_percent: number
+}
+
+export interface InvoiceCreate {
+  tenant_id: number
+  kind?: InvoiceKind
+  service_period_start?: string | null
+  service_period_end?: string | null
+  customer_notes?: string | null
+  notes?: string | null
+  postal_delivery?: boolean
+  items?: InvoiceItemInput[]
+}
+
+export const getInvoices = (params?: { tenant_id?: number; status?: string; kind?: string; from?: string; to?: string }) =>
+  api.get<Invoice[]>('/billing/invoices', { params })
+
+export const getInvoice = (id: number) =>
+  api.get<Invoice>(`/billing/invoices/${id}`)
+
+export const createInvoice = (data: InvoiceCreate) =>
+  api.post<Invoice>('/billing/invoices', data)
+
+export const updateInvoice = (id: number, patch: Partial<Pick<Invoice, 'customer_notes'|'notes'|'service_period_start'|'service_period_end'>> & { postal_delivery?: boolean }) =>
+  api.patch<Invoice>(`/billing/invoices/${id}`, patch)
+
+export const addInvoiceItem = (invoiceId: number, item: InvoiceItemInput) =>
+  api.post<Invoice>(`/billing/invoices/${invoiceId}/items`, item)
+
+export const deleteInvoiceItem = (invoiceId: number, itemId: number) =>
+  api.delete<Invoice>(`/billing/invoices/${invoiceId}/items/${itemId}`)
+
+export const issueInvoice = (id: number) =>
+  api.post<{ invoice_number: string; due_date: string; invoice: Invoice }>(`/billing/invoices/${id}/issue`)
+
+export const cancelInvoice = (id: number, reason?: string) =>
+  api.post<{ ok: true; hard_deleted?: true; credit_note?: Invoice }>(`/billing/invoices/${id}/cancel`, { reason })
+
+// ── Payments / Dunning / Postal ─────────────────────────────
+
+export interface Payment {
+  id: number
+  invoice_id: number
+  paid_at: string
+  amount_cents: number
+  method: 'transfer'|'sepa'|'cash'|'card'|'manual'|'offset'
+  reference: string | null
+  notes: string | null
+  created_by: number
+  created_at: string
+}
+
+export const getInvoicePayments = (invoiceId: number) =>
+  api.get<Payment[]>(`/billing/invoices/${invoiceId}/payments`)
+
+export const createPayment = (invoiceId: number, body: {
+  paid_at: string; amount_cents: number;
+  method?: Payment['method']; reference?: string | null; notes?: string | null
+}) => api.post<Payment>(`/billing/invoices/${invoiceId}/payments`, body)
+
+export const deletePayment = (paymentId: number) =>
+  api.delete<{ ok: true }>(`/billing/payments/${paymentId}`)
+
+export interface DunningQueueRow {
+  id: number
+  invoice_number: string
+  tenant_id: number
+  tenant_name: string
+  total_cents: number
+  paid_cents: number
+  due_date: string
+  status: string
+  dunning_paused: number
+  days_overdue: number
+  last_level: number
+}
+export const getDunningQueue = () => api.get<DunningQueueRow[]>('/billing/dunning/queue')
+
+export interface PostalQueueRow {
+  id: number
+  invoice_number: string
+  tenant_id: number
+  tenant_name: string
+  invoice_date: string
+  due_date: string
+  total_cents: number
+  pdf_path: string | null
+}
+export const getPostalQueue = () => api.get<PostalQueueRow[]>('/billing/postal/queue')
+
+export const markInvoicePrinted = (invoiceId: number) =>
+  api.post<Invoice>(`/billing/invoices/${invoiceId}/mark-printed`)
+
+export interface DunningLogEntry {
+  id: number
+  level: number
+  sent_at: string
+  fee_added_cents: number
+  mail_queue_id: number | null
+  pdf_path: string | null
+  label: string
+  template_key: string
+}
+export const getInvoiceDunning = (invoiceId: number) =>
+  api.get<DunningLogEntry[]>(`/billing/invoices/${invoiceId}/dunning`)
+
+// Dashboard
+export interface BillingDashboardStats {
+  mrr_cents: number
+  arr_cents: number
+  lifetime_active_count: number
+  usage_active_count: number
+  outstanding_cents: number
+  open_count: number
+  overdue_cents: number
+  overdue_count: number
+  this_month: { issued_count: number; issued_sum: number; paid_sum: number }
+  trend: { bucket: string; count: number; sum_cents: number }[]
+  top_overdue: { tenant_id: number; tenant_name: string; overdue_count: number; overdue_cents: number; oldest_due: string }[]
+  recent: { id: number; invoice_number: string; tenant_id: number; tenant_name: string; invoice_date: string; total_cents: number; status: string; kind: string }[]
+}
+export const getBillingDashboardStats = () =>
+  api.get<BillingDashboardStats>('/billing/dashboard/stats')
+
+// VIES
+export interface ViesResult {
+  tenant_id: number
+  vat_id: string
+  valid: boolean
+  name: string | null
+  address: string | null
+  checked_at: string
+}
+export const validateVatId = (tenantId: number) =>
+  api.post<ViesResult>(`/billing/validate-vat-id/${tenantId}`)
+
+// Pay-per-use
+export interface UsageMetric {
+  id: number
+  billing_item_id: number
+  recorded_at: string
+  quantity: number
+  metadata: Record<string, any> | null
+  consumed_invoice_id: number | null
+}
+
+export interface UsageSummaryRow {
+  bucket: string                  // YYYY-MM
+  total_quantity: number
+  data_points: number
+  consumed_count: number
+  sample_invoice_id: number | null
+}
+
+export const recordUsage = (body: {
+  billing_item_id: number; quantity: number;
+  recorded_at?: string; metadata?: Record<string, any>
+}) => api.post<UsageMetric>('/billing/usage', body)
+
+export const getItemUsage = (itemId: number, params?: { from?: string; to?: string; limit?: number }) =>
+  api.get<UsageMetric[]>(`/billing/items/${itemId}/usage`, { params })
+
+export const getItemUsageSummary = (itemId: number) =>
+  api.get<UsageSummaryRow[]>(`/billing/items/${itemId}/usage/summary`)
+
+export const deleteUsage = (id: number) =>
+  api.delete<{ ok: true }>(`/billing/usage/${id}`)
+
+export const triggerDunning = (invoiceId: number, level?: number) =>
+  api.post<{ ok: true; level: number; dunning_invoice: Invoice | null; original: Invoice }>(
+    `/billing/invoices/${invoiceId}/dunning`,
+    level != null ? { level } : {}
+  )
+
+/**
+ * Lädt das Rechnungs-PDF und öffnet es in einem neuen Tab. Bei 425 (PDF wird
+ * noch generiert) wird ein freundlicher Hinweis ausgegeben.
+ */
+export async function openInvoicePdf(id: number): Promise<void> {
+  try {
+    const resp = await api.get(`/billing/invoices/${id}/pdf`, { responseType: 'blob' })
+    const url = URL.createObjectURL(resp.data)
+    window.open(url, '_blank')
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  } catch (err: any) {
+    if (err?.response?.status === 425) {
+      alert('Das PDF wird gerade erzeugt — bitte in ein paar Sekunden erneut versuchen.')
+    } else {
+      throw err
+    }
+  }
 }
